@@ -8,6 +8,7 @@
 
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 
+#include "mlir/Conversion/AMDGPUToROCDL/AMDGPUToROCDL.h"
 #include "mlir/Conversion/GPUCommon/GPUCommonPass.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h"
@@ -39,10 +40,11 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/LogicalResult.h"
+#include <optional>
 #include <type_traits>
 
 using namespace mlir;
@@ -51,11 +53,6 @@ using namespace mlir::transform;
 using namespace mlir::transform::gpu;
 
 #define DEBUG_TYPE "gpu-transforms"
-#define DEBUG_TYPE_ALIAS "gpu-transforms-alias"
-
-#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
-#define DBGS_ALIAS() (llvm::dbgs() << '[' << DEBUG_TYPE_ALIAS << "] ")
 
 //===----------------------------------------------------------------------===//
 // Apply...ConversionPatternsOp
@@ -64,31 +61,7 @@ using namespace mlir::transform::gpu;
 void transform::ApplyGPUToNVVMConversionPatternsOp::populatePatterns(
     TypeConverter &typeConverter, RewritePatternSet &patterns) {
   auto &llvmTypeConverter = static_cast<LLVMTypeConverter &>(typeConverter);
-  // NVVM uses alloca in the default address space to represent private
-  // memory allocations, so drop private annotations. NVVM uses address
-  // space 3 for shared memory. NVVM uses the default address space to
-  // represent global memory.
-  // Used in populateGpuToNVVMConversionPatternsso attaching here for now.
-  // TODO: We should have a single to_nvvm_type_converter.
-  populateGpuMemorySpaceAttributeConversions(
-      llvmTypeConverter, [](AddressSpace space) -> unsigned {
-        switch (space) {
-        case AddressSpace::Global:
-          return static_cast<unsigned>(
-              NVVM::NVVMMemorySpace::kGlobalMemorySpace);
-        case AddressSpace::Workgroup:
-          return static_cast<unsigned>(
-              NVVM::NVVMMemorySpace::kSharedMemorySpace);
-        case AddressSpace::Private:
-          return 0;
-        }
-        llvm_unreachable("unknown address space enum value");
-        return 0;
-      });
-  // Used in GPUToNVVM/WmmaOpsToNvvm.cpp so attaching here for now.
-  // TODO: We should have a single to_nvvm_type_converter.
-  llvmTypeConverter.addConversion(
-      [&](MMAMatrixType type) -> Type { return convertMMAToLLVMType(type); });
+  configureGpuToNVVMTypeConverter(llvmTypeConverter);
   // Set higher benefit, so patterns will run before generic LLVM lowering.
   populateGpuToNVVMConversionPatterns(llvmTypeConverter, patterns,
                                       getBenefit());
@@ -133,33 +106,21 @@ LogicalResult transform::ApplyGPUSubgroupReduceToNVVMConversionPatternsOp::
 void transform::ApplyGPUToROCDLConversionPatternsOp::populatePatterns(
     TypeConverter &typeConverter, RewritePatternSet &patterns) {
   auto &llvmTypeConverter = static_cast<LLVMTypeConverter &>(typeConverter);
-  populateGpuMemorySpaceAttributeConversions(
-      llvmTypeConverter, [](AddressSpace space) {
-        switch (space) {
-        case AddressSpace::Global:
-          return ROCDL::ROCDLDialect::kGlobalMemoryAddressSpace;
-        case AddressSpace::Workgroup:
-          return ROCDL::ROCDLDialect::kSharedMemoryAddressSpace;
-        case AddressSpace::Private:
-          return ROCDL::ROCDLDialect::kPrivateMemoryAddressSpace;
-        }
-        llvm_unreachable("unknown address space enum value");
-      });
-  FailureOr<amdgpu::Chipset> maybeChipset =
-      amdgpu::Chipset::parse(getChipset());
-  assert(llvm::succeeded(maybeChipset) && "expected valid chipset");
+  amdgpu::populateCommonGPUTypeAndAttributeConversions(llvmTypeConverter);
+  // The verifier has already rejected anything unparseable.
+  FailureOr<ROCDL::TargetInfo> targetInfo =
+      ROCDL::TargetInfo::get(getArch(), getWavesize().value_or(0));
+  assert(llvm::succeeded(targetInfo) && "verifier accepted this target");
   populateGpuToROCDLConversionPatterns(
-      llvmTypeConverter, patterns, mlir::gpu::amd::Runtime::HIP, *maybeChipset);
+      llvmTypeConverter, patterns, mlir::gpu::amd::Runtime::HIP, *targetInfo);
 }
 
 LogicalResult
 transform::ApplyGPUToROCDLConversionPatternsOp::verifyTypeConverter(
     transform::TypeConverterBuilderOpInterface builder) {
-  FailureOr<amdgpu::Chipset> maybeChipset =
-      amdgpu::Chipset::parse(getChipset());
-  if (failed(maybeChipset)) {
-    return emitOpError("Invalid chipset name: " + getChipset());
-  }
+  if (failed(ROCDL::TargetInfo::get(getArch(), getWavesize().value_or(0),
+                                    [&] { return emitOpError(); })))
+    return failure();
   if (builder.getTypeConverterType() != "LLVMTypeConverter")
     return emitOpError("expected LLVMTypeConverter");
   return success();
@@ -175,7 +136,27 @@ void ApplyGPURewritePatternsOp::populatePatterns(RewritePatternSet &patterns) {
 
 void transform::ApplyGPUPromoteShuffleToAMDGPUPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
-  populateGpuPromoteShuffleToAMDGPUPatterns(patterns);
+  std::optional<StringRef> archName = getArch();
+  std::optional<ROCDL::TargetInfo> targetInfo;
+  if (archName) {
+    // The verifier has already rejected anything unparseable.
+    FailureOr<ROCDL::TargetInfo> parsed = ROCDL::TargetInfo::get(*archName);
+    assert(llvm::succeeded(parsed) && "verifier accepted this target");
+    targetInfo = *parsed;
+  }
+
+  populateGpuPromoteShuffleToAMDGPUPatterns(patterns, targetInfo);
+}
+
+LogicalResult transform::ApplyGPUPromoteShuffleToAMDGPUPatternsOp::verify() {
+  std::optional<StringRef> archName = getArch();
+  if (!archName)
+    return success();
+
+  if (failed(ROCDL::TargetInfo::get(*archName, /*waveSize=*/0,
+                                    [&] { return emitOpError(); })))
+    return failure();
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -471,7 +452,7 @@ static DiagnosedSilenceableFailure rewriteOneForallCommonImpl(
     RewriterBase &rewriter, std::optional<TransformOpInterface> transformOp,
     scf::ForallOp forallOp, ArrayRef<int64_t> availableMappingSizes,
     ForallRewriteResult &result, const GpuIdBuilder &gpuIdBuilder) {
-  LDBG("--start rewriteOneForallCommonImpl");
+  LDBG() << "--start rewriteOneForallCommonImpl";
 
   // Step 1. Complete the mapping to a full mapping (with 1s) if necessary.
   auto numParallelIterations =
@@ -506,14 +487,14 @@ static DiagnosedSilenceableFailure rewriteOneForallCommonImpl(
     // Otherwise, we have a new insertion without a size -> use size 1.
     tmpMappingSizes.push_back(1);
   }
-  LDBG("----tmpMappingSizes extracted from scf.forall op: "
-       << llvm::interleaved(tmpMappingSizes));
+  LDBG() << "----tmpMappingSizes extracted from scf.forall op: "
+         << llvm::interleaved(tmpMappingSizes);
 
   // Step 2. sort the values by the corresponding DeviceMappingAttrInterface.
   SmallVector<int64_t> forallMappingSizes = getValuesSortedByKey(
       forallMappingAttrs.getArrayRef(), tmpMappingSizes, comparator);
-  LDBG("----forallMappingSizes: " << llvm::interleaved(forallMappingSizes));
-  LDBG("----forallMappingAttrs: " << llvm::interleaved(forallMappingAttrs));
+  LDBG() << "----forallMappingSizes: " << llvm::interleaved(forallMappingSizes);
+  LDBG() << "----forallMappingAttrs: " << llvm::interleaved(forallMappingAttrs);
 
   // Step 3. Generate the mappingIdOps using the provided generator.
   Location loc = forallOp.getLoc();
@@ -522,24 +503,24 @@ static DiagnosedSilenceableFailure rewriteOneForallCommonImpl(
   SmallVector<int64_t> originalBasis(availableMappingSizes);
   bool originalBasisWasProvided = !originalBasis.empty();
   if (!originalBasisWasProvided) {
-    LDBG("----originalBasis was not provided, deriving it and there will be no "
-         "predication");
+    LDBG() << "----originalBasis was not provided, deriving it and there will "
+              "be no "
+              "predication";
     originalBasis = forallMappingSizes;
     while (originalBasis.size() < 3)
       originalBasis.push_back(1);
   } else {
-    LDBG("----originalBasis was provided, using it, there will be predication");
+    LDBG() << "----originalBasis was provided, using it, there will be "
+              "predication";
   }
-  LLVM_DEBUG(
-      llvm::interleaveComma(originalBasis, DBGS() << "------originalBasis: ");
-      llvm::dbgs() << "\n");
+  LDBG() << "------originalBasis: " << llvm::interleaved(originalBasis);
 
   IdBuilderResult builderResult =
       gpuIdBuilder.idBuilder(rewriter, loc, forallMappingSizes, originalBasis);
   if (!builderResult.errorMsg.empty())
     return definiteFailureHelper(transformOp, forallOp, builderResult.errorMsg);
 
-  LLVM_DEBUG(DBGS() << builderResult);
+  LDBG() << builderResult;
 
   // Step 4. Map the induction variables to the mappingIdOps, this may involve
   // a permutation.
@@ -550,7 +531,7 @@ static DiagnosedSilenceableFailure rewriteOneForallCommonImpl(
            forallMappingAttrs.getArrayRef().take_front(forallOp.getRank()))) {
     auto mappingAttr = cast<DeviceMappingAttrInterface>(dim);
     Value peIdOp = mappingIdOps[mappingAttr.getRelativeIndex()];
-    LDBG("----map: " << iv << " to " << peIdOp);
+    LDBG() << "----map: " << iv << " to " << peIdOp;
     bvm.map(iv, peIdOp);
   }
 
@@ -560,8 +541,8 @@ static DiagnosedSilenceableFailure rewriteOneForallCommonImpl(
   Value predicate;
   if (originalBasisWasProvided) {
     for (Value tmpPredicate : builderResult.predicateOps) {
-      predicate = predicate ? rewriter.create<arith::AndIOp>(loc, predicate,
-                                                             tmpPredicate)
+      predicate = predicate ? arith::AndIOp::create(rewriter, loc, predicate,
+                                                    tmpPredicate)
                             : tmpPredicate;
     }
   }
@@ -573,8 +554,8 @@ static DiagnosedSilenceableFailure rewriteOneForallCommonImpl(
   Block::iterator insertionPoint;
   if (predicate) {
     // Step 6.a. If predicated, move at the beginning.
-    auto ifOp = rewriter.create<scf::IfOp>(loc, predicate,
-                                           /*withElseRegion=*/false);
+    auto ifOp = scf::IfOp::create(rewriter, loc, predicate,
+                                  /*withElseRegion=*/false);
     targetBlock = ifOp.thenBlock();
     insertionPoint = ifOp.thenBlock()->begin();
   } else {
@@ -596,9 +577,9 @@ static DiagnosedSilenceableFailure rewriteOneForallCommonImpl(
   // Step 8. Erase old op.
   rewriter.eraseOp(forallOp);
 
-  LDBG("----result forallMappingSizes: "
-       << llvm::interleaved(forallMappingSizes));
-  LDBG("----result mappingIdOps: " << llvm::interleaved(mappingIdOps));
+  LDBG() << "----result forallMappingSizes: "
+         << llvm::interleaved(forallMappingSizes);
+  LDBG() << "----result mappingIdOps: " << llvm::interleaved(mappingIdOps);
 
   result = ForallRewriteResult{forallMappingSizes, mappingIdOps};
   return DiagnosedSilenceableFailure::success();
@@ -612,7 +593,7 @@ DiagnosedSilenceableFailure mlir::transform::gpu::mapForallToBlocksImpl(
     RewriterBase &rewriter, TransformOpInterface transformOp,
     scf::ForallOp forallOp, SmallVectorImpl<int64_t> &gridDims,
     const GpuIdBuilder &gpuIdBuilder) {
-  LDBG("Start mapForallToBlocksImpl");
+  LDBG() << "Start mapForallToBlocksImpl";
 
   {
     // GPU-specific verifications. There is no better place to anchor
@@ -632,7 +613,7 @@ DiagnosedSilenceableFailure mlir::transform::gpu::mapForallToBlocksImpl(
     // the insertion point.
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(parentBlock);
-    zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   }
 
   ForallRewriteResult rewriteResult;
@@ -769,6 +750,10 @@ static DiagnosedSilenceableFailure checkMappingSpec(
     std::optional<TransformOpInterface> transformOp, scf::ForallOp forallOp,
     ArrayRef<int64_t> numParallelIterations, ArrayRef<int64_t> blockOrGridSizes,
     int factor, bool useLinearMapping = false) {
+  if (llvm::any_of(blockOrGridSizes, [](int64_t i) { return i <= 0; })) {
+    return definiteFailureHelper(transformOp, forallOp,
+                                 "block/grid sizes must be strictly positive");
+  }
   if (!useLinearMapping && blockOrGridSizes.front() % factor != 0) {
     auto diag = definiteFailureHelper(
         transformOp, forallOp,
@@ -776,15 +761,23 @@ static DiagnosedSilenceableFailure checkMappingSpec(
             Twine(factor));
     return diag;
   }
-  if (computeProduct(numParallelIterations) * factor >
-      computeProduct(blockOrGridSizes)) {
+  bool hasZeroParallelIteration =
+      llvm::any_of(numParallelIterations, [](int64_t i) { return i == 0; });
+  // `computeProduct` requires strictly positive inputs, so handle the
+  // zero-iteration case explicitly to avoid asserting on valid degenerate
+  // loop bounds.
+  int64_t requiredResourceCount =
+      hasZeroParallelIteration ? 0
+                               : computeProduct(numParallelIterations) * factor;
+  int64_t availableResourceCount = computeProduct(blockOrGridSizes);
+  if (requiredResourceCount > availableResourceCount) {
     auto diag = definiteFailureHelper(
         transformOp, forallOp,
         Twine("the number of required parallel resources (blocks or "
               "threads) ") +
-            Twine(computeProduct(numParallelIterations) * factor) +
+            Twine(requiredResourceCount) +
             " overflows the number of available resources " +
-            Twine(computeProduct(blockOrGridSizes)));
+            Twine(availableResourceCount));
     return diag;
   }
   return DiagnosedSilenceableFailure::success();
@@ -843,9 +836,7 @@ getThreadIdBuilder(std::optional<TransformOpInterface> transformOp,
             return GpuLaneIdBuilder(ctx, warpSize, useLinearMapping,
                                     *maybeMaskingAttr);
           })
-          .Default([&](DeviceMappingAttrInterface) -> GpuIdBuilder {
-            llvm_unreachable("unknown mapping attribute");
-          });
+          .DefaultUnreachable("unknown mapping attribute");
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -884,7 +875,7 @@ DiagnosedSilenceableFailure mlir::transform::gpu::mapOneForallToThreadsImpl(
     return diag;
   // Add a syncthreads if needed. TODO: warpsync
   if (syncAfterDistribute)
-    rewriter.create<BarrierOp>(loc);
+    BarrierOp::create(rewriter, loc);
 
   return DiagnosedSilenceableFailure::success();
 }
@@ -893,7 +884,7 @@ DiagnosedSilenceableFailure mlir::transform::gpu::mapNestedForallToThreadsImpl(
     RewriterBase &rewriter, std::optional<TransformOpInterface> transformOp,
     Operation *target, ArrayRef<int64_t> blockDims, int64_t warpSize,
     bool syncAfterDistribute) {
-  LDBG("Start mapNestedForallToThreadsImpl");
+  LDBG() << "Start mapNestedForallToThreadsImpl";
   if (blockDims.size() != 3) {
     return definiteFailureHelper(transformOp, target,
                                  "requires size-3 thread mapping");
@@ -901,7 +892,7 @@ DiagnosedSilenceableFailure mlir::transform::gpu::mapNestedForallToThreadsImpl(
 
   // Create an early zero index value for replacements.
   Location loc = target->getLoc();
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   DiagnosedSilenceableFailure diag = DiagnosedSilenceableFailure::success();
   WalkResult walkResult = target->walk([&](scf::ForallOp forallOp) {
     diag = mlir::transform::gpu::mapOneForallToThreadsImpl(

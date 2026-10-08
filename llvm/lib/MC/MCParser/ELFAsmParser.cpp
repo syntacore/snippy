@@ -22,11 +22,9 @@
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCSymbolELF.h"
 #include "llvm/MC/SectionKind.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 #include <cassert>
 #include <cstdint>
-#include <utility>
 
 using namespace llvm;
 
@@ -399,7 +397,7 @@ bool ELFAsmParser::maybeParseSectionType(StringRef &TypeName) {
   Lex();
   if (L.isNot(AsmToken::At) && L.isNot(AsmToken::Percent) &&
       L.isNot(AsmToken::String)) {
-    if (getContext().getAsmInfo()->getCommentString().starts_with('@'))
+    if (getContext().getAsmInfo().getCommentString().starts_with('@'))
       return TokError("expected '%<type>' or \"<type>\"");
     else
       return TokError("expected '@<type>', '%<type>' or \"<type>\"");
@@ -465,7 +463,7 @@ bool ELFAsmParser::parseLinkedToSym(MCSymbolELF *&LinkedToSym) {
     }
     return TokError("invalid linked-to symbol");
   }
-  LinkedToSym = dyn_cast_or_null<MCSymbolELF>(getContext().lookupSymbol(Name));
+  LinkedToSym = static_cast<MCSymbolELF *>(getContext().lookupSymbol(Name));
   if (!LinkedToSym || !LinkedToSym->isInSection())
     return Error(StartLoc, "linked-to symbol is not in a section: " + Name);
   return false;
@@ -570,7 +568,7 @@ bool ELFAsmParser::parseSectionArguments(bool IsPush, SMLoc loc) {
         return TokError("expected end of directive");
     }
 
-    if (Mergeable)
+    if (Mergeable || TypeName == "llvm_cfi_jump_table")
       if (parseMergeSize(Size))
         return true;
     if (Flags & ELF::SHF_LINK_ORDER)
@@ -636,13 +634,19 @@ EndStmt:
       Type = ELF::SHT_LLVM_LTO;
     else if (TypeName == "llvm_jt_sizes")
       Type = ELF::SHT_LLVM_JT_SIZES;
+    else if (TypeName == "llvm_cfi_jump_table")
+      Type = ELF::SHT_LLVM_CFI_JUMP_TABLE;
+    else if (TypeName == "llvm_call_graph")
+      Type = ELF::SHT_LLVM_CALL_GRAPH;
+    else if (TypeName == "llvm_dyndbg_elf")
+      Type = ELF::SHT_LLVM_DYNDBG_ELF;
     else if (TypeName.getAsInteger(0, Type))
       return TokError("unknown section type");
   }
 
   if (UseLastGroup) {
-    if (const MCSectionELF *Section =
-            cast_or_null<MCSectionELF>(getStreamer().getCurrentSectionOnly()))
+    if (auto *Section = static_cast<const MCSectionELF *>(
+            getStreamer().getCurrentSectionOnly()))
       if (const MCSymbol *Group = Section->getGroup()) {
         GroupName = Group->getName();
         IsComdat = Section->isComdat();
@@ -692,15 +696,15 @@ bool ELFAsmParser::parseDirectivePrevious(StringRef DirName, SMLoc) {
 
 static MCSymbolAttr MCAttrForString(StringRef Type) {
   return StringSwitch<MCSymbolAttr>(Type)
-          .Cases("STT_FUNC", "function", MCSA_ELF_TypeFunction)
-          .Cases("STT_OBJECT", "object", MCSA_ELF_TypeObject)
-          .Cases("STT_TLS", "tls_object", MCSA_ELF_TypeTLS)
-          .Cases("STT_COMMON", "common", MCSA_ELF_TypeCommon)
-          .Cases("STT_NOTYPE", "notype", MCSA_ELF_TypeNoType)
-          .Cases("STT_GNU_IFUNC", "gnu_indirect_function",
-                 MCSA_ELF_TypeIndFunction)
-          .Case("gnu_unique_object", MCSA_ELF_TypeGnuUniqueObject)
-          .Default(MCSA_Invalid);
+      .Cases({"STT_FUNC", "function"}, MCSA_ELF_TypeFunction)
+      .Cases({"STT_OBJECT", "object"}, MCSA_ELF_TypeObject)
+      .Cases({"STT_TLS", "tls_object"}, MCSA_ELF_TypeTLS)
+      .Cases({"STT_COMMON", "common"}, MCSA_ELF_TypeCommon)
+      .Cases({"STT_NOTYPE", "notype"}, MCSA_ELF_TypeNoType)
+      .Cases({"STT_GNU_IFUNC", "gnu_indirect_function"},
+             MCSA_ELF_TypeIndFunction)
+      .Case("gnu_unique_object", MCSA_ELF_TypeGnuUniqueObject)
+      .Default(MCSA_Invalid);
 }
 
 /// parseDirectiveELFType
@@ -716,10 +720,9 @@ bool ELFAsmParser::parseDirectiveType(StringRef, SMLoc) {
 
   bool AllowAt = getLexer().getAllowAtInIdentifier();
   if (!AllowAt &&
-      !getContext().getAsmInfo()->getCommentString().starts_with("@"))
+      !getContext().getAsmInfo().getCommentString().starts_with("@"))
     getLexer().setAllowAtInIdentifier(true);
-  auto _ =
-      make_scope_exit([&]() { getLexer().setAllowAtInIdentifier(AllowAt); });
+  llvm::scope_exit _([&]() { getLexer().setAllowAtInIdentifier(AllowAt); });
 
   // NOTE the comma is optional in all cases.  It is only documented as being
   // optional in the first case, however, GAS will silently treat the comma as
@@ -885,10 +888,4 @@ bool ELFAsmParser::parseDirectiveCGProfile(StringRef S, SMLoc Loc) {
   return MCAsmParserExtension::parseDirectiveCGProfile(S, Loc);
 }
 
-namespace llvm {
-
-MCAsmParserExtension *createELFAsmParser() {
-  return new ELFAsmParser;
-}
-
-} // end namespace llvm
+MCAsmParserExtension *llvm::createELFAsmParser() { return new ELFAsmParser; }

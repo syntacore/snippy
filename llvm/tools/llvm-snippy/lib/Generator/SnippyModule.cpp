@@ -73,7 +73,7 @@ SnippyModule::SnippyModule(LLVMState &State, StringRef Name)
         auto Context = std::make_unique<MCContext>(
             LLVMTM.getTargetTriple(), LLVMTM.getMCAsmInfo(),
             LLVMTM.getMCRegisterInfo(), LLVMTM.getMCSubtargetInfo(), nullptr,
-            &LLVMTM.Options.MCOptions, false);
+            false);
         Context->setObjectFileInfo(LLVMTM.getObjFileLowering());
         return Context;
       }()),

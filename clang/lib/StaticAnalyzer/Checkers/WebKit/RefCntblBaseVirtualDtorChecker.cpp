@@ -65,8 +65,8 @@ public:
 
   bool VisitCallExpr(const CallExpr *CE) {
     const Decl *D = CE->getCalleeDecl();
-    if (D && D->hasBody())
-      return VisitBody(D->getBody());
+    if (Stmt *Body; D && (Body = D->getBody()))
+      return VisitBody(Body);
     else {
       auto name = safeGetName(D);
       if (name == "ensureOnMainThread" || name == "ensureOnMainRunLoop") {
@@ -113,10 +113,6 @@ public:
         auto CastType = Cast->getType();
         if (auto *PtrType = dyn_cast<PointerType>(CastType)) {
           auto PointeeType = PtrType->getPointeeType();
-          while (auto *ET = dyn_cast<ElaboratedType>(PointeeType)) {
-            if (ET->isSugared())
-              PointeeType = ET->desugar();
-          }
           if (auto *ParmType = dyn_cast<TemplateTypeParmType>(PointeeType)) {
             if (ArgList) {
               auto ParmIndex = ParmType->getIndex();
@@ -125,13 +121,13 @@ public:
                 return true;
             }
           } else if (auto *RD = dyn_cast<RecordType>(PointeeType)) {
-            if (RD->getDecl() == ClassDecl)
+            if (declaresSameEntity(RD->getDecl(), ClassDecl))
               return true;
           } else if (auto *ST =
                          dyn_cast<SubstTemplateTypeParmType>(PointeeType)) {
             auto Type = ST->getReplacementType();
             if (auto *RD = dyn_cast<RecordType>(Type)) {
-              if (RD->getDecl() == ClassDecl)
+              if (declaresSameEntity(RD->getDecl(), ClassDecl))
                 return true;
             }
           }

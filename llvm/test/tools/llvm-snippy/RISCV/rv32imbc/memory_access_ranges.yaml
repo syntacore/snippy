@@ -9,7 +9,8 @@ options:
     mcpu: generic-rv32
     march: "rv32imc_zba_zbb_zbc_zbs_zicsr"
     preserve-ra: true
-    num-instrs: 5000
+    # Keep rare opcodes statistically stable across deterministic seeds.
+    num-instrs: 10000
     random-scheduling: true
     init-memory: full
     verify-gen-histogram: true

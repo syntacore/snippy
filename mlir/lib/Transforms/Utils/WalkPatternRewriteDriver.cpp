@@ -19,8 +19,9 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Rewrite/PatternApplicator.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 
 #define DEBUG_TYPE "walk-rewriter"
@@ -61,16 +62,38 @@ struct WalkAndApplyPatternsAction final
 // ops/blocks. Because we use walk-based pattern application, erasing the
 // op/block from the *next* iteration (e.g., a user of the visited op) is not
 // valid. Note that this is only used with expensive pattern API checks.
+//
+// Ops and blocks that were *created* during the current pattern application are
+// exempt: they were not in the walk schedule before the pattern ran, so erasing
+// them cannot invalidate the current walk iterator.
 struct ErasedOpsListener final : RewriterBase::ForwardingListener {
   using RewriterBase::ForwardingListener::ForwardingListener;
 
+  void notifyOperationInserted(Operation *op,
+                               OpBuilder::InsertPoint previous) override {
+    if (visitedOp)
+      newlyCreatedOps.insert(op);
+    ForwardingListener::notifyOperationInserted(op, previous);
+  }
+
+  void notifyBlockInserted(Block *block, Region *previous,
+                           Region::iterator previousIt) override {
+    if (visitedOp)
+      newlyCreatedBlocks.insert(block);
+    ForwardingListener::notifyBlockInserted(block, previous, previousIt);
+  }
+
   void notifyOperationErased(Operation *op) override {
-    checkErasure(op);
+    if (!newlyCreatedOps.contains(op))
+      checkErasure(op);
+    newlyCreatedOps.erase(op);
     ForwardingListener::notifyOperationErased(op);
   }
 
   void notifyBlockErased(Block *block) override {
-    checkErasure(block->getParentOp());
+    if (!newlyCreatedBlocks.contains(block))
+      checkErasure(block->getParentOp());
+    newlyCreatedBlocks.erase(block);
     ForwardingListener::notifyBlockErased(block);
   }
 
@@ -86,6 +109,9 @@ struct ErasedOpsListener final : RewriterBase::ForwardingListener {
   }
 
   Operation *visitedOp = nullptr;
+  // Ops and blocks inserted since visitedOp was last set; may be freely erased.
+  DenseSet<Operation *> newlyCreatedOps;
+  DenseSet<Block *> newlyCreatedBlocks;
 };
 #endif // MLIR_ENABLE_EXPENSIVE_PATTERN_API_CHECKS
 } // namespace
@@ -136,12 +162,8 @@ void walkAndApplyPatterns(Operation *op,
       }
       ++blockIt;
       if (blockIt != regionIt->end()) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "Incrementing block iterator, next op: "
-                       << OpWithFlags(&*blockIt,
-                                      OpPrintingFlags().skipRegions())
-                       << "\n";
-        });
+        LDBG() << "Incrementing block iterator, next op: "
+               << OpWithFlags(&*blockIt, OpPrintingFlags().skipRegions());
       }
     }
     // The region we're iterating over.
@@ -159,8 +181,7 @@ void walkAndApplyPatterns(Operation *op,
   // Worklist of regions to visit to drive the post-order traversal.
   SmallVector<RegionReachableOpIterator> worklist;
 
-  LLVM_DEBUG(
-      { llvm::dbgs() << "Starting walk-based pattern rewrite driver\n"; });
+  LDBG() << "Starting walk-based pattern rewrite driver";
   ctx->executeAction<WalkAndApplyPatternsAction>(
       [&] {
         // Perform a post-order traversal of the regions, visiting each
@@ -205,16 +226,15 @@ void walkAndApplyPatterns(Operation *op,
             // would be erased.
             it.advance();
 
-            LLVM_DEBUG({
-              llvm::dbgs() << "Visiting op: "
-                           << OpWithFlags(op, OpPrintingFlags().skipRegions())
-                           << "\n";
-            });
+            LDBG() << "Visiting op: "
+                   << OpWithFlags(op, OpPrintingFlags().skipRegions());
 #if MLIR_ENABLE_EXPENSIVE_PATTERN_API_CHECKS
             erasedListener.visitedOp = op;
+            erasedListener.newlyCreatedOps.clear();
+            erasedListener.newlyCreatedBlocks.clear();
 #endif // MLIR_ENABLE_EXPENSIVE_PATTERN_API_CHECKS
             if (succeeded(applicator.matchAndRewrite(op, rewriter)))
-              LLVM_DEBUG({ llvm::dbgs() << "\tOp matched and rewritten\n"; });
+              LDBG() << "\tOp matched and rewritten";
           }
         }
       },

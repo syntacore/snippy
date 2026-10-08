@@ -576,21 +576,34 @@ public:
     }
   }
 
-  /// If this is an OpenCL address space attribute, returns its SYCL
-  /// representation in LangAS, otherwise returns default address space.
+  /// If this is a SYCL address space attribute, returns its SYCL
+  /// representation in LangAS.
   LangAS asSYCLLangAS() const {
-    switch (getKind()) {
-    case ParsedAttr::AT_OpenCLGlobalAddressSpace:
+    switch (getParsedKind()) {
+    case ParsedAttr::AT_SYCLGlobalAddressSpace:
       return LangAS::sycl_global;
     case ParsedAttr::AT_OpenCLGlobalDeviceAddressSpace:
       return LangAS::sycl_global_device;
     case ParsedAttr::AT_OpenCLGlobalHostAddressSpace:
       return LangAS::sycl_global_host;
-    case ParsedAttr::AT_OpenCLLocalAddressSpace:
+    case ParsedAttr::AT_SYCLLocalAddressSpace:
       return LangAS::sycl_local;
-    case ParsedAttr::AT_OpenCLPrivateAddressSpace:
+    case ParsedAttr::AT_SYCLPrivateAddressSpace:
       return LangAS::sycl_private;
+    case ParsedAttr::AT_SYCLGenericAddressSpace:
+      return LangAS::sycl_generic;
+    case ParsedAttr::AT_SYCLConstantAddressSpace:
+      return LangAS::sycl_constant;
+    // The OpenCL address space attributes are available to enable
+    // implicit conversions between OpenCL address space attributes and
+    // SYCL address space attributes when targeting the OpenCL execution
+    // environments.
+    case ParsedAttr::AT_OpenCLGlobalAddressSpace:
+    case ParsedAttr::AT_OpenCLLocalAddressSpace:
+    case ParsedAttr::AT_OpenCLPrivateAddressSpace:
     case ParsedAttr::AT_OpenCLGenericAddressSpace:
+    case ParsedAttr::AT_OpenCLConstantAddressSpace:
+      return asOpenCLLangAS();
     default:
       return LangAS::Default;
     }
@@ -856,19 +869,19 @@ public:
     friend class ParsedAttributesView;
   };
 
-  void addAll(iterator B, iterator E) {
+  void prepend(iterator B, iterator E) {
     AttrList.insert(AttrList.begin(), B.I, E.I);
   }
 
-  void addAll(const_iterator B, const_iterator E) {
+  void prepend(const_iterator B, const_iterator E) {
     AttrList.insert(AttrList.begin(), B.I, E.I);
   }
 
-  void addAllAtEnd(iterator B, iterator E) {
+  void append(iterator B, iterator E) {
     AttrList.insert(AttrList.end(), B.I, E.I);
   }
 
-  void addAllAtEnd(const_iterator B, const_iterator E) {
+  void append(const_iterator B, const_iterator E) {
     AttrList.insert(AttrList.end(), B.I, E.I);
   }
 
@@ -943,18 +956,18 @@ public:
 
   AttributePool &getPool() const { return pool; }
 
-  void takeAllFrom(ParsedAttributes &Other) {
+  void takeAllPrependingFrom(ParsedAttributes &Other) {
     assert(&Other != this &&
            "ParsedAttributes can't take attributes from itself");
-    addAll(Other.begin(), Other.end());
+    prepend(Other.begin(), Other.end());
     Other.clearListOnly();
     pool.takeAllFrom(Other.pool);
   }
 
-  void takeAllAtEndFrom(ParsedAttributes &Other) {
+  void takeAllAppendingFrom(ParsedAttributes &Other) {
     assert(&Other != this &&
            "ParsedAttributes can't take attributes from itself");
-    addAllAtEnd(Other.begin(), Other.end());
+    append(Other.begin(), Other.end());
     Other.clearListOnly();
     pool.takeAllFrom(Other.pool);
   }

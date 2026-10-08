@@ -57,7 +57,9 @@ getSupportedSysRegs(const RISCVSubtarget &ST);
 
 static inline unsigned getRegBitWidth(const RISCVSubtarget &ST, MCRegister Reg,
                                       unsigned VLEN = 0) {
-  if (RISCV::GPRRegClass.contains(Reg))
+  if (RISCV::GPRRegClass.contains(Reg) ||
+      (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H) ||
+      (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W))
     return ST.getXLen();
   if (RISCV::FPR16RegClass.contains(Reg))
     return Reg2Bytes * RISCV_CHAR_BIT;
@@ -69,20 +71,27 @@ static inline unsigned getRegBitWidth(const RISCVSubtarget &ST, MCRegister Reg,
   if (is_contained(getSupportedSysRegs(ST), RegID))
     return RISCVSimulatorSysRegs::getBitWidth(
         ST, static_cast<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>(Reg.id()));
-  assert(RISCV::VRRegClass.contains(Reg) && "unknown register class");
+  if (!RISCV::VRRegClass.contains(Reg))
+    report_fatal_error(Twine("unknown RISC-V register class for register ") +
+                       Twine(Reg.id()));
   return VLEN;
 }
 
 static inline unsigned regToIndex(Register Reg) {
-  if (RISCV::X0 <= Reg && Reg <= RISCV::X31)
+  // Register classes use allocation order, which is not architectural order.
+  if (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H)
+    return Reg - RISCV::X0_H;
+  if (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W)
+    return Reg - RISCV::X0_W;
+  if (RISCV::GPRRegClass.contains(Reg))
     return Reg - RISCV::X0;
-  if (RISCV::F0_D <= Reg && Reg <= RISCV::F31_D)
+  if (RISCV::FPR64RegClass.contains(Reg))
     return Reg - RISCV::F0_D;
-  if (RISCV::F0_F <= Reg && Reg <= RISCV::F31_F)
+  if (RISCV::FPR32RegClass.contains(Reg))
     return Reg - RISCV::F0_F;
-  if (RISCV::F0_H <= Reg && Reg <= RISCV::F31_H)
+  if (RISCV::FPR16RegClass.contains(Reg))
     return Reg - RISCV::F0_H;
-  assert(RISCV::V0 <= Reg && Reg <= RISCV::V31 && "unknown register");
+  assert(RISCV::VRRegClass.contains(Reg) && "unknown register");
   return Reg - RISCV::V0;
 }
 

@@ -18,4 +18,4 @@ histogram:
     - [BLT, 1.0]
     - [SH, 1.0]
 
-# CHECK: [[REG:\$x[[:digit:]]+]] = ADDI [[REG]], {{[[:digit:]]+}}, pcsections <{{(0x)?[[:xdigit:]]+}}>{{[[:space:]].*}} BLT [[REG]], $x{{[[:digit:]]+}}
+# CHECK: [[REG:\$x[[:digit:]]+]] = ADDI [[REG]], {{[[:digit:]]+}}, pcsections !{{[[:digit:]]+}}{{[[:space:]].*}} BLT [[REG]], $x{{[[:digit:]]+}}

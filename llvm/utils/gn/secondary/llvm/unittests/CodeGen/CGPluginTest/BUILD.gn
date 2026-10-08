@@ -12,8 +12,8 @@ unittest("CGPluginTest") {
     "//llvm/lib/Testing/Support",
   ]
   sources = [
-    "PluginTest.cpp",
     "Plugin/CodeGenTestPass.cpp",
+    "PluginTest.cpp",
   ]
 
   # Support plugins.
@@ -22,4 +22,5 @@ unittest("CGPluginTest") {
     # Corresponds to export_executable_symbols() in cmake.
     ldflags = [ "-rdynamic" ]
   }
+  configs -= [ "//llvm/utils/gn/build:no_exported_symbols" ]
 }

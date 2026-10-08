@@ -1,4 +1,4 @@
-// RUN: not llvm-mc -triple=amdgcn -mcpu=gfx1250 %s 2>&1 | FileCheck %s -check-prefix=GFX12 --implicit-check-not=error: --strict-whitespace
+// RUN: not llvm-mc -triple=amdgpu12.50 %s -filetype=null 2>&1 | FileCheck %s -check-prefix=GFX12 --implicit-check-not=error: --strict-whitespace
 
 //===----------------------------------------------------------------------===//
 // A VOPD instruction can use only one literal.
@@ -22,7 +22,7 @@ v_dual_fmamk_f32    v122, v74, 0xa0172923, v161  ::  v_dual_lshlrev_b32  v247, 0
 v_dual_add_f32      v5, 0xaf123456, v2           ::  v_dual_fmaak_f32     v6, v3, v1, 0xbabe
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: only one unique literal operand is allowed
 // GFX12-NEXT:{{^}}v_dual_add_f32      v5, 0xaf123456, v2           ::  v_dual_fmaak_f32     v6, v3, v1, 0xbabe
-// GFX12-NEXT:{{^}}                        ^
+// GFX12-NEXT:{{^}}                                                                                      ^
 
 v_dual_add_f32      v5, 0xaf123456, v2           ::  v_dual_fmaak_f32     v6, 0xbabe, v1, 0xbabe
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: only one unique literal operand is allowed
@@ -32,12 +32,12 @@ v_dual_add_f32      v5, 0xaf123456, v2           ::  v_dual_fmaak_f32     v6, 0x
 v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v123, 0xdeadbeef, 0x1234, v162
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: only one unique literal operand is allowed
 // GFX12-NEXT:{{^}}v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v123, 0xdeadbeef, 0x1234, v162
-// GFX12-NEXT:{{^}}                                                                                   ^
+// GFX12-NEXT:{{^}}                                                                                               ^
 
 v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v123, s0, 0x1234, v162
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: only one unique literal operand is allowed
 // GFX12-NEXT:{{^}}v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v123, s0, 0x1234, v162
-// GFX12-NEXT:{{^}}                          ^
+// GFX12-NEXT:{{^}}                                                                                       ^
 
 //===----------------------------------------------------------------------===//
 // Check that assembler detects a different literal regardless of its location.
@@ -46,7 +46,7 @@ v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v12
 v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v123, 0xdeadbeef, 0x1234, v162
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: only one unique literal operand is allowed
 // GFX12-NEXT:{{^}}v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v123, 0xdeadbeef, 0x1234, v162
-// GFX12-NEXT:{{^}}                                                                                   ^
+// GFX12-NEXT:{{^}}                                                                                               ^
 
 v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v123, 0x1234, 0xdeadbeef, v162
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: only one unique literal operand is allowed
@@ -56,7 +56,7 @@ v_dual_fmamk_f32    v122, 0xdeadbeef, 0xdeadbeef, v161 ::  v_dual_fmamk_f32  v12
 v_dual_fmamk_f32    v122, 0xdeadbeef, 0x1234, v161     ::  v_dual_fmamk_f32  v123, 0xdeadbeef, 0xdeadbeef, v162
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: only one unique literal operand is allowed
 // GFX12-NEXT:{{^}}v_dual_fmamk_f32    v122, 0xdeadbeef, 0x1234, v161     ::  v_dual_fmamk_f32  v123, 0xdeadbeef, 0xdeadbeef, v162
-// GFX12-NEXT:{{^}}                                                                                   ^
+// GFX12-NEXT:{{^}}                                      ^
 
 v_dual_fmamk_f32    v122, 0x1234, 0xdeadbeef, v161     ::  v_dual_fmamk_f32  v123, 0xdeadbeef, 0xdeadbeef, v162
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: only one unique literal operand is allowed
@@ -114,7 +114,7 @@ v_dual_cndmask_b32  v255, s1, v2                 ::  v_dual_cndmask_b32   v6, s2
 v_dual_cndmask_b32 v1, s2, v3, vcc_lo :: v_dual_cndmask_b32 v2, s3, v4, vcc_lo
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: invalid operand (violates constant bus restrictions)
 // GFX12-NEXT:{{^}}v_dual_cndmask_b32 v1, s2, v3, vcc_lo :: v_dual_cndmask_b32 v2, s3, v4, vcc_lo
-// GFX12-NEXT:{{^}}                                                                        ^
+// GFX12-NEXT:{{^}}                                                                ^
 
 // SGPR + LITERAL + VCC
 
@@ -324,3 +324,23 @@ v_dual_cndmask_b32 v28, -v15, v15, s46 :: v_dual_cndmask_b32 v29, sext(v13), -v1
 // GFX12: :[[@LINE-1]]:{{[0-9]+}}: error: not a valid operand
 // GFX12-NEXT:{{^}}v_dual_cndmask_b32 v28, -v15, v15, s46 :: v_dual_cndmask_b32 v29, sext(v13), -v13, s46
 // GFX12-NEXT:{{^}}                                                                  ^
+
+//===----------------------------------------------------------------------===//
+// VOPD3 f64 sources must be 64-bit aligned (FeatureRequiresAlignedVGPRs).
+//===----------------------------------------------------------------------===//
+
+v_dual_fma_f64 v[252:253], v[7:8], v[4:5], v[10:11] :: v_dual_add_f32 v8, v1, v3
+// GFX12: :[[@LINE-1]]:28: error: invalid operand for instruction
+// GFX12-NEXT:{{^}}v_dual_fma_f64 v[252:253], v[7:8], v[4:5], v[10:11] :: v_dual_add_f32 v8, v1, v3
+// GFX12-NEXT:{{^}}                           ^
+
+v_dual_fma_f64 v[252:253], v[6:7], v[5:6], v[10:11] :: v_dual_add_f32 v8, v1, v3
+// GFX12: :[[@LINE-1]]:36: error: invalid operand for instruction
+// GFX12-NEXT:{{^}}v_dual_fma_f64 v[252:253], v[6:7], v[5:6], v[10:11] :: v_dual_add_f32 v8, v1, v3
+// GFX12-NEXT:{{^}}                                   ^
+
+v_dual_fma_f64 v[252:253], v[6:7], v[4:5], v[11:12] :: v_dual_add_f32 v8, v1, v3
+// GFX12: :[[@LINE-1]]:44: error: invalid operand for instruction
+// GFX12-NEXT:{{^}}v_dual_fma_f64 v[252:253], v[6:7], v[4:5], v[11:12] :: v_dual_add_f32 v8, v1, v3
+// GFX12-NEXT:{{^}}                                           ^
+

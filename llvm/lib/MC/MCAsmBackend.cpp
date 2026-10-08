@@ -8,6 +8,7 @@
 
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDXContainerWriter.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCGOFFObjectWriter.h"
@@ -73,11 +74,14 @@ MCAsmBackend::createDwoObjectWriter(raw_pwrite_stream &OS,
     return std::make_unique<ELFObjectWriter>(
         cast<MCELFObjectTargetWriter>(std::move(TW)), OS, DwoOS,
         Endian == llvm::endianness::little);
+  case Triple::GOFF:
+    return createGOFFObjectWriter(cast<MCGOFFObjectTargetWriter>(std::move(TW)),
+                                  OS, DwoOS);
   case Triple::Wasm:
     return createWasmDwoObjectWriter(
         cast<MCWasmObjectTargetWriter>(std::move(TW)), OS, DwoOS);
   default:
-    report_fatal_error("dwo only supported with COFF, ELF, and Wasm");
+    report_fatal_error("dwo only supported with COFF, ELF, GOFF, and Wasm");
   }
 }
 
@@ -105,12 +109,11 @@ MCFixupKindInfo MCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
   return Builtins[Kind - FK_NONE];
 }
 
-bool MCAsmBackend::fixupNeedsRelaxationAdvanced(const MCFixup &Fixup,
-                                                const MCValue &, uint64_t Value,
+bool MCAsmBackend::fixupNeedsRelaxationAdvanced(const MCFragment &,
+                                                const MCFixup &,
+                                                const MCValue &, uint64_t,
                                                 bool Resolved) const {
-  if (!Resolved)
-    return true;
-  return fixupNeedsRelaxation(Fixup, Value);
+  return !Resolved;
 }
 
 void MCAsmBackend::maybeAddReloc(const MCFragment &F, const MCFixup &Fixup,
@@ -121,13 +124,11 @@ void MCAsmBackend::maybeAddReloc(const MCFragment &F, const MCFixup &Fixup,
 }
 
 bool MCAsmBackend::isDarwinCanonicalPersonality(const MCSymbol *Sym) const {
+  assert(getContext().isMachO());
   // Consider a NULL personality (ie., no personality encoding) to be canonical
   // because it's always at 0.
   if (!Sym)
     return true;
-
-  if (!Sym->isMachO())
-    llvm_unreachable("Expected MachO symbols only");
 
   StringRef name = Sym->getName();
   // XXX: We intentionally leave out "___gcc_personality_v0" because, despite
@@ -138,9 +139,7 @@ bool MCAsmBackend::isDarwinCanonicalPersonality(const MCSymbol *Sym) const {
 
 const MCSubtargetInfo *MCAsmBackend::getSubtargetInfo(const MCFragment &F) {
   const MCSubtargetInfo *STI = nullptr;
-  if (auto *DF = dyn_cast<MCEncodedFragment>(&F)) {
-    STI = DF->getSubtargetInfo();
-    assert(!DF->hasInstructions() || STI != nullptr);
-  }
+  STI = F.getSubtargetInfo();
+  assert(!F.hasInstructions() || STI != nullptr);
   return STI;
 }

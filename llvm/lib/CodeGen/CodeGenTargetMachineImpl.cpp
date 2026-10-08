@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/CodeGenTargetMachineImpl.h"
+#include "llvm/Analysis/RuntimeLibcallInfo.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
@@ -45,7 +47,7 @@ static cl::opt<bool> EnableNoTrapAfterNoreturn(
              "after noreturn calls, even if --trap-unreachable is set."));
 
 void CodeGenTargetMachineImpl::initAsmInfo() {
-  MRI.reset(TheTarget.createMCRegInfo(getTargetTriple().str()));
+  MRI.reset(TheTarget.createMCRegInfo(getTargetTriple()));
   assert(MRI && "Unable to create reg info");
   MII.reset(TheTarget.createMCInstrInfo());
   assert(MII && "Unable to create instruction info");
@@ -53,12 +55,12 @@ void CodeGenTargetMachineImpl::initAsmInfo() {
   // to some backends having subtarget feature dependent module level
   // code generation. This is similar to the hack in the AsmPrinter for
   // module level assembly etc.
-  STI.reset(TheTarget.createMCSubtargetInfo(
-      getTargetTriple().str(), getTargetCPU(), getTargetFeatureString()));
+  STI.reset(TheTarget.createMCSubtargetInfo(getTargetTriple(), getTargetCPU(),
+                                            getTargetFeatureString()));
   assert(STI && "Unable to create subtarget info");
 
-  MCAsmInfo *TmpAsmInfo = TheTarget.createMCAsmInfo(
-      *MRI, getTargetTriple().str(), Options.MCOptions);
+  MCAsmInfo *TmpAsmInfo =
+      TheTarget.createMCAsmInfo(*MRI, getTargetTriple(), Options.MCOptions);
   // TargetSelect.h moved to a different directory between LLVM 2.9 and 3.0,
   // and if the old one gets included then MCAsmInfo will be NULL and
   // we'll crash later.
@@ -67,10 +69,7 @@ void CodeGenTargetMachineImpl::initAsmInfo() {
                        "Make sure you include the correct TargetSelect.h"
                        "and that InitializeAllTargetMCs() is being invoked!");
 
-  if (Options.BinutilsVersion.first > 0)
-    TmpAsmInfo->setBinutilsVersion(Options.BinutilsVersion);
-
-  if (Options.DisableIntegratedAS) {
+  if (Options.MCOptions.DisableIntegratedAS) {
     TmpAsmInfo->setUseIntegratedAssembler(false);
     // If there is explict option disable integratedAS, we can't use it for
     // inlineasm either.
@@ -85,17 +84,18 @@ void CodeGenTargetMachineImpl::initAsmInfo() {
              getTargetTriple().getDefaultExceptionHandling() &&
          "MCAsmInfo and Triple disagree on default exception handling type");
 
-  if (Options.ExceptionModel != ExceptionHandling::None)
+  if (Options.ExceptionModel != ExceptionHandling::Default)
     TmpAsmInfo->setExceptionsType(Options.ExceptionModel);
 
   AsmInfo.reset(TmpAsmInfo);
 }
 
 CodeGenTargetMachineImpl::CodeGenTargetMachineImpl(
-    const Target &T, StringRef DataLayoutString, const Triple &TT,
-    StringRef CPU, StringRef FS, const TargetOptions &Options, Reloc::Model RM,
-    CodeModel::Model CM, CodeGenOptLevel OL)
-    : TargetMachine(T, DataLayoutString, TT, CPU, FS, Options) {
+    const Target &T, const Triple &TT, StringRef CPU, StringRef FS,
+    const TargetOptions &Options, Reloc::Model RM, CodeModel::Model CM,
+    CodeGenOptLevel OL)
+    : TargetMachine(T, TT.computeDataLayout(Options.MCOptions.getABIName()), TT,
+                    CPU, FS, Options) {
   this->RM = RM;
   this->CMModel = CM;
   this->OptLevel = OL;
@@ -123,6 +123,13 @@ addPassesToGenerateCode(CodeGenTargetMachineImpl &TM, PassManagerBase &PM,
   PassConfig->setDisableVerify(DisableVerify);
   PM.add(PassConfig);
   PM.add(&MMIWP);
+
+  const TargetOptions &Options = TM.Options;
+  TargetLibraryInfoImpl TLII(TM.getTargetTriple(), Options.VecLib);
+  PM.add(new TargetLibraryInfoWrapperPass(TLII));
+  PM.add(
+      new RuntimeLibraryInfoWrapper(Options.MCOptions.ABIName, Options.VecLib));
+
   invokeGlobalTargetPassConfigCallbacks(TM, PM, PassConfig);
 
   if (PassConfig->addISelPasses())
@@ -159,9 +166,9 @@ CodeGenTargetMachineImpl::createMCStreamer(raw_pwrite_stream &Out,
                                            raw_pwrite_stream *DwoOut,
                                            CodeGenFileType FileType,
                                            MCContext &Context) {
-  const MCSubtargetInfo &STI = *getMCSubtargetInfo();
-  const MCAsmInfo &MAI = *getMCAsmInfo();
-  const MCRegisterInfo &MRI = *getMCRegisterInfo();
+  const MCSubtargetInfo &STI = getMCSubtargetInfo();
+  const MCAsmInfo &MAI = getMCAsmInfo();
+  const MCRegisterInfo &MRI = getMCRegisterInfo();
   const MCInstrInfo &MII = *getMCInstrInfo();
 
   std::unique_ptr<MCStreamer> AsmStreamer;
@@ -169,9 +176,7 @@ CodeGenTargetMachineImpl::createMCStreamer(raw_pwrite_stream &Out,
   switch (FileType) {
   case CodeGenFileType::AssemblyFile: {
     std::unique_ptr<MCInstPrinter> InstPrinter(getTarget().createMCInstPrinter(
-        getTargetTriple(),
-        Options.MCOptions.OutputAsmVariant.value_or(MAI.getAssemblerDialect()),
-        MAI, MII, MRI));
+        getTargetTriple(), MAI.getOutputAssemblerDialect(), MAI, MII, MRI));
     for (StringRef Opt : Options.MCOptions.InstPrinterOptions)
       if (!InstPrinter->applyTargetSpecificCLOption(Opt))
         return createStringError("invalid InstPrinter option '" + Opt + "'");
@@ -271,8 +276,8 @@ bool CodeGenTargetMachineImpl::addPassesToEmitMC(PassManagerBase &PM,
 
   // Create the code emitter for the target if it exists.  If not, .o file
   // emission fails.
-  const MCSubtargetInfo &STI = *getMCSubtargetInfo();
-  const MCRegisterInfo &MRI = *getMCRegisterInfo();
+  const MCSubtargetInfo &STI = getMCSubtargetInfo();
+  const MCRegisterInfo &MRI = getMCRegisterInfo();
   std::unique_ptr<MCCodeEmitter> MCE(
       getTarget().createMCCodeEmitter(*getMCInstrInfo(), *Ctx));
   if (!MCE)

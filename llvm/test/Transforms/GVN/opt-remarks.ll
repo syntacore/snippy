@@ -107,10 +107,11 @@ entry:
   ret i32 %add
 }
 
-define i8 @lifetime_end(ptr %p, i8 %val) {
-  call void @llvm.lifetime.start.p0(i64 32, ptr %p)
+define i8 @lifetime_end(i8 %val) {
+  %p = alloca [32 x i8]
+  call void @llvm.lifetime.start.p0(ptr %p)
   store i8 %val, ptr %p
-  call void @llvm.lifetime.end.p0(i64 32, ptr %p)
+  call void @llvm.lifetime.end.p0(ptr %p)
   %1 = load i8, ptr %p
   ret i8 %1
 }
@@ -133,4 +134,5 @@ define i8 @lifetime_end(ptr %p, i8 %val) {
 !11 = !DILocation(line: 3, column: 3, scope: !7)
 
 !12 = !{ !"tbaa root" }
-!13 = !{ !"int", !12 }
+!13 = !{!14, !14, i64 0}
+!14 = !{!"int", !12}

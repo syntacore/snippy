@@ -1,4 +1,4 @@
-// REQUIRES: arm-emulator
+// REQUIRES: mlir_arm_neon_tests
 
 // DEFINE: %{compile} = mlir-opt %s \
 // DEFINE:   --convert-vector-to-scf --convert-scf-to-cf  --convert-vector-to-llvm='enable-arm-neon enable-arm-i8mm' \
@@ -240,7 +240,7 @@ func.func @test_usmmla() {
 
 // Test the operation where LHS is interpreted as signed and RHS is interpreted
 // as unsigned. In this test we ultimately emit end execute the `usmmla`
-// instruction with reversed operands, see `LowerContractionToNeonI8MMPattern.cpp`
+// instruction with reversed operands, see `LowerContractoNeonPatterns.cpp`
 // for more details.
 
 // CHECK-IR-LABEL: llvm.func @test_summla

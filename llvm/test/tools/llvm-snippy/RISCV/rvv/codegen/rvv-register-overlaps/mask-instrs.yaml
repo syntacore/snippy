@@ -21,9 +21,9 @@ histogram:
   - [VFIRST_M, 1.0]
 
 # COM: Check that source register groups can overlaps with v0, because EEW = 1.
-# CHECK-DAG: VIOTA_M $v0, $v0
-# CHECK-DAG: VMSIF_M $v0, $v0
-# CHECK-DAG: VMSOF_M $v0, $v0
-# CHECK-DAG: VMSBF_M $v0, $v0
-# CHECK-DAG: VCPOP_M $v0, $v0
-# CHECK-DAG: VFIRST_M $v0, $v0
+# CHECK-DAG: VIOTA_M $v0, $noreg
+# CHECK-DAG: VMSIF_M $v0, $noreg
+# CHECK-DAG: VMSOF_M $v0, $noreg
+# CHECK-DAG: VMSBF_M $v0, $noreg
+# CHECK-DAG: VCPOP_M $v0, $noreg
+# CHECK-DAG: VFIRST_M $v0, $noreg

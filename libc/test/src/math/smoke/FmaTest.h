@@ -86,9 +86,8 @@ public:
     }
 
     // Test overflow.
-    OutType z = out.max_normal;
     InType in_z = LIBC_NAMESPACE::fputil::cast<InType>(out.max_normal);
-    EXPECT_FP_EQ_ALL_ROUNDING(OutType(0.75) * z,
+    EXPECT_FP_EQ_ALL_ROUNDING(func(InType(-0.25), in_z, in_z),
                               func(InType(1.75), in_z, -in_z));
 
     // Exact cancellation.
@@ -112,12 +111,12 @@ public:
   }
 };
 
-#define LIST_FMA_TESTS(T, func)                                                \
-  using LlvmLibcFmaTest = FmaTestTemplate<T>;                                  \
-  TEST_F(LlvmLibcFmaTest, SpecialNumbers) { test_special_numbers(&func); }
+#define LIST_FMA_TESTS(Name, T, func)                                          \
+  using LlvmLibc##Name##Test = FmaTestTemplate<T>;                             \
+  TEST_F(LlvmLibc##Name##Test, SpecialNumbers) { test_special_numbers(&func); }
 
-#define LIST_NARROWING_FMA_TESTS(OutType, InType, func)                        \
-  using LlvmLibcFmaTest = FmaTestTemplate<OutType, InType>;                    \
-  TEST_F(LlvmLibcFmaTest, SpecialNumbers) { test_special_numbers(&func); }
+#define LIST_NARROWING_FMA_TESTS(Name, OutType, InType, func)                  \
+  using LlvmLibc##Name##Test = FmaTestTemplate<OutType, InType>;               \
+  TEST_F(LlvmLibc##Name##Test, SpecialNumbers) { test_special_numbers(&func); }
 
 #endif // LLVM_LIBC_TEST_SRC_MATH_FMATEST_H

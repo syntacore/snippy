@@ -7,8 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/DebugInfo/DWARF/LowLevel/DWARFExpression.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/Support/Format.h"
 #include <cassert>
 #include <cstdint>
 #include <vector>
@@ -132,6 +130,25 @@ static std::vector<Desc> getSubOpDescriptions() {
   std::vector<Desc> Descriptions;
   Descriptions.resize(LlvmUserDescriptionsSize);
   Descriptions[DW_OP_LLVM_nop] = Desc(Op::Dwarf5, Op::SizeSubOpLEB);
+  Descriptions[DW_OP_LLVM_form_aspace_address] =
+      Desc(Op::Dwarf5, Op::SizeSubOpLEB);
+  Descriptions[DW_OP_LLVM_push_lane] = Desc(Op::Dwarf5, Op::SizeSubOpLEB);
+  Descriptions[DW_OP_LLVM_offset] = Desc(Op::Dwarf5, Op::SizeSubOpLEB);
+  Descriptions[DW_OP_LLVM_offset_uconst] =
+      Desc(Op::Dwarf5, Op::SizeSubOpLEB, Op::SizeLEB);
+  Descriptions[DW_OP_LLVM_bit_offset] = Desc(Op::Dwarf5, Op::SizeSubOpLEB);
+  Descriptions[DW_OP_LLVM_call_frame_entry_reg] =
+      Desc(Op::Dwarf5, Op::SizeSubOpLEB, Op::SizeLEB);
+  Descriptions[DW_OP_LLVM_undefined] = Desc(Op::Dwarf5, Op::SizeSubOpLEB);
+  Descriptions[DW_OP_LLVM_aspace_bregx] =
+      Desc(Op::Dwarf5, Op::SizeSubOpLEB, Op::SizeLEB, Op::SizeLEB);
+  Descriptions[DW_OP_LLVM_piece_end] = Desc(Op::Dwarf5, Op::SizeSubOpLEB);
+  Descriptions[DW_OP_LLVM_extend] =
+      Desc(Op::Dwarf5, Op::SizeSubOpLEB, Op::SizeLEB, Op::SizeLEB);
+  Descriptions[DW_OP_LLVM_select_bit_piece] =
+      Desc(Op::Dwarf5, Op::SizeSubOpLEB, Op::SizeLEB, Op::SizeLEB);
+  Descriptions[DW_OP_LLVM_NVIDIA_mux] =
+      Desc(Op::Dwarf5, Op::SizeSubOpLEB, Op::NvidiaMuxArg);
   return Descriptions;
 }
 
@@ -166,6 +183,8 @@ bool DWARFExpression::Operation::extract(DataExtractor Data,
         return false;
       assert(Desc.Op[Operand] == Operation::SizeSubOpLEB &&
              "SizeSubOpLEB Description must begin with SizeSubOpLEB operand");
+      Operands.resize(Desc.Op.size());
+      OperandEndOffsets.resize(Desc.Op.size());
       break;
     case Operation::Size1:
       Operands[Operand] = Data.getU8(&Offset);
@@ -203,6 +222,16 @@ bool DWARFExpression::Operation::extract(DataExtractor Data,
     case Operation::BaseTypeRef:
       Operands[Operand] = Data.getULEB128(&Offset);
       break;
+    case Operation::NvidiaMuxArg:
+      assert(Operand == 1);
+      Operands[Operand] = Data.getULEB128(&Offset);
+      // The selector names an NVIDIA specific operation, and the number and
+      // type of the operands that follow it are implied by that operation.
+      // No NVIDIA operation is known here, so where this operation ends is
+      // unknown and anything after it would be parsed from the wrong offset.
+      // Refuse to decode rather than mis-parse the rest of the expression.
+      // A build that knows a selector can decode its operands here.
+      return false;
     case Operation::WasmLocationArg:
       assert(Operand == 1);
       switch (Operands[0]) {
@@ -248,6 +277,43 @@ bool DWARFExpression::operator==(const DWARFExpression &RHS) const {
   if (AddressSize != RHS.AddressSize || Format != RHS.Format)
     return false;
   return Data.getData() == RHS.Data.getData();
+}
+
+/// Test if a simple location description ending in \p LastOp, or empty if
+/// there is none, is a memory location description. Register and implicit
+/// location descriptions are each marked by their final operation.
+static bool isMemoryLocationEndingIn(std::optional<uint8_t> LastOp) {
+  if (!LastOp)
+    return false;
+  if (*LastOp >= dwarf::DW_OP_reg0 && *LastOp <= dwarf::DW_OP_reg31)
+    return false;
+  switch (*LastOp) {
+  case dwarf::DW_OP_regx:
+  case dwarf::DW_OP_stack_value:
+  case dwarf::DW_OP_implicit_value:
+  case dwarf::DW_OP_implicit_pointer:
+  case dwarf::DW_OP_GNU_implicit_pointer:
+    return false;
+  default:
+    return true;
+  }
+}
+
+bool DWARFExpression::isMemoryLocation() const {
+  std::optional<uint8_t> LastOp;
+  for (const Operation &Op : *this) {
+    if (Op.isError())
+      break;
+    if (Op.getCode() == dwarf::DW_OP_piece ||
+        Op.getCode() == dwarf::DW_OP_bit_piece) {
+      if (isMemoryLocationEndingIn(LastOp))
+        return true;
+      LastOp.reset();
+      continue;
+    }
+    LastOp = Op.getCode();
+  }
+  return isMemoryLocationEndingIn(LastOp);
 }
 
 } // namespace llvm

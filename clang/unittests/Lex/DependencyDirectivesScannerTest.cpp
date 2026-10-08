@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/Lex/DependencyDirectivesScanner.h"
+#include "clang/Basic/TokenKinds.h"
 #include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
 
@@ -639,15 +640,15 @@ TEST(MinimizeSourceToDependencyDirectivesTest, AtImport) {
   ASSERT_FALSE(minimizeSourceToDependencyDirectives(" @ import  A;\n", Out));
   EXPECT_STREQ("@import A;\n", Out.data());
 
-  ASSERT_FALSE(minimizeSourceToDependencyDirectives("@import A\n;", Out));
+  ASSERT_FALSE(minimizeSourceToDependencyDirectives("@import A;\n", Out));
   EXPECT_STREQ("@import A;\n", Out.data());
 
   ASSERT_FALSE(minimizeSourceToDependencyDirectives("@import A.B;\n", Out));
   EXPECT_STREQ("@import A.B;\n", Out.data());
 
   ASSERT_FALSE(minimizeSourceToDependencyDirectives(
-      "@import /*x*/ A /*x*/ . /*x*/ B /*x*/ \n /*x*/ ; /*x*/", Out));
-  EXPECT_STREQ("@import A.B;\n", Out.data());
+      "@import /*x*/ A /*x*/ . /*x*/ B /*x*/ \\n /*x*/ ; /*x*/", Out));
+  EXPECT_STREQ("@import A.B\\n;\n", Out.data());
 }
 
 TEST(MinimizeSourceToDependencyDirectivesTest, EmptyIncludesAndImports) {
@@ -685,18 +686,19 @@ TEST(MinimizeSourceToDependencyDirectivesTest, ImportFailures) {
       minimizeSourceToDependencyDirectives("@import MACRO(A);\n", Out));
   ASSERT_FALSE(minimizeSourceToDependencyDirectives("@import \" \";\n", Out));
 
-  ASSERT_FALSE(minimizeSourceToDependencyDirectives("import <Foo.h>\n"
+  ASSERT_FALSE(minimizeSourceToDependencyDirectives("import <Foo.h>;\n"
                                                     "@import Foo;",
                                                     Out));
-  EXPECT_STREQ("@import Foo;\n", Out.data());
+  EXPECT_STREQ("import<Foo.h>;\n@import Foo;\n", Out.data());
 
   ASSERT_FALSE(
-      minimizeSourceToDependencyDirectives("import <Foo.h>\n"
+      minimizeSourceToDependencyDirectives("import <Foo.h>;\n"
                                            "#import <Foo.h>\n"
                                            "@;\n"
                                            "#pragma clang module import Foo",
                                            Out));
-  EXPECT_STREQ("#import <Foo.h>\n"
+  EXPECT_STREQ("import<Foo.h>;\n"
+               "#import <Foo.h>\n"
                "#pragma clang module import Foo\n",
                Out.data());
 }
@@ -1000,6 +1002,22 @@ int z = 128'78;
   EXPECT_STREQ("#include <test.h>\n", Out.data());
 }
 
+TEST(MinimizeSourceToDependencyDirectivesTest, CharacterLiteralInPreprocessor) {
+  SmallVector<char, 128> Out;
+  SmallVector<dependency_directives_scan::Token, 8> Tokens;
+  SmallVector<Directive, 4> Directives;
+
+  StringRef Source = R"(
+    #if 1'2 == 12
+    #endif
+    )";
+  ASSERT_FALSE(
+      minimizeSourceToDependencyDirectives(Source, Out, Tokens, Directives));
+  ASSERT_GE(Tokens.size(), 4u);
+  EXPECT_EQ(Tokens[2].Kind, tok::numeric_constant);
+  EXPECT_EQ(Tokens[3].Kind, tok::equalequal);
+}
+
 TEST(MinimizeSourceToDependencyDirectivesTest, PragmaOnce) {
   SmallVector<char, 128> Out;
   SmallVector<dependency_directives_scan::Token, 4> Tokens;
@@ -1122,16 +1140,23 @@ ort \
     )";
   ASSERT_FALSE(
       minimizeSourceToDependencyDirectives(Source, Out, Tokens, Directives));
-  EXPECT_STREQ("#include \"textual-header.h\"\nexport module m;"
-               "exp\\\nort import:l[[rename]];"
-               "import<<=3;import a b d e d e f e;"
-               "import foo[[no_unique_address]];import foo();"
-               "import f(:sefse);import f(->a=3);"
+
+  EXPECT_STREQ("module;\n"
+               "#include \"textual-header.h\"\n"
+               "export module m;\n"
+               "exp\\\nort import:l[[rename]];\n"
+               "import<<=3;\n"
+               "import a b d e d e f e;\n"
+               "import foo[[no_unique_address]];\n"
+               "import foo();\n"
+               "import f(:sefse);\n"
+               "import f(->a=3);\n"
                "<TokBeforeEOF>\n",
                Out.data());
-  ASSERT_EQ(Directives.size(), 11u);
-  EXPECT_EQ(Directives[0].Kind, pp_include);
-  EXPECT_EQ(Directives[1].Kind, cxx_export_module_decl);
+  ASSERT_EQ(Directives.size(), 12u);
+  EXPECT_EQ(Directives[0].Kind, cxx_module_decl);
+  EXPECT_EQ(Directives[1].Kind, pp_include);
+  EXPECT_EQ(Directives[2].Kind, cxx_export_module_decl);
 }
 
 TEST(MinimizeSourceToDependencyDirectivesTest, ObjCMethodArgs) {
@@ -1206,6 +1231,94 @@ TEST(MinimizeSourceToDependencyDirectivesTest, TokensBeforeEOF) {
     )";
   ASSERT_FALSE(minimizeSourceToDependencyDirectives(Source, Out));
   EXPECT_STREQ("#ifndef A\n#define A\n#endif\n<TokBeforeEOF>\n", Out.data());
+}
+
+TEST(MinimizeSourceToDependencyDirectivesTest, PreprocessedModule) {
+  SmallVector<char, 128> Out;
+
+  ASSERT_FALSE(
+      minimizeSourceToDependencyDirectives("export __preprocessed_module M;\n"
+                                           "struct import {};\n"
+                                           "import foo;\n"
+                                           "__preprocessed_import bar;\n",
+                                           Out));
+  EXPECT_STREQ("export __preprocessed_module M;\n"
+               "__preprocessed_import bar;\n",
+               Out.data());
+}
+
+TEST(MinimizeSourceToDependencyDirectivesTest, ScanningPreprocessedModuleFile) {
+  StringRef Source = R"(
+    export __preprocessed_module M;
+    struct import {};
+    import foo;
+    )";
+
+  ASSERT_TRUE(clang::isPreprocessedModuleFile(Source));
+
+  Source = R"(
+    export module M;
+    struct import {};
+    import foo;
+    )";
+
+  ASSERT_FALSE(clang::isPreprocessedModuleFile(Source));
+
+  Source = R"(
+    __preprocessed_import foo;
+    )";
+  ASSERT_TRUE(clang::isPreprocessedModuleFile(Source));
+}
+
+TEST(MinimizeSourceToDependencyDirectivesTest, CXX20ModuleUnitKind) {
+  EXPECT_FALSE(scanInputForCXX20ModulesUsage("int x;"));
+  EXPECT_TRUE(scanInputForCXX20ModulesUsage("module;"));
+  EXPECT_TRUE(scanInputForCXX20ModulesUsage("export module M;"));
+  EXPECT_TRUE(scanInputForCXX20ModulesUsage("import M;"));
+  EXPECT_TRUE(scanInputForCXX20ModulesUsage("export import M;"));
+
+  EXPECT_EQ(ModuleUnitKind::NotModuleUnit,
+            scanInputForCXX20ModuleUnit("int x;"));
+  EXPECT_EQ(ModuleUnitKind::NotModuleUnit,
+            scanInputForCXX20ModuleUnit("import M;"));
+  EXPECT_EQ(ModuleUnitKind::NotModuleUnit,
+            scanInputForCXX20ModuleUnit("export import M;"));
+  EXPECT_EQ(ModuleUnitKind::NotModuleUnit,
+            scanInputForCXX20ModuleUnit("module"));
+  EXPECT_EQ(ModuleUnitKind::NotModuleUnit,
+            scanInputForCXX20ModuleUnit("export module"));
+
+  EXPECT_EQ(ModuleUnitKind::HasGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("module;"));
+  EXPECT_EQ(ModuleUnitKind::HasGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit(R"(
+              // Leading comments and line splices are ignored.
+              module \
+              ;
+              export module M;
+            )"));
+
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("export module M;"));
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("module M;"));
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("export module M:Part;"));
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("module M:Part;"));
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("module \"M\";"));
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("export module 42;"));
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("export module M any pp tokens;"));
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("#line 7\nexport module M;"));
+  EXPECT_EQ(
+      ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+      scanInputForCXX20ModuleUnit("# 7 \"input.cppm\"\nexport module M;"));
+  EXPECT_EQ(ModuleUnitKind::NamedModuleWithoutGlobalModuleFragment,
+            scanInputForCXX20ModuleUnit("#pragma once\nexport module M;"));
 }
 
 } // end anonymous namespace

@@ -59,7 +59,7 @@ SPIRVTranslate(Module *M, std::string &SpirvObj, std::string &ErrMsg,
   static const std::string DefaultTriple = "spirv64-unknown-unknown";
   static const std::string DefaultMArch = "";
 
-  std::set<SPIRV::Extension::Extension> AllowedExtIds;
+  ExtensionSet AllowedExtIds;
   StringRef UnknownExt =
       SPIRVExtensionsParser::checkExtensions(AllowExtNames, AllowedExtIds);
   if (!UnknownExt.empty()) {
@@ -79,10 +79,10 @@ SPIRVTranslate(Module *M, std::string &SpirvObj, std::string &ErrMsg,
   if (!TheTarget)
     return false;
 
-  // A call to codegen::InitTargetOptionsFromCodeGenFlags(TargetTriple)
-  // hits the following assertion: llvm/lib/CodeGen/CommandFlags.cpp:78:
-  // llvm::FPOpFusion::FPOpFusionMode llvm::codegen::getFuseFPOps(): Assertion
-  // `FuseFPOpsView && "RegisterCodeGenFlags not created."' failed.
+  // A call to codegen::InitTargetOptionsFromCodeGenFlags(TargetTriple) hits an
+  // assertion in one of the codegen flag getters in
+  // llvm/lib/CodeGen/CommandFlags.cpp:
+  // `...View && "RegisterCodeGenFlags not created."' failed.
   TargetOptions Options;
   std::optional<Reloc::Model> RM;
   std::optional<CodeModel::Model> CM;
@@ -103,8 +103,7 @@ SPIRVTranslate(Module *M, std::string &SpirvObj, std::string &ErrMsg,
 
   std::string DLStr = M->getDataLayoutStr();
   Expected<DataLayout> MaybeDL = DataLayout::parse(
-      DLStr.empty() ? Target->createDataLayout().getStringRepresentation()
-                    : DLStr);
+      DLStr.empty() ? TargetTriple.computeDataLayout() : DLStr);
   if (!MaybeDL) {
     ErrMsg = toString(MaybeDL.takeError());
     return false;
@@ -116,8 +115,8 @@ SPIRVTranslate(Module *M, std::string &SpirvObj, std::string &ErrMsg,
   PM.add(new TargetLibraryInfoWrapperPass(TLII));
   std::unique_ptr<MachineModuleInfoWrapperPass> MMIWP(
       new MachineModuleInfoWrapperPass(Target.get()));
-  const_cast<TargetLoweringObjectFile *>(Target->getObjFileLowering())
-      ->Initialize(MMIWP->getMMI().getContext(), *Target);
+  Target->getObjFileLowering()->Initialize(MMIWP->getMMI().getContext(),
+                                           *Target);
 
   SmallString<4096> OutBuffer;
   raw_svector_ostream OutStream(OutBuffer);
@@ -156,7 +155,7 @@ SPIRVTranslateModule(Module *M, std::string &SpirvObj, std::string &ErrMsg,
     }
   }
   return SPIRVTranslate(M, SpirvObj, ErrMsg, AllowExtNames, OLevel,
-                        TargetTriple);
+                        std::move(TargetTriple));
 }
 
 } // namespace llvm

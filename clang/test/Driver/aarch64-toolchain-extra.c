@@ -2,8 +2,7 @@
 
 // The tests here are similar to those in aarch64-toolchain.c, however
 // these tests need to create symlinks to test directory trees in order to
-// set up the environment and therefore shell support is required.
-// REQUIRES: shell
+// set up the environment and therefore POSIX is required.
 // UNSUPPORTED: system-windows
 
 // If there is no GCC install detected then the driver searches for executables
@@ -16,7 +15,7 @@
 // RUN: ln -s %clang %t/aarch64-nogcc/bin/clang
 // RUN: ln -s %S/Inputs/basic_aarch64_nogcc_tree/aarch64-none-elf %t/aarch64-nogcc/aarch64-none-elf
 // RUN: ln -s %S/Inputs/basic_aarch64_nogcc_tree/bin/aarch64-none-elf-ld %t/aarch64-nogcc/bin/aarch64-none-elf-ld
-// RUN: %t/aarch64-nogcc/bin/clang %s -### -no-canonical-prefixes \
+// RUN: %t/aarch64-nogcc/bin/clang %s --sysroot= -### -no-canonical-prefixes \
 // RUN:    --gcc-toolchain=%t/aarch64-nogcc/invalid \
 // RUN:    --target=aarch64-none-elf --rtlib=libgcc --unwindlib=platform -fuse-ld=ld 2>&1 \
 // RUN:    | FileCheck -check-prefix=C-AARCH64-BAREMETAL-NOGCC %s

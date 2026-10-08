@@ -48,12 +48,6 @@ static std::string &prepareParamName(std::string &Name) {
   return Name;
 }
 
-namespace llvm {
-template <> struct enum_iteration_traits<omp::Directive> {
-  static constexpr bool is_iterable = true;
-};
-} // namespace llvm
-
 // Test tokenizing.
 
 class Tokenize : public testing::TestWithParam<omp::Directive> {};
@@ -87,16 +81,24 @@ getParamName1(const testing::TestParamInfo<Tokenize::ParamType> &Info) {
   return prepareParamName(Name);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    DirectiveNameParserTest, Tokenize,
-    testing::ValuesIn(
-        llvm::enum_seq(static_cast<omp::Directive>(0),
-                       static_cast<omp::Directive>(omp::Directive_enumSize))),
-    getParamName1);
+static std::vector<omp::Directive> getDirectiveSet() {
+  // The variants of the ORDERED construct share the same spelling, so only
+  // use one of them, otherwise the test will fail to instantiate.
+  std::vector<omp::Directive> Dirs;
+  for (omp::Directive D : llvm::omp::directives()) {
+    if (D == omp::Directive::OMPD_ordered_blockassoc)
+      continue;
+    Dirs.push_back(D);
+  }
+  return Dirs;
+}
+
+INSTANTIATE_TEST_SUITE_P(DirectiveNameParserTest, Tokenize,
+                         testing::ValuesIn(getDirectiveSet()), getParamName1);
 
 // Test parsing of valid names.
 
-using ValueType = std::tuple<omp::Directive, unsigned>;
+using ValueType = std::tuple<omp::Directive, omp::Version>;
 
 class ParseValid : public testing::TestWithParam<ValueType> {};
 
@@ -124,16 +126,15 @@ TEST_P(ParseValid, T) {
 static std::string
 getParamName2(const testing::TestParamInfo<ParseValid::ParamType> &Info) {
   auto [DirId, Version] = Info.param;
-  std::string Name = omp::getOpenMPDirectiveName(DirId, Version).str() + "v" +
-                     std::to_string(Version);
+  std::string Name =
+      omp::getOpenMPDirectiveName(DirId, Version).str() + "v" +
+      std::to_string(static_cast<omp::Version::value_type>(Version));
   return prepareParamName(Name);
 }
 
 INSTANTIATE_TEST_SUITE_P(
     DirectiveNameParserTest, ParseValid,
-    testing::Combine(testing::ValuesIn(llvm::enum_seq(
-                         static_cast<omp::Directive>(0),
-                         static_cast<omp::Directive>(omp::Directive_enumSize))),
+    testing::Combine(testing::ValuesIn(getDirectiveSet()),
                      testing::ValuesIn(omp::getOpenMPVersions())),
     getParamName2);
 

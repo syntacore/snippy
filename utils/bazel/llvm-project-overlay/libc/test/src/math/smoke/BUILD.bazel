@@ -10,11 +10,33 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
+math_test(name = "acos")
+
+math_test(
+    name = "acosbf16",
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
 math_test(name = "acosf")
 
 math_test(name = "acoshf")
 
 math_test(name = "acosf16")
+
+math_test(name = "acoshf16")
+
+math_test(name = "acospif16")
+
+math_test(name = "asin")
+
+math_test(
+    name = "asinbf16",
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
 
 math_test(name = "asinf")
 
@@ -22,20 +44,58 @@ math_test(name = "asinf16")
 
 math_test(name = "asinhf")
 
+math_test(name = "asinhf16")
+
+math_test(name = "asinpi")
+
+math_test(name = "asinpif16")
+
 math_test(name = "atan2")
 
 math_test(name = "atan2f")
 
+math_test(name = "atan2f16")
+
+math_test(
+    name = "atan2f128",
+    deps = [
+        "//libc:__support_fputil_float128",
+        "//libc:__support_integer_literals",
+    ],
+)
+
 math_test(name = "atan")
+
+math_test(
+    name = "atanbf16",
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
 
 math_test(name = "atanf")
 
 math_test(name = "atanhf")
 
+math_test(name = "atanf16")
+
+math_test(name = "atanhf16")
+
+math_test(name = "atanpif16")
+
 math_test(
     name = "canonicalize",
     hdrs = ["CanonicalizeTest.h"],
     deps = [
+        "//libc:__support_integer_literals",
+    ],
+)
+
+math_test(
+    name = "canonicalizebf16",
+    hdrs = ["CanonicalizeTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
         "//libc:__support_integer_literals",
     ],
 )
@@ -73,17 +133,55 @@ math_test(
 )
 
 math_test(
+    name = "iscanonical",
+    hdrs = ["IsCanonicalTest.h"],
+)
+
+math_test(
+    name = "iscanonicalbf16",
+    hdrs = ["IsCanonicalTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "iscanonicalf16",
     hdrs = ["IsCanonicalTest.h"],
 )
 
+math_test(
+    name = "iscanonicalf128",
+    hdrs = ["IsCanonicalTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
+)
+
 math_test(name = "cbrt")
 
+math_test(
+    name = "cbrtbf16",
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
 math_test(name = "cbrtf")
+
+math_test(name = "cbrtf16")
 
 math_test(
     name = "ceil",
     hdrs = ["CeilTest.h"],
+)
+
+math_test(
+    name = "ceilbf16",
+    hdrs = ["CeilTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -94,11 +192,17 @@ math_test(
 math_test(
     name = "ceill",
     hdrs = ["CeilTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
     name = "ceilf128",
     hdrs = ["CeilTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -109,6 +213,14 @@ math_test(
 math_test(
     name = "copysign",
     hdrs = ["CopySignTest.h"],
+)
+
+math_test(
+    name = "copysignbf16",
+    hdrs = ["CopySignTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -124,6 +236,9 @@ math_test(
 math_test(
     name = "copysignf128",
     hdrs = ["CopySignTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -165,6 +280,11 @@ math_test(
 )
 
 math_test(
+    name = "f16addf128",
+    hdrs = ["AddTest.h"],
+)
+
+math_test(
     name = "f16addl",
     hdrs = ["AddTest.h"],
 )
@@ -190,6 +310,11 @@ math_test(
 )
 
 math_test(
+    name = "f16divf128",
+    hdrs = ["DivTest.h"],
+)
+
+math_test(
     name = "f16divl",
     hdrs = ["DivTest.h"],
 )
@@ -204,21 +329,25 @@ math_test(
     hdrs = ["FmaTest.h"],
 )
 
-# TODO: Reenable these tests once they pass at Google.
-# math_test(
-#     name = "f16fma",
-#     hdrs = ["FmaTest.h"],
-# )
-#
-# math_test(
-#     name = "f16fmaf",
-#     hdrs = ["FmaTest.h"],
-# )
-#
-# math_test(
-#     name = "f16fmal",
-#     hdrs = ["FmaTest.h"],
-# )
+math_test(
+    name = "f16fma",
+    hdrs = ["FmaTest.h"],
+)
+
+math_test(
+    name = "f16fmaf",
+    hdrs = ["FmaTest.h"],
+)
+
+math_test(
+    name = "f16fmaf128",
+    hdrs = ["FmaTest.h"],
+)
+
+math_test(
+    name = "f16fmal",
+    hdrs = ["FmaTest.h"],
+)
 
 math_test(
     name = "dmull",
@@ -237,6 +366,11 @@ math_test(
 
 math_test(
     name = "f16mulf",
+    hdrs = ["MulTest.h"],
+)
+
+math_test(
+    name = "f16mulf128",
     hdrs = ["MulTest.h"],
 )
 
@@ -276,6 +410,14 @@ math_test(
 )
 
 math_test(
+    name = "sqrtbf16",
+    hdrs = ["SqrtTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "sqrtf",
     hdrs = ["SqrtTest.h"],
 )
@@ -288,6 +430,10 @@ math_test(
 math_test(
     name = "sqrtf128",
     hdrs = ["SqrtTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+        "//libc:__support_integer_literals",
+    ],
 )
 
 math_test(
@@ -301,9 +447,16 @@ math_test(
 )
 
 math_test(
+    name = "f16sqrtf128",
+    hdrs = ["SqrtTest.h"],
+)
+
+math_test(
     name = "sqrtf16",
     hdrs = ["SqrtTest.h"],
 )
+
+math_test(name = "rsqrtf16")
 
 math_test(
     name = "f16sqrtl",
@@ -331,23 +484,51 @@ math_test(
 )
 
 math_test(
+    name = "f16subf128",
+    hdrs = ["SubTest.h"],
+)
+
+math_test(
     name = "f16subl",
     hdrs = ["SubTest.h"],
 )
 
 math_test(name = "erff")
 
+math_test(name = "erfcf16")
+
+math_test(name = "erff16")
+
 math_test(name = "exp")
 
-math_test(name = "expf")
+math_test(
+    name = "expf",
+    deps = [
+        "//libc:__support_math_expf_double_eval",
+        "//libc:__support_math_expf_float_eval",
+        "//libc:__support_math_expf_integer_eval",
+    ],
+)
 
 math_test(name = "exp10")
 
-math_test(name = "exp10f")
+math_test(
+    name = "exp10f",
+    deps = [
+        "//libc:__support_math_exp10f_double_eval",
+        "//libc:__support_math_exp10f_float_eval",
+    ],
+)
 
 math_test(name = "exp2")
 
-math_test(name = "exp2f")
+math_test(
+    name = "exp2f",
+    deps = [
+        "//libc:__support_math_exp2f_double_eval",
+        "//libc:__support_math_exp2f_float_eval",
+    ],
+)
 
 math_test(name = "exp2m1f")
 
@@ -358,6 +539,14 @@ math_test(name = "expm1f")
 math_test(
     name = "fabs",
     hdrs = ["FAbsTest.h"],
+)
+
+math_test(
+    name = "fabsbf16",
+    hdrs = ["FAbsTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -373,6 +562,9 @@ math_test(
 math_test(
     name = "fabsf128",
     hdrs = ["FAbsTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -401,6 +593,14 @@ math_test(
 )
 
 math_test(
+    name = "fdimbf16",
+    hdrs = ["FDimTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "fdimf",
     hdrs = ["FDimTest.h"],
 )
@@ -413,6 +613,9 @@ math_test(
 math_test(
     name = "fdimf128",
     hdrs = ["FDimTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -456,6 +659,14 @@ math_test(
 )
 
 math_test(
+    name = "floorbf16",
+    hdrs = ["FloorTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "floorf",
     hdrs = ["FloorTest.h"],
 )
@@ -468,6 +679,9 @@ math_test(
 math_test(
     name = "floorf128",
     hdrs = ["FloorTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -475,17 +689,40 @@ math_test(
     hdrs = ["FloorTest.h"],
 )
 
-# TODO: Add fma, fmaf, fmal, fmaf128 tests.
+math_test(
+    name = "fma",
+    hdrs = ["FmaTest.h"],
+)
 
-# TODO: Reenable this test once it passes at Google.
-# math_test(
-#     name = "fmaf16",
-#     hdrs = ["FmaTest.h"],
-# )
+math_test(
+    name = "fmabf16",
+    hdrs = ["FmaTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
+    name = "fmaf",
+    hdrs = ["FmaTest.h"],
+)
+
+math_test(
+    name = "fmaf16",
+    hdrs = ["FmaTest.h"],
+)
 
 math_test(
     name = "fmax",
     hdrs = ["FMaxTest.h"],
+)
+
+math_test(
+    name = "fmaxbf16",
+    hdrs = ["FMaxTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -501,6 +738,9 @@ math_test(
 math_test(
     name = "fmaxf128",
     hdrs = ["FMaxTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -511,6 +751,14 @@ math_test(
 math_test(
     name = "fmaximum",
     hdrs = ["FMaximumTest.h"],
+)
+
+math_test(
+    name = "fmaximumbf16",
+    hdrs = ["FMaximumTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -526,11 +774,22 @@ math_test(
 math_test(
     name = "fmaximumf128",
     hdrs = ["FMaximumTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
     name = "fmaximum_mag",
     hdrs = ["FMaximumMagTest.h"],
+)
+
+math_test(
+    name = "fmaximum_magbf16",
+    hdrs = ["FMaximumMagTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -546,11 +805,22 @@ math_test(
 math_test(
     name = "fmaximum_magf128",
     hdrs = ["FMaximumMagTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
     name = "fmaximum_mag_num",
     hdrs = ["FMaximumMagNumTest.h"],
+)
+
+math_test(
+    name = "fmaximum_mag_numbf16",
+    hdrs = ["FMaximumMagNumTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -566,11 +836,22 @@ math_test(
 math_test(
     name = "fmaximum_mag_numf128",
     hdrs = ["FMaximumMagNumTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
     name = "fmaximum_num",
     hdrs = ["FMaximumNumTest.h"],
+)
+
+math_test(
+    name = "fmaximum_numbf16",
+    hdrs = ["FMaximumNumTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -586,6 +867,9 @@ math_test(
 math_test(
     name = "fmaximum_numf128",
     hdrs = ["FMaximumNumTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -614,6 +898,14 @@ math_test(
 )
 
 math_test(
+    name = "fminbf16",
+    hdrs = ["FMinTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "fminf",
     hdrs = ["FMinTest.h"],
 )
@@ -626,6 +918,9 @@ math_test(
 math_test(
     name = "fminf128",
     hdrs = ["FMinTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -636,6 +931,14 @@ math_test(
 math_test(
     name = "fminimum",
     hdrs = ["FMinimumTest.h"],
+)
+
+math_test(
+    name = "fminimumbf16",
+    hdrs = ["FMinimumTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -651,11 +954,22 @@ math_test(
 math_test(
     name = "fminimumf128",
     hdrs = ["FMinimumTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
     name = "fminimum_mag",
     hdrs = ["FMinimumMagTest.h"],
+)
+
+math_test(
+    name = "fminimum_magbf16",
+    hdrs = ["FMinimumMagTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -671,6 +985,9 @@ math_test(
 math_test(
     name = "fminimum_magf128",
     hdrs = ["FMinimumMagTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -681,6 +998,14 @@ math_test(
 math_test(
     name = "fminimum_mag_num",
     hdrs = ["FMinimumMagNumTest.h"],
+)
+
+math_test(
+    name = "fminimum_mag_numbf16",
+    hdrs = ["FMinimumMagNumTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -696,6 +1021,9 @@ math_test(
 math_test(
     name = "fminimum_mag_numf128",
     hdrs = ["FMinimumMagNumTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -706,6 +1034,14 @@ math_test(
 math_test(
     name = "fminimum_num",
     hdrs = ["FMinimumNumTest.h"],
+)
+
+math_test(
+    name = "fminimum_numbf16",
+    hdrs = ["FMinimumNumTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -721,6 +1057,9 @@ math_test(
 math_test(
     name = "fminimum_numf128",
     hdrs = ["FMinimumNumTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -736,6 +1075,16 @@ math_test(
 math_test(
     name = "fmod",
     hdrs = ["FModTest.h"],
+)
+
+math_test(
+    name = "fmodbf16",
+    hdrs = [
+        "FModTest.h",
+    ],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -779,6 +1128,14 @@ math_test(
 )
 
 math_test(
+    name = "frexpbf16",
+    hdrs = ["FrexpTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "frexpf",
     hdrs = ["FrexpTest.h"],
 )
@@ -804,6 +1161,14 @@ math_test(
 )
 
 math_test(
+    name = "fromfpbf16",
+    hdrs = ["FromfpTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "fromfpf",
     hdrs = ["FromfpTest.h"],
 )
@@ -826,6 +1191,14 @@ math_test(
 math_test(
     name = "fromfpx",
     hdrs = ["FromfpxTest.h"],
+)
+
+math_test(
+    name = "fromfpxbf16",
+    hdrs = ["FromfpxTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -869,6 +1242,14 @@ math_test(
 )
 
 math_test(
+    name = "getpayloadbf16",
+    hdrs = ["GetPayloadTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "getpayloadf",
     hdrs = ["GetPayloadTest.h"],
 )
@@ -894,13 +1275,34 @@ math_test(
 )
 
 math_test(
+    name = "hypotbf16",
+    hdrs = ["HypotTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "hypotf",
+    hdrs = ["HypotTest.h"],
+)
+
+math_test(
+    name = "hypotf16",
     hdrs = ["HypotTest.h"],
 )
 
 math_test(
     name = "ilogb",
     hdrs = ["ILogbTest.h"],
+)
+
+math_test(
+    name = "ilogbbf16",
+    hdrs = ["ILogbTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -921,6 +1323,14 @@ math_test(
 math_test(
     name = "ldexp",
     hdrs = ["LdExpTest.h"],
+)
+
+math_test(
+    name = "ldexpbf16",
+    hdrs = ["LdExpTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -949,6 +1359,14 @@ math_test(
 )
 
 math_test(
+    name = "llogbbf16",
+    hdrs = ["ILogbTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "llogbf",
     hdrs = ["ILogbTest.h"],
 )
@@ -969,6 +1387,19 @@ math_test(
 )
 
 math_test(
+    name = "isnanf128",
+    hdrs = ["IsNanTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
+)
+
+math_test(
+    name = "isnanf16",
+    hdrs = ["IsNanTest.h"],
+)
+
+math_test(
     name = "llogbf16",
     hdrs = ["ILogbTest.h"],
 )
@@ -976,6 +1407,14 @@ math_test(
 math_test(
     name = "llrint",
     hdrs = ["RoundToIntegerTest.h"],
+)
+
+math_test(
+    name = "llrintbf16",
+    hdrs = ["RoundToIntegerTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -991,6 +1430,9 @@ math_test(
 math_test(
     name = "llrintf128",
     hdrs = ["RoundToIntegerTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -1009,6 +1451,14 @@ math_test(
 )
 
 math_test(
+    name = "llroundbf16",
+    hdrs = ["RoundToIntegerTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "llroundf",
     hdrs = ["RoundToIntegerTest.h"],
 )
@@ -1021,6 +1471,9 @@ math_test(
 math_test(
     name = "llroundf128",
     hdrs = ["RoundToIntegerTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -1034,6 +1487,13 @@ math_test(
 )
 
 math_test(name = "log")
+
+math_test(
+    name = "log_bf16",
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
 
 math_test(name = "logf")
 
@@ -1052,6 +1512,14 @@ math_test(name = "log2f")
 math_test(
     name = "logb",
     hdrs = ["LogbTest.h"],
+)
+
+math_test(
+    name = "logbbf16",
+    hdrs = ["LogbTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1080,6 +1548,14 @@ math_test(
 )
 
 math_test(
+    name = "lrintbf16",
+    hdrs = ["RoundToIntegerTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "lrintf",
     hdrs = ["RoundToIntegerTest.h"],
 )
@@ -1092,11 +1568,22 @@ math_test(
 math_test(
     name = "lrintf128",
     hdrs = ["RoundToIntegerTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
     name = "lround",
     hdrs = ["RoundToIntegerTest.h"],
+)
+
+math_test(
+    name = "lroundbf16",
+    hdrs = ["RoundToIntegerTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1112,11 +1599,22 @@ math_test(
 math_test(
     name = "lroundf128",
     hdrs = ["RoundToIntegerTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
     name = "modf",
     hdrs = ["ModfTest.h"],
+)
+
+math_test(
+    name = "modfbf16",
+    hdrs = ["ModfTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1147,6 +1645,14 @@ math_test(
 )
 
 math_test(
+    name = "nearbyintbf16",
+    hdrs = ["NearbyIntTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "nearbyintf",
     hdrs = ["NearbyIntTest.h"],
 )
@@ -1159,6 +1665,9 @@ math_test(
 math_test(
     name = "nearbyintf128",
     hdrs = ["NearbyIntTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -1169,31 +1678,53 @@ math_test(
 math_test(
     name = "nextafter",
     hdrs = ["NextAfterTest.h"],
+    deps = ["//libc:__support_sign"],
+)
+
+math_test(
+    name = "nextafterbf16",
+    hdrs = ["NextAfterTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+        "//libc:__support_sign",
+    ],
 )
 
 math_test(
     name = "nextafterf",
     hdrs = ["NextAfterTest.h"],
+    deps = ["//libc:__support_sign"],
 )
 
 math_test(
     name = "nextafterl",
     hdrs = ["NextAfterTest.h"],
+    deps = ["//libc:__support_sign"],
 )
 
 math_test(
     name = "nextafterf128",
     hdrs = ["NextAfterTest.h"],
+    deps = ["//libc:__support_sign"],
 )
 
 math_test(
     name = "nextafterf16",
     hdrs = ["NextAfterTest.h"],
+    deps = ["//libc:__support_sign"],
 )
 
 math_test(
     name = "nextdown",
     hdrs = ["NextDownTest.h"],
+)
+
+math_test(
+    name = "nextdownbf16",
+    hdrs = ["NextDownTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1222,6 +1753,14 @@ math_test(
 )
 
 math_test(
+    name = "nexttowardbf16",
+    hdrs = ["NextTowardTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "nexttowardf",
     hdrs = ["NextTowardTest.h"],
 )
@@ -1239,6 +1778,14 @@ math_test(
 math_test(
     name = "nextup",
     hdrs = ["NextUpTest.h"],
+)
+
+math_test(
+    name = "nextupbf16",
+    hdrs = ["NextUpTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1263,11 +1810,25 @@ math_test(
 
 math_test(name = "pow")
 
-math_test(name = "powf")
+math_test(
+    name = "powf",
+    deps = [
+        "//libc:__support_math_powf_double_eval",
+        "//libc:__support_math_powf_float_eval",
+    ],
+)
 
 math_test(
     name = "remquo",
     hdrs = ["RemQuoTest.h"],
+)
+
+math_test(
+    name = "remquobf16",
+    hdrs = ["RemQuoTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1296,6 +1857,14 @@ math_test(
 )
 
 math_test(
+    name = "rintbf16",
+    hdrs = ["RIntTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "rintf",
     hdrs = ["RIntTest.h"],
 )
@@ -1308,6 +1877,9 @@ math_test(
 math_test(
     name = "rintf128",
     hdrs = ["RIntTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -1318,6 +1890,14 @@ math_test(
 math_test(
     name = "roundeven",
     hdrs = ["RoundEvenTest.h"],
+)
+
+math_test(
+    name = "roundevenbf16",
+    hdrs = ["RoundEvenTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1333,6 +1913,9 @@ math_test(
 math_test(
     name = "roundevenf128",
     hdrs = ["RoundEvenTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -1343,6 +1926,14 @@ math_test(
 math_test(
     name = "round",
     hdrs = ["RoundTest.h"],
+)
+
+math_test(
+    name = "roundbf16",
+    hdrs = ["RoundTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1358,6 +1949,9 @@ math_test(
 math_test(
     name = "roundf128",
     hdrs = ["RoundTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -1370,6 +1964,17 @@ math_test(
     hdrs = [
         "LdExpTest.h",
         "ScalbnTest.h",
+    ],
+)
+
+math_test(
+    name = "scalbnbf16",
+    hdrs = [
+        "LdExpTest.h",
+        "ScalbnTest.h",
+    ],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
     ],
 )
 
@@ -1422,6 +2027,17 @@ math_test(
 )
 
 math_test(
+    name = "scalblnbf16",
+    hdrs = [
+        "LdExpTest.h",
+        "ScalbnTest.h",
+    ],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "scalblnf",
     hdrs = [
         "LdExpTest.h",
@@ -1451,6 +2067,14 @@ math_test(
 )
 
 math_test(
+    name = "setpayloadbf16",
+    hdrs = ["SetPayloadTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "setpayloadf",
     hdrs = ["SetPayloadTest.h"],
 )
@@ -1473,6 +2097,14 @@ math_test(
 math_test(
     name = "setpayloadsig",
     hdrs = ["SetPayloadSigTest.h"],
+)
+
+math_test(
+    name = "setpayloadsigbf16",
+    hdrs = ["SetPayloadSigTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1518,9 +2150,19 @@ math_test(name = "tanf")
 
 math_test(name = "tanhf")
 
+math_test(name = "tanpif")
+
 math_test(
     name = "totalorder",
     hdrs = ["TotalOrderTest.h"],
+)
+
+math_test(
+    name = "totalorderbf16",
+    hdrs = ["TotalOrderTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1549,6 +2191,14 @@ math_test(
 )
 
 math_test(
+    name = "totalordermagbf16",
+    hdrs = ["TotalOrderMagTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "totalordermagf",
     hdrs = ["TotalOrderMagTest.h"],
 )
@@ -1574,6 +2224,14 @@ math_test(
 )
 
 math_test(
+    name = "truncbf16",
+    hdrs = ["TruncTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
+math_test(
     name = "truncf",
     hdrs = ["TruncTest.h"],
 )
@@ -1586,6 +2244,9 @@ math_test(
 math_test(
     name = "truncf128",
     hdrs = ["TruncTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
 )
 
 math_test(
@@ -1596,6 +2257,14 @@ math_test(
 math_test(
     name = "ufromfp",
     hdrs = ["UfromfpTest.h"],
+)
+
+math_test(
+    name = "ufromfpbf16",
+    hdrs = ["UfromfpTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1621,6 +2290,14 @@ math_test(
 math_test(
     name = "ufromfpx",
     hdrs = ["UfromfpxTest.h"],
+)
+
+math_test(
+    name = "ufromfpxbf16",
+    hdrs = ["UfromfpxTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
 )
 
 math_test(
@@ -1659,18 +2336,69 @@ math_test(name = "exp2m1f16")
 
 math_test(name = "expf16")
 
+math_test(
+    name = "expbf16",
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
+
 math_test(name = "expm1f16")
+
+math_test(
+    name = "issignaling",
+    hdrs = ["IsSignalingTest.h"],
+)
+
+math_test(
+    name = "issignalingbf16",
+    hdrs = ["IsSignalingTest.h"],
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
 
 math_test(
     name = "issignalingf16",
     hdrs = ["IsSignalingTest.h"],
 )
 
+math_test(
+    name = "issignalingf128",
+    hdrs = ["IsSignalingTest.h"],
+    deps = [
+        "//libc:__support_fputil_float128",
+    ],
+)
+
 math_test(name = "log10f16")
 
 math_test(name = "log2f16")
 
+math_test(name = "log2p1f16")
+
+math_test(name = "log10p1f16")
+
 math_test(name = "logf16")
+
+math_test(name = "lgammaf16")
+
+math_test(
+    name = "nan",
+    deps = [
+        "//libc:__support_macros_sanitizer",
+        "//libc:hdr_signal_macros",
+    ],
+)
+
+math_test(
+    name = "nanbf16",
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+        "//libc:__support_macros_sanitizer",
+        "//libc:hdr_signal_macros",
+    ],
+)
 
 math_test(
     name = "nanf16",
@@ -1687,6 +2415,13 @@ math_test(name = "sinf16")
 math_test(name = "sinhf16")
 
 math_test(name = "sinpif16")
+
+math_test(
+    name = "tanbf16",
+    deps = [
+        "//libc:__support_fputil_bfloat16",
+    ],
+)
 
 math_test(name = "tanf16")
 

@@ -25,7 +25,6 @@
 #include "llvm/CodeGen/GlobalISel/IRTranslator.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelect.h"
 #include "llvm/CodeGen/GlobalISel/Legalizer.h"
-#include "llvm/CodeGen/GlobalISel/Localizer.h"
 #include "llvm/CodeGen/GlobalISel/RegBankSelect.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/Passes.h"
@@ -99,7 +98,7 @@ static cl::opt<bool>
                   cl::desc("Expand eligible cr-logical binary ops to branches"),
                   cl::init(true), cl::Hidden);
 
-static cl::opt<bool> EnablePPCGenScalarMASSEntries(
+cl::opt<bool> EnablePPCGenScalarMASSEntries(
     "enable-ppc-gen-scalar-mass", cl::init(false),
     cl::desc("Enable lowering math functions to their corresponding MASS "
              "(scalar) entries"),
@@ -129,7 +128,7 @@ LLVMInitializePowerPCTarget() {
   initializePPCLoopInstrFormPrepPass(PR);
   initializePPCTOCRegDepsPass(PR);
   initializePPCEarlyReturnPass(PR);
-  initializePPCVSXCopyPass(PR);
+  initializePPCVSXWACCCopyPass(PR);
   initializePPCVSXFMAMutatePass(PR);
   initializePPCVSXSwapRemovalPass(PR);
   initializePPCReduceCRLogicalsPass(PR);
@@ -145,60 +144,9 @@ LLVMInitializePowerPCTarget() {
   initializeGlobalISel(PR);
   initializePPCCTRLoopsPass(PR);
   initializePPCDAGToDAGISelLegacyPass(PR);
+  initializePPCPrepareIFuncsOnAIXPass(PR);
   initializePPCLinuxAsmPrinterPass(PR);
   initializePPCAIXAsmPrinterPass(PR);
-}
-
-static bool isLittleEndianTriple(const Triple &T) {
-  return T.getArch() == Triple::ppc64le || T.getArch() == Triple::ppcle;
-}
-
-/// Return the datalayout string of a subtarget.
-static std::string getDataLayoutString(const Triple &T) {
-  bool is64Bit = T.getArch() == Triple::ppc64 || T.getArch() == Triple::ppc64le;
-  std::string Ret;
-
-  // Most PPC* platforms are big endian, PPC(64)LE is little endian.
-  if (isLittleEndianTriple(T))
-    Ret = "e";
-  else
-    Ret = "E";
-
-  Ret += DataLayout::getManglingComponent(T);
-
-  // PPC32 has 32 bit pointers. The PS3 (OS Lv2) is a PPC64 machine with 32 bit
-  // pointers.
-  if (!is64Bit || T.getOS() == Triple::Lv2)
-    Ret += "-p:32:32";
-
-  // If the target ABI uses function descriptors, then the alignment of function
-  // pointers depends on the alignment used to emit the descriptor. Otherwise,
-  // function pointers are aligned to 32 bits because the instructions must be.
-  if ((T.getArch() == Triple::ppc64 && !T.isPPC64ELFv2ABI())) {
-    Ret += "-Fi64";
-  } else if (T.isOSAIX()) {
-    Ret += is64Bit ? "-Fi64" : "-Fi32";
-  } else {
-    Ret += "-Fn32";
-  }
-
-  // Note, the alignment values for f64 and i64 on ppc64 in Darwin
-  // documentation are wrong; these are correct (i.e. "what gcc does").
-  Ret += "-i64:64";
-
-  // PPC64 has 32 and 64 bit registers, PPC32 has only 32 bit ones.
-  if (is64Bit)
-    Ret += "-i128:128-n32:64";
-  else
-    Ret += "-n32";
-
-  // Specify the vector alignment explicitly. For v256i1 and v512i1, the
-  // calculated alignment would be 256*alignment(i1) and 512*alignment(i1),
-  // which is 256 and 512 bytes - way over aligned.
-  if (is64Bit && (T.isOSAIX() || T.isOSLinux()))
-    Ret += "-S128-v256:256:256-v512:512:512";
-
-  return Ret;
 }
 
 static std::string computeFSAdditions(StringRef FS, CodeGenOptLevel OL,
@@ -206,7 +154,7 @@ static std::string computeFSAdditions(StringRef FS, CodeGenOptLevel OL,
   std::string FullFS = std::string(FS);
 
   // Make sure 64-bit features are available when CPUname is generic
-  if (TT.getArch() == Triple::ppc64 || TT.getArch() == Triple::ppc64le) {
+  if (TT.isPPC64()) {
     if (!FullFS.empty())
       FullFS = "+64bit," + FullFS;
     else
@@ -244,26 +192,23 @@ static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
   return std::make_unique<PPC64LinuxTargetObjectFile>();
 }
 
-static PPCTargetMachine::PPCABI computeTargetABI(const Triple &TT,
-                                                 const TargetOptions &Options) {
-  if (Options.MCOptions.getABIName().starts_with("elfv1"))
-    return PPCTargetMachine::PPC_ABI_ELFv1;
-  else if (Options.MCOptions.getABIName().starts_with("elfv2"))
-    return PPCTargetMachine::PPC_ABI_ELFv2;
+// An explicit ABI name takes precedence; otherwise use the triple default.
+PPCABI PPCTargetMachine::computeABI(const Triple &TT, StringRef ABIName) {
+  if (ABIName.starts_with("elfv1"))
+    return PPC_ABI_ELFv1;
+  if (ABIName.starts_with("elfv2"))
+    return PPC_ABI_ELFv2;
 
-  assert(Options.MCOptions.getABIName().empty() &&
-         "Unknown target-abi option!");
+  if (TT.isOSAIX())
+    return ABIName == "vec-extabi" ? PPC_ABI_AIX_EXTABI : PPC_ABI_UNKNOWN;
 
   switch (TT.getArch()) {
   case Triple::ppc64le:
-    return PPCTargetMachine::PPC_ABI_ELFv2;
+    return PPC_ABI_ELFv2;
   case Triple::ppc64:
-    if (TT.isPPC64ELFv2ABI())
-      return PPCTargetMachine::PPC_ABI_ELFv2;
-    else
-      return PPCTargetMachine::PPC_ABI_ELFv1;
+    return TT.isPPC64ELFv2ABI() ? PPC_ABI_ELFv2 : PPC_ABI_ELFv1;
   default:
-    return PPCTargetMachine::PPC_ABI_UNKNOWN;
+    return PPC_ABI_UNKNOWN;
   }
 }
 
@@ -297,8 +242,12 @@ getEffectivePPCCodeModel(const Triple &TT, std::optional<CodeModel::Model> CM,
 
   if (JIT)
     return CodeModel::Small;
-  if (TT.isOSAIX())
+  if (TT.isOSAIX()) {
+    // Use large code model for 64-bit AIX by default.
+    if (TT.isArch64Bit())
+      return CodeModel::Large;
     return CodeModel::Small;
+  }
 
   assert(TT.isOSBinFormatELF() && "All remaining PPC OSes are ELF based.");
 
@@ -317,7 +266,7 @@ static ScheduleDAGInstrs *createPPCMachineScheduler(MachineSchedContext *C) {
                                : createSchedLive<GenericScheduler>(C);
   // add DAG Mutations here.
   if (ST.hasStoreFusion())
-    DAG->addMutation(createStoreClusterDAGMutation(DAG->TII, DAG->TRI));
+    DAG->addMutation(createStoreClusterDAGMutation(DAG->TII));
   if (ST.hasFusion())
     DAG->addMutation(createPowerPCMacroFusionDAGMutation());
 
@@ -332,7 +281,7 @@ createPPCPostMachineScheduler(MachineSchedContext *C) {
                            : createSchedPostRA<PostGenericScheduler>(C);
   // add DAG Mutations here.
   if (ST.hasStoreFusion())
-    DAG->addMutation(createStoreClusterDAGMutation(DAG->TII, DAG->TRI));
+    DAG->addMutation(createStoreClusterDAGMutation(DAG->TII));
   if (ST.hasFusion())
     DAG->addMutation(createPowerPCMacroFusionDAGMutation());
   return DAG;
@@ -348,13 +297,11 @@ PPCTargetMachine::PPCTargetMachine(const Target &T, const Triple &TT,
                                    std::optional<Reloc::Model> RM,
                                    std::optional<CodeModel::Model> CM,
                                    CodeGenOptLevel OL, bool JIT)
-    : CodeGenTargetMachineImpl(T, getDataLayoutString(TT), TT, CPU,
-                               computeFSAdditions(FS, OL, TT), Options,
-                               getEffectiveRelocModel(TT, RM),
+    : CodeGenTargetMachineImpl(T, TT, CPU, computeFSAdditions(FS, OL, TT),
+                               Options, getEffectiveRelocModel(TT, RM),
                                getEffectivePPCCodeModel(TT, CM, JIT), OL),
       TLOF(createTLOF(getTargetTriple())),
-      TargetABI(computeTargetABI(TT, Options)),
-      Endianness(isLittleEndianTriple(TT) ? Endian::LITTLE : Endian::BIG) {
+      Endianness(TT.isLittleEndian() ? Endian::LITTLE : Endian::BIG) {
   initAsmInfo();
 }
 
@@ -384,12 +331,12 @@ PPCTargetMachine::getSubtargetImpl(const Function &F) const {
   if (SoftFloat)
     FS += FS.empty() ? "-hard-float" : ",-hard-float";
 
-  auto &I = SubtargetMap[CPU + TuneCPU + FS];
+  // Prefer the "target-abi" module flag, falling back to the -target-abi
+  // option.
+  StringRef ABIName = getTargetABIName(*F.getParent());
+
+  auto &I = SubtargetMap[CPU + TuneCPU + FS + ABIName.str()];
   if (!I) {
-    // This needs to be done before we create a new subtarget since any
-    // creation will depend on the TM and the code generation flags on the
-    // function that reside in TargetOptions.
-    resetTargetOptions(F);
     I = std::make_unique<PPCSubtarget>(
         TargetTriple, CPU, TuneCPU,
         // FIXME: It would be good to have the subtarget additions here
@@ -398,7 +345,8 @@ PPCTargetMachine::getSubtargetImpl(const Function &F) const {
         // shouldn't require adding them. Fixing this means pulling Feature64Bit
         // out of most of the target cpus in the .td file and making it set only
         // as part of initialization via the TargetTriple.
-        computeFSAdditions(FS, getOptLevel(), getTargetTriple()), *this);
+        computeFSAdditions(FS, getOptLevel(), getTargetTriple()), ABIName,
+        *this);
   }
   return I.get();
 }
@@ -467,10 +415,8 @@ void PPCPassConfig::addIRPasses() {
   // Generate PowerPC target-specific entries for scalar math functions
   // that are available in IBM MASS (scalar) library.
   if (TM->getOptLevel() == CodeGenOptLevel::Aggressive &&
-      EnablePPCGenScalarMASSEntries) {
-    TM->Options.PPCGenScalarMASSEntries = EnablePPCGenScalarMASSEntries;
+      EnablePPCGenScalarMASSEntries)
     addPass(createPPCGenScalarMASSEntriesPass());
-  }
 
   // If explicitly requested, add explicit data prefetch intrinsics.
   if (EnablePrefetch.getNumOccurrences() > 0)
@@ -488,6 +434,9 @@ void PPCPassConfig::addIRPasses() {
     // invariant.
     addPass(createLICMPass());
   }
+
+  if (TM->getTargetTriple().isOSAIX())
+    addPass(createPPCPrepareIFuncsOnAIXPass());
 
   TargetPassConfig::addIRPasses();
 }
@@ -528,7 +477,7 @@ bool PPCPassConfig::addInstSelector() {
     addPass(createPPCCTRLoopsVerify());
 #endif
 
-  addPass(createPPCVSXCopyPass());
+  addPass(createPPCVSXWACCCopyPass());
   return false;
 }
 
@@ -632,21 +581,21 @@ PPCPostRASchedRegistry("ppc-postra",
 
 // Global ISEL
 bool PPCPassConfig::addIRTranslator() {
-  addPass(new IRTranslator());
+  addPass(new IRTranslatorLegacy());
   return false;
 }
 
 bool PPCPassConfig::addLegalizeMachineIR() {
-  addPass(new Legalizer());
+  addPass(new LegalizerLegacy());
   return false;
 }
 
 bool PPCPassConfig::addRegBankSelect() {
-  addPass(new RegBankSelect());
+  addPass(new RegBankSelectLegacy());
   return false;
 }
 
 bool PPCPassConfig::addGlobalInstructionSelect() {
-  addPass(new InstructionSelect(getOptLevel()));
+  addPass(new InstructionSelectLegacy(getOptLevel()));
   return false;
 }

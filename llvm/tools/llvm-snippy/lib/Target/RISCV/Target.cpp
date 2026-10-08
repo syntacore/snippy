@@ -328,15 +328,16 @@ getIncOpcodeForLoopCounter(const InstructionGenerationContext &IGC) {
 }
 
 static RegStorageType regToStorage(Register Reg) {
-  if ((RISCV::X0 <= Reg && Reg <= RISCV::X31) ||
-      (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W) ||
-      (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H))
+  if (RISCV::GPRRegClass.contains(Reg) ||
+      (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H) ||
+      (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W))
     return RegStorageType::XReg;
-  if ((RISCV::F0_D <= Reg && Reg <= RISCV::F31_D) ||
-      (RISCV::F0_F <= Reg && Reg <= RISCV::F31_F) ||
-      (RISCV::F0_H <= Reg && Reg <= RISCV::F31_H))
+  if (RISCV::FPR16RegClass.contains(Reg) ||
+      RISCV::FPR32RegClass.contains(Reg) || RISCV::FPR64RegClass.contains(Reg))
     return RegStorageType::FReg;
-  assert(RISCV::V0 <= Reg && Reg <= RISCV::V31 && "unknown register");
+  if (!RISCV::VRRegClass.contains(Reg))
+    report_fatal_error(Twine("unknown RISC-V register storage for register ") +
+                       Twine(Reg.id()));
   return RegStorageType::VReg;
 }
 
@@ -1058,15 +1059,15 @@ static std::pair<AddressParts, MemAddresses> breakDownAddrForInstrWithImmOffset(
 }
 
 inline bool hasScInstr(const OpcodeHistogram &H) {
-  return H.isAnyNonZero(RISCV::SC_D, RISCV::SC_D_AQ, RISCV::SC_D_AQ_RL,
+  return H.isAnyNonZero(RISCV::SC_D, RISCV::SC_D_AQ, RISCV::SC_D_AQRL,
                         RISCV::SC_D_RL, RISCV::SC_W, RISCV::SC_W_AQ,
-                        RISCV::SC_W_AQ_RL, RISCV::SC_W_RL);
+                        RISCV::SC_W_AQRL, RISCV::SC_W_RL);
 }
 
 inline bool hasLrInstr(const OpcodeHistogram &H) {
-  return H.isAnyNonZero(RISCV::LR_D, RISCV::LR_D_AQ, RISCV::LR_D_AQ_RL,
+  return H.isAnyNonZero(RISCV::LR_D, RISCV::LR_D_AQ, RISCV::LR_D_AQRL,
                         RISCV::LR_D_RL, RISCV::LR_W, RISCV::LR_W_AQ,
-                        RISCV::LR_W_AQ_RL, RISCV::LR_W_RL);
+                        RISCV::LR_W_AQRL, RISCV::LR_W_RL);
 }
 
 inline bool checkPairedLrScInstrs(const OpcodeHistogram &H) {
@@ -1611,6 +1612,11 @@ public:
               const MCInstrDesc &InstrDesc,
               const MCRegisterInfo &RegInfo) const override;
 
+  bool isRegisterOperand(const MCOperandInfo &Operand) const override {
+    return SnippyTarget::isRegisterOperand(Operand) ||
+           Operand.OperandType == RISCVOp::OPERAND_VMASK;
+  }
+
   bool matchesArch(Triple::ArchType Arch) const override {
     return Arch == Triple::riscv32 || Arch == Triple::riscv64;
   }
@@ -2027,6 +2033,12 @@ public:
     if (RegClassID == RISCV::VMV0RegClassID)
       return false;
     const auto &RC = RI.getRegClass(RegClassID);
+    // Architectural GPRs gained Zhinx subregisters, but remain single
+    // physical registers from Snippy's perspective.
+    if (any_of(RC, [](MCRegister Reg) {
+          return RISCV::X0 <= Reg && Reg <= RISCV::X31;
+        }))
+      return true;
     return std::all_of(RC.begin(), RC.end(), [this, &RI](unsigned Reg) {
       return !isMultipleReg(Reg, RI);
     });
@@ -2036,6 +2048,14 @@ public:
                            const MCRegisterInfo &RI) const override {
     if (Reg == RISCV::NoRegister)
       return Reg;
+    // GPRs now have Zhinx subregisters.  They are aliases used for register
+    // allocation, not separate architectural registers for Snippy's model.
+    if (RISCV::X0 <= Reg && Reg <= RISCV::X31)
+      return Reg;
+    if (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H)
+      return RISCV::X0 + (Reg - RISCV::X0_H);
+    if (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W)
+      return RISCV::X0 + (Reg - RISCV::X0_W);
     auto Subregs = RI.subregs_inclusive(Reg);
     // The following comparisons rely on the location of the registers in the
     // file RISCVGenRegisterInfo.inc. All registers except FP are written in
@@ -2204,9 +2224,7 @@ public:
                          AsmPrinter &AP, const MCSubtargetInfo &STI,
                          SmallVector<char> &OutBuf) const override {
     MCInst OutInst;
-    auto &RVAP = static_cast<RISCVAsmPrinter &>(AP);
-    if (!RVAP.lowerPseudoInstExpansion(MI, OutInst))
-      RVAP.lowerToMCInst(MI, OutInst);
+    lowerRISCVMachineInstrToMCInst(AP, MI, OutInst);
 
     SmallVector<MCFixup> Fixups;
     MCCE.encodeInstruction(OutInst, OutBuf, Fixups, STI);
@@ -3377,14 +3395,28 @@ public:
 
   std::optional<unsigned>
   findRegisterByName(const StringRef RegName) const override {
+    StringRef NumericName = RegName;
+    if (NumericName.consume_front_insensitive("f")) {
+      unsigned Index = 0;
+      if (!NumericName.getAsInteger(10, Index) && Index < 32)
+        // Multiple FPR views have the same assembler name.  Snippy register
+        // files describe the widest supported architectural FP state.
+        return RISCV::F0_D + Index;
+    }
     Register Reg = 0;
     Reg = MatchRegisterAltName(RegName);
     if (Reg == RISCV::NoRegister)
       Reg = MatchRegisterName(RegName);
     if (Reg == RISCV::NoRegister)
       return std::nullopt;
-    else
-      return Reg;
+    // Zhinx subregisters deliberately have the same assembler names as GPRs.
+    // Normalize an ambiguous matcher result to the architectural register;
+    // Snippy's configuration and simulator state are expressed in full GPRs.
+    if (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H)
+      Reg = RISCV::X0 + (Reg - RISCV::X0_H);
+    else if (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W)
+      Reg = RISCV::X0 + (Reg - RISCV::X0_W);
+    return Reg;
   }
 
   unsigned getSpillAlignmentInBytes(MCRegister Reg,
@@ -3465,7 +3497,7 @@ public:
   std::vector<MCRegister>
   getCallerSavedRegs(const MachineFunction &MF,
                      ArrayRef<std::string> RegGroups) const override {
-    using namespace ::RISCV;
+    using namespace RISCV;
 
     if (RegGroups.empty())
       return {};
@@ -3518,7 +3550,7 @@ public:
 
   std::vector<MCRegister>
   getCalleeSavedRegs(const MCSubtargetInfo &SubTgt) const override {
-    using namespace ::RISCV;
+    using namespace RISCV;
 
     std::vector<MCRegister> PreservedRegs{
         X1 /* Return address */, X3 /* Global pointer */,
@@ -4158,6 +4190,10 @@ public:
                                         const LLVMState &State) const {
     auto Opcode = MIDesc.getOpcode();
     auto OperandType = MIDesc.operands()[OperandIdx].OperandType;
+    if (OperandType == RISCVOp::OPERAND_VMASK)
+      return MachineOperand::CreateReg(
+          isRVVuseV0RegExplicitly(Opcode) ? RISCV::V0 : RISCV::NoRegister,
+          /*isDef=*/false);
     return MachineOperand::CreateImm(
         genImmOperandForOpcode(Opcode, IH, OperandType, StridedImm, State));
   }
@@ -4224,8 +4260,6 @@ public:
       return genImmUINTWithNZeroLSBs<9, 3>(IH, StridedImm);
     case OPERAND_UIMM12:
       return genImmUINT<12>(IH, StridedImm);
-    case OPERAND_ZERO:
-      return 0;
     case OPERAND_SIMM5:
       return genImmSINT<5>(IH, StridedImm);
     case OPERAND_SIMM5_PLUS1:
@@ -4241,10 +4275,12 @@ public:
     case OPERAND_UIMM10_LSB00_NONZERO:
       return genImmNonZeroUINTWithNZeroLSBs<10, 2>(IH, StridedImm);
     case OPERAND_SIMM12:
+    case OPERAND_SIMM12_LO:
       return genImmSINT<12>(IH, StridedImm);
     case OPERAND_SIMM12_LSB00000:
       return genImmSINTWithNZeroLSBs<12, 5>(IH, StridedImm);
-    case OPERAND_UIMM20:
+    case OPERAND_UIMM20_LUI:
+    case OPERAND_UIMM20_AUIPC:
       return genImmUINT<20>(IH, StridedImm);
     case OPERAND_UIMMLOG2XLEN:
       if (is64Bit(TM))
@@ -4425,15 +4461,17 @@ public:
 
   void addTargetLegalizationPasses(PassManagerWrapper &PM) const override {
     PM.add(createRISCVExpandSnippyPseudoPass());
-    PM.add(createRISCVExpandPseudoPass());
-    PM.add(createRISCVExpandAtomicPseudoPass());
+    PM.add(createRISCVExpandPseudoPostRALegacyPass());
+    PM.add(createRISCVExpandPseudoPreEmitLegacyPass());
+    PM.add(createRISCVExpandPseudoAtomicsLegacyPass());
     PM.add(createRISCVZcmpPopretCombinePass());
   }
 
   void initializeTargetPasses() const override {
     auto *PM = PassRegistry::getPassRegistry();
-    initializeRISCVExpandPseudoPass(*PM);
-    initializeRISCVExpandAtomicPseudoPass(*PM);
+    initializeRISCVExpandPseudoPostRALegacyPass(*PM);
+    initializeRISCVExpandPseudoPreEmitLegacyPass(*PM);
+    initializeRISCVExpandPseudoAtomicsLegacyPass(*PM);
   }
 
   unsigned countAddrsToGenerate(unsigned Opcode) const override {
@@ -4997,8 +5035,10 @@ public:
 
       if (IsSimpleLoadStore && IsImmHistUniform) {
         [[maybe_unused]] auto ImmOpIdx = getImmOperandIdx(InstrDesc);
-        assert(InstrDesc.operands()[ImmOpIdx].OperandType ==
-               RISCVOp::OPERAND_SIMM12);
+        assert((InstrDesc.operands()[ImmOpIdx].OperandType ==
+                    RISCVOp::OPERAND_SIMM12 ||
+                InstrDesc.operands()[ImmOpIdx].OperandType ==
+                    RISCVOp::OPERAND_SIMM12_LO));
         // Both LoadStores and FPLoadStores have simm12 immediate
         if (isInt<12>(*Addr))
           return;
@@ -5062,8 +5102,7 @@ public:
       SmallVectorImpl<Register> &Result) const override {
     auto Opcode = InstrDesc.getOpcode();
     assert(PregeneratedOperands.size() == InstrDesc.getNumOperands());
-    assert(InstrDesc.operands()[OpIndex].OperandType ==
-           MCOI::OperandType::OPERAND_REGISTER);
+    assert(isRegisterOperand(InstrDesc.operands()[OpIndex]));
     auto &ProgCtx = IGC.ProgCtx;
     auto &State = ProgCtx.getLLVMState();
     const auto &TgtCtx =
@@ -5232,9 +5271,10 @@ public:
            "Expected memory access instruction");
     if (isLoadStore(Opcode) || isFPLoadStore(Opcode)) {
       assert(getMemOperandIdx(InstrDesc) + 1 < InstrDesc.getNumOperands());
-      assert(
-          InstrDesc.operands()[getMemOperandIdx(InstrDesc) + 1].OperandType ==
-          RISCVOp::OPERAND_SIMM12);
+      auto ImmOpType =
+          InstrDesc.operands()[getMemOperandIdx(InstrDesc) + 1].OperandType;
+      assert((ImmOpType == RISCVOp::OPERAND_SIMM12 ||
+              ImmOpType == RISCVOp::OPERAND_SIMM12_LO));
       return StridedImmediate(APInt::getSignedMinValue(12).getSExtValue(),
                               APInt::getSignedMaxValue(12).getSExtValue(), 1);
     }
@@ -5405,43 +5445,22 @@ private:
   getMostSuperFPRegWithClassID(const InstructionGenerationContext &InstrGenCtx,
                                const MCRegisterInfo &RI, MCRegister Reg) const {
     assert(isFloatingPoint(Reg));
-    static constexpr std::array<unsigned, 4> FPRClassesID{
-        RISCV::FPR16RegClassID,
-        RISCV::FPR32RegClassID,
-        RISCV::FPR64RegClassID,
-        RISCV::FPR128RegClassID,
-    };
+    static constexpr std::array<unsigned, 3> FPRClassesID{
+        RISCV::FPR16RegClassID, RISCV::FPR32RegClassID, RISCV::FPR64RegClassID};
 
     auto &ST = InstrGenCtx.getSubtarget<RISCVSubtarget>();
-    SmallVector<MCRegister, 4> SupRegs(RI.superregs(Reg));
-    // When any of the zfh, zfhmin, or f extensions are enabled, we can only
-    // unNaN FPR32 registers. UnNaN operations on FPR64 registers require
-    // instructions from the d extension, which is not present in these
-    // configurations. Also handle the case when we have 32-bit GPR registers
-    // and can only overwrite single precision FP registers.
-    llvm::erase_if(SupRegs, [&](auto SupReg) {
-      if (RI.getRegClass(RISCV::FPR64RegClassID).contains(SupReg) &&
+    // Select the widest supported FP view explicitly: LLVM also exposes
+    // FPR128 superregisters, even when the Q extension is disabled.
+    for (auto ClassID : llvm::reverse(FPRClassesID)) {
+      if (ClassID == RISCV::FPR64RegClassID &&
           (!ST.hasStdExtD() || ST.getXLen() == 32))
-        return true;
-      if (RI.getRegClass(RISCV::FPR128RegClassID).contains(SupReg))
-        return true;
-      return false;
-    });
-    if (SupRegs.empty())
-      return std::nullopt;
-    // When the +d extension is enabled, the FPR64 register must be obtained. It
-    // is a superregister of FPR32
-    if (ST.hasStdExtD())
-      llvm::erase_if(SupRegs, [&](auto &&SupReg) {
-        return !RI.getRegClass(RISCV::FPR64RegClassID).contains(SupReg);
-      });
-    assert(SupRegs.size() == 1);
-    auto SuperReg = SupRegs.front();
-    auto ClassIDIter = llvm::find_if(FPRClassesID, [&](auto ID) {
-      return RI.getRegClass(ID).contains(SuperReg);
-    });
-    assert(ClassIDIter != FPRClassesID.end());
-    return std::make_pair(SuperReg, *ClassIDIter);
+        continue;
+      const auto &RC = RI.getRegClass(ClassID);
+      for (auto SuperReg : RI.superregs(Reg))
+        if (RC.contains(SuperReg))
+          return std::make_pair(SuperReg, ClassID);
+    }
+    return std::nullopt;
   }
 
   // Returns an optional pair of the most super-register for the provided `Reg`
@@ -5469,7 +5488,8 @@ private:
   std::unique_ptr<AsmPrinter>
   createAsmPrinter(TargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const override {
-    return std::make_unique<RISCVAsmPrinter>(TM, std::move(Streamer));
+    return std::unique_ptr<AsmPrinter>(
+        TM.getTarget().createAsmPrinter(TM, std::move(Streamer)));
   }
 
   CLMBBAddrSelectParams
@@ -5491,7 +5511,7 @@ private:
     auto &State = ProgCtx.getLLVMState();
     auto &RI = State.getRegInfo();
     auto &InstrInfo = State.getInstrInfo();
-    auto &RegClass = RI.getRegClass(RISCV::GPRJALRRegClassID);
+    auto &RegClass = RI.getRegClass(RISCV::GPRJALRNonX7RegClassID);
     auto Reg =
         RP.getAvailableRegister("Reg to be used by JALR in relocation", RI,
                                 RegClass, MBB, AccessMaskBit::PrimaryRW);
@@ -5687,7 +5707,7 @@ void SnippyRISCVTarget::rvvUnsafeWriteValueUsingXReg(
   // other cases it's not quite right to use it. However, I expect the whole
   // this function to be a temporary solution, so it shouldn't be a big
   // problem.
-  unsigned RegFlags = RegState::Undef;
+  RegState RegFlags = RegState::Undef;
   for (unsigned Idx = 0; Idx < VL; ++Idx) {
     auto EltValue = Value.extractBitsAsZExtValue(SEW, Idx * SEW);
     writeValueToReg(IGC, APInt(SEW, EltValue), XScratchReg);
@@ -5697,7 +5717,7 @@ void SnippyRISCVTarget::rvvUnsafeWriteValueUsingXReg(
         .addReg(XScratchReg)
         // Disable masking
         .addReg(RISCV::NoRegister);
-    RegFlags = 0;
+    RegFlags = {};
   }
 }
 

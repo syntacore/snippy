@@ -8,7 +8,7 @@
 
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/IR/ArithDialect.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/IR/Builders.h"
@@ -43,14 +43,14 @@ NumElementsOpConverter::matchAndRewrite(NumElementsOp op,
                    ->materializeConstant(rewriter, rewriter.getIndexAttr(1),
                                          valueType, loc)
                    ->getResult(0);
-  ReduceOp reduce = rewriter.create<ReduceOp>(loc, op.getShape(), init);
+  ReduceOp reduce = ReduceOp::create(rewriter, loc, op.getShape(), init);
 
   // Generate reduce operator.
   Block *body = reduce.getBody();
   OpBuilder b = OpBuilder::atBlockEnd(body);
-  Value product = b.create<MulOp>(loc, valueType, body->getArgument(1),
-                                  body->getArgument(2));
-  b.create<shape::YieldOp>(loc, product);
+  Value product = MulOp::create(b, loc, valueType, body->getArgument(1),
+                                body->getArgument(2));
+  shape::YieldOp::create(b, loc, product);
 
   rewriter.replaceOp(op, reduce.getResult());
   return success();

@@ -37,7 +37,6 @@
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachinePassManager.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
-#include "llvm/InitializePasses.h"
 #include "llvm/PassRegistry.h"
 #include "llvm/Support/Compiler.h"
 
@@ -165,10 +164,8 @@ private:   // Intermediate data structures
   MachineInstr *FindLastRefOrPartRef(Register Reg);
 
   /// FindLastPartialDef - Return the last partial def of the specified
-  /// register. Also returns the sub-registers that're defined by the
-  /// instruction.
-  MachineInstr *FindLastPartialDef(Register Reg,
-                                   SmallSet<Register, 4> &PartDefRegs);
+  /// register.
+  MachineInstr *FindLastPartialDef(Register Reg);
 
   /// analyzePHINodes - Gather information about the PHI nodes in here. In
   /// particular, we want to map the variable information of a virtual
@@ -194,11 +191,6 @@ public:
   /// after removing some uses of \p Reg. It is not necessary for the whole
   /// machine function to be in SSA form.
   LLVM_ABI void recomputeForSingleDefVirtReg(Register Reg);
-
-  /// replaceKillInstruction - Update register kill info by replacing a kill
-  /// instruction with a new one.
-  LLVM_ABI void replaceKillInstruction(Register Reg, MachineInstr &OldMI,
-                                       MachineInstr &NewMI);
 
   /// addVirtualRegisterKilled - Add information about the fact that the
   /// specified register is killed after being used by the specified
@@ -313,14 +305,13 @@ public:
 };
 
 class LiveVariablesPrinterPass
-    : public PassInfoMixin<LiveVariablesPrinterPass> {
+    : public RequiredPassInfoMixin<LiveVariablesPrinterPass> {
   raw_ostream &OS;
 
 public:
   explicit LiveVariablesPrinterPass(raw_ostream &OS) : OS(OS) {}
   LLVM_ABI PreservedAnalyses run(MachineFunction &MF,
                                  MachineFunctionAnalysisManager &MFAM);
-  static bool isRequired() { return true; }
 };
 
 class LLVM_ABI LiveVariablesWrapperPass : public MachineFunctionPass {
@@ -329,9 +320,7 @@ class LLVM_ABI LiveVariablesWrapperPass : public MachineFunctionPass {
 public:
   static char ID; // Pass identification, replacement for typeid
 
-  LiveVariablesWrapperPass() : MachineFunctionPass(ID) {
-    initializeLiveVariablesWrapperPassPass(*PassRegistry::getPassRegistry());
-  }
+  LiveVariablesWrapperPass() : MachineFunctionPass(ID) {}
 
   bool runOnMachineFunction(MachineFunction &MF) override {
     LV.analyze(MF);

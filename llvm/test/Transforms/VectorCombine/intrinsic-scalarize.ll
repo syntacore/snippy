@@ -81,12 +81,12 @@ define <4 x i32> @non_trivially_vectorizable(i32 %x, i32 %y) {
 ; CHECK-SAME: i32 [[X:%.*]], i32 [[Y:%.*]]) {
 ; CHECK-NEXT:    [[X_INSERT:%.*]] = insertelement <4 x i32> poison, i32 [[X]], i32 0
 ; CHECK-NEXT:    [[Y_INSERT:%.*]] = insertelement <8 x i32> poison, i32 [[Y]], i32 0
-; CHECK-NEXT:    [[V:%.*]] = call <4 x i32> @llvm.experimental.vector.partial.reduce.add.v4i32.v8i32(<4 x i32> [[X_INSERT]], <8 x i32> [[Y_INSERT]])
+; CHECK-NEXT:    [[V:%.*]] = call <4 x i32> @llvm.vector.partial.reduce.add.v4i32.v8i32(<4 x i32> [[X_INSERT]], <8 x i32> [[Y_INSERT]])
 ; CHECK-NEXT:    ret <4 x i32> [[V]]
 ;
   %x.insert = insertelement <4 x i32> poison, i32 %x, i32 0
   %y.insert = insertelement <8 x i32> poison, i32 %y, i32 0
-  %v = call <4 x i32> @llvm.experimental.vector.partial.reduce.add(<4 x i32> %x.insert, <8 x i32> %y.insert)
+  %v = call <4 x i32> @llvm.vector.partial.reduce.add(<4 x i32> %x.insert, <8 x i32> %y.insert)
   ret <4 x i32> %v
 }
 
@@ -151,6 +151,19 @@ define <4 x float> @scalar_argument(float %x) {
 ;
   %x.insert = insertelement <4 x float> poison, float %x, i32 0
   %v = call <4 x float> @llvm.powi(<4 x float> %x.insert, i32 42)
+  ret <4 x float> %v
+}
+
+; Verify that fast-math flags on FP intrinsics survive scalarization.
+define <4 x float> @pow_fmf_preserved(float %x) {
+; CHECK-LABEL: define <4 x float> @pow_fmf_preserved(
+; CHECK-SAME: float [[X:%.*]]) {
+; CHECK-NEXT:    [[V_SCALAR:%.*]] = call arcp contract afn float @llvm.pow.f32(float [[X]], float 2.000000e+00)
+; CHECK-NEXT:    [[V:%.*]] = insertelement <4 x float> splat (float 1.000000e+00), float [[V_SCALAR]], i64 0
+; CHECK-NEXT:    ret <4 x float> [[V]]
+;
+  %x.insert = insertelement <4 x float> splat (float 1.0), float %x, i64 0
+  %v = call arcp contract afn <4 x float> @llvm.pow.v4f32(<4 x float> %x.insert, <4 x float> splat (float 2.0))
   ret <4 x float> %v
 }
 

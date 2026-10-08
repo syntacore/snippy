@@ -36,7 +36,7 @@ namespace snippy {
 #define ATOMIC_INST_PLACER(BASIC_OPCODE)                                       \
   BASIC_OPCODE:                                                                \
   case BASIC_OPCODE##_AQ:                                                      \
-  case BASIC_OPCODE##_AQ_RL:                                                   \
+  case BASIC_OPCODE##_AQRL:                                                    \
   case BASIC_OPCODE##_RL
 
 #ifdef RVV_SEG_EACHFIELD_PLACER

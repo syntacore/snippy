@@ -18,7 +18,9 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/BasicPtxBuilderInterface.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/NVVMDialectDecl.h"
 #include "mlir/Dialect/LLVMIR/NVVMRequiresSMTraits.h"
+#include "mlir/Dialect/Ptr/IR/MemorySpaceInterfaces.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/InferIntRangeInterface.h"
@@ -30,30 +32,22 @@
 
 namespace mlir {
 namespace NVVM {
+/// Utility functions to compare NVVMMemorySpace with unsigned values.
+inline bool operator==(unsigned as, NVVMMemorySpace memSpace) {
+  return as == static_cast<unsigned>(memSpace);
+}
+inline bool operator==(NVVMMemorySpace memSpace, unsigned as) {
+  return static_cast<unsigned>(memSpace) == as;
+}
+inline bool operator!=(unsigned as, NVVMMemorySpace memSpace) {
+  return as != static_cast<unsigned>(memSpace);
+}
+inline bool operator!=(NVVMMemorySpace memSpace, unsigned as) {
+  return static_cast<unsigned>(memSpace) != as;
+}
 
 // Shared memory has 128-bit alignment
 constexpr int kSharedMemoryAlignmentBit = 128;
-
-/// NVVM memory space identifiers.
-enum NVVMMemorySpace {
-  /// Generic memory space identifier.
-  kGenericMemorySpace = 0,
-  /// Global memory space identifier.
-  kGlobalMemorySpace = 1,
-  /// Shared memory space identifier.
-  kSharedMemorySpace = 3,
-  /// Constant memory space identifier.
-  kConstantMemorySpace = 4,
-  /// Local memory space identifier.
-  kLocalMemorySpace = 5,
-  /// Tensor memory space identifier.
-  /// Tensor memory is available only in arch-accelerated
-  /// variants from sm100 onwards.
-  kTensorMemorySpace = 6,
-  /// Distributed shared memory space identifier.
-  /// Distributed shared memory is available only in sm90+.
-  kSharedClusterMemorySpace = 7,
-};
 
 /// A pair type of LLVM's Intrinsic ID and args (which are llvm values).
 /// This type is returned by the getIntrinsicIDAndArgs() methods.
@@ -76,7 +70,5 @@ std::pair<mlir::Type, unsigned> inferMMAType(mlir::NVVM::MMATypes type,
 
 #define GET_OP_CLASSES
 #include "mlir/Dialect/LLVMIR/NVVMOps.h.inc"
-
-#include "mlir/Dialect/LLVMIR/NVVMOpsDialect.h.inc"
 
 #endif /* MLIR_DIALECT_LLVMIR_NVVMDIALECT_H_ */

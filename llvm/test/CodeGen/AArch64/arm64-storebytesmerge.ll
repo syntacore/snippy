@@ -8,7 +8,7 @@
 ; CHECK: str     x30, [sp, #-16]!
 ; CHECK: adrp    x8, q   
 ; CHECK: ldr     x8, [x8, :lo12:q]
-; CHECK: stp     xzr, xzr, [x8] 
+; CHECK: str     q0, [x8]
 ; CHECK: bl f
 
 @q = external dso_local unnamed_addr global ptr, align 8
@@ -36,6 +36,6 @@ for.end705.i:                                     ; preds = %for.body453.i
 
 declare void @f() local_unnamed_addr #1
 
-attributes #0 = { nounwind "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "frame-pointer"="none" "no-infs-fp-math"="true" "no-jump-tables"="false" "no-nans-fp-math"="true" "no-signed-zeros-fp-math"="true" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="cortex-a57" "target-features"="+crc,+crypto,+fp-armv8,+neon" "unsafe-fp-math"="true" "use-soft-float"="false" }
-attributes #1 = { "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "frame-pointer"="none" "no-infs-fp-math"="true" "no-nans-fp-math"="true" "no-signed-zeros-fp-math"="true" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="cortex-a57" "target-features"="+crc,+crypto,+fp-armv8,+neon" "unsafe-fp-math"="true" "use-soft-float"="false" }
+attributes #0 = { nounwind "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "frame-pointer"="none" "no-infs-fp-math"="true" "no-jump-tables"="false" "no-nans-fp-math"="true" "no-signed-zeros-fp-math"="true" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="cortex-a57" "target-features"="+crc,+crypto,+fp-armv8,+neon" "use-soft-float"="false" }
+attributes #1 = { "correctly-rounded-divide-sqrt-fp-math"="false" "disable-tail-calls"="false" "less-precise-fpmad"="false" "frame-pointer"="none" "no-infs-fp-math"="true" "no-nans-fp-math"="true" "no-signed-zeros-fp-math"="true" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="cortex-a57" "target-features"="+crc,+crypto,+fp-armv8,+neon" "use-soft-float"="false" }
 attributes #2 = { nounwind }

@@ -42,11 +42,11 @@ class CodeGenRegisterClass;
 class CodeGenSchedModels;
 class CodeGenSubRegIndex;
 
-/// getValueType - Return the MVT::SimpleValueType that the specified TableGen
+/// Returns the MVT that the specified TableGen
 /// record corresponds to.
-MVT::SimpleValueType getValueType(const Record *Rec);
+MVT getValueType(const Record *Rec);
 
-StringRef getEnumName(MVT::SimpleValueType T);
+StringRef getEnumName(MVT T);
 
 /// getQualifiedName - Return the name of the specified record, with a
 /// namespace qualifier if the record contains one.
@@ -63,6 +63,7 @@ class CodeGenTarget {
   mutable std::unique_ptr<CodeGenRegBank> RegBank;
   mutable ArrayRef<const Record *> RegAltNameIndices;
   mutable SmallVector<ValueTypeByHwMode, 8> LegalValueTypes;
+  mutable std::optional<std::vector<const Record *>> RegClassByHwModeList;
   CodeGenHwModes CGH;
   ArrayRef<const Record *> MacroFusions;
   mutable bool HasVariableLengthEncodings = false;
@@ -101,6 +102,11 @@ public:
   ///
   bool getAllowRegisterRenaming() const;
 
+  /// getRegistersAreIntervals - Return the RegistersAreIntervals flag value for
+  /// this target.
+  ///
+  bool getRegistersAreIntervals() const;
+
   /// getAsmParser - Return the AssemblyParser definition for this target.
   ///
   const Record *getAsmParser() const;
@@ -132,7 +138,15 @@ public:
     return RegAltNameIndices;
   }
 
-  const CodeGenRegisterClass &getRegisterClass(const Record *R) const;
+  const CodeGenRegisterClass &getRegisterClass(const Record *R,
+                                               ArrayRef<SMLoc> Loc = {}) const;
+
+  /// Convenience wrapper to avoid hardcoding the name of RegClassByHwMode
+  /// everywhere. This is here instead of CodeGenRegBank to avoid the fatal
+  /// error that occurs when no RegisterClasses are defined when constructing
+  /// the bank. The empty ptr_rc placeholder is excluded: it carries no register
+  /// classes and only exists to be substituted per target.
+  ArrayRef<const Record *> getAllRegClassByHwMode() const;
 
   /// getRegisterVTs - Find the union of all possible SimpleValueTypes for the
   /// specified physical register.
@@ -143,6 +157,22 @@ public:
       ReadLegalValueTypes();
     return LegalValueTypes;
   }
+
+  /// If \p V is a DefInit that can be interpreted as a RegisterClass (e.g.,
+  /// it's a RegisterOperand, or a direct RegisterClass reference), return the
+  /// Record for that RegisterClass.
+  ///
+  /// AssumeRegClassByHwModeIsDefault is a hack which should be removed. It only
+  /// happens to be adequate for the current GlobalISel usage.
+  const Record *
+  getInitValueAsRegClass(const Init *V,
+                         bool AssumeRegClassByHwModeIsDefault = false) const;
+
+  /// If \p V is a DefInit that can be interpreted as a RegisterClassLike,
+  /// return the Record. This is used as a convenience function to handle direct
+  /// RegisterClass references, or those wrapped in a RegisterOperand.
+  const Record *getInitValueAsRegClassLike(const Init *V) const;
+  const Record *getAsRegClassLike(const Record *V) const;
 
   CodeGenSchedModels &getSchedModels() const;
 

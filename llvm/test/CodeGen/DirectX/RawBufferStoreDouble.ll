@@ -4,10 +4,10 @@
 define void @storef64(double %0, i32 %index) {
   ; CHECK: [[B:%.*]] = tail call target("dx.RawBuffer", double, 1, 0)
   ; CHECK-SAME: @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_f64_1_0t(
-  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, i1 false, ptr null)
+  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, ptr null)
   %buffer = tail call target("dx.RawBuffer", double, 1, 0)
       @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_f64_1_0t(
-          i32 0, i32 0, i32 1, i32 0, i1 false, ptr null)
+          i32 0, i32 0, i32 1, i32 0, ptr null)
 
   ; check we don't modify the code in sm6.3 or later
   ; CHECK63: call void @llvm.dx.resource.store.rawbuffer
@@ -30,10 +30,10 @@ define void @storef64(double %0, i32 %index) {
 define void @storev2f64(<2 x double> %0, i32 %index) {
   ; CHECK: [[B:%.*]] = tail call target("dx.RawBuffer", <2 x double>, 1, 0)
   ; CHECK-SAME: @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_v2f64_1_0t(
-  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, i1 false, ptr null)
+  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, ptr null)
   %buffer = tail call target("dx.RawBuffer", <2 x double>, 1, 0)
       @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_v2f64_1_0t(
-          i32 0, i32 0, i32 1, i32 0, i1 false, ptr null)
+          i32 0, i32 0, i32 1, i32 0, ptr null)
 
   ; check we don't modify the code in sm6.3 or later
   ; CHECK63: call void @llvm.dx.resource.store.rawbuffer
@@ -55,10 +55,10 @@ define void @storev2f64(<2 x double> %0, i32 %index) {
 define void @storev3f64(<3 x double> %0, i32 %index) {
   ; CHECK: [[Buf:%.*]] = tail call target("dx.RawBuffer", <3 x double>, 1, 0)
   ; CHECK-SAME: @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_v3f64_1_0t(
-  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, i1 false, ptr null)
+  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, ptr null)
   %buffer = tail call target("dx.RawBuffer", <3 x double>, 1, 0)
       @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_v3f64_1_0t(
-          i32 0, i32 0, i32 1, i32 0, i1 false, ptr null)
+          i32 0, i32 0, i32 1, i32 0, ptr null)
 
   ; check we don't modify the code in sm6.3 or later
   ; CHECK63: call void @llvm.dx.resource.store.rawbuffer
@@ -81,10 +81,10 @@ define void @storev3f64(<3 x double> %0, i32 %index) {
 define void @storev4f64(<4 x double> %0, i32 %index) {
   ; CHECK: [[Buf:%.*]] = tail call target("dx.RawBuffer", <4 x double>, 1, 0)
   ; CHECK-SAME: @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_v4f64_1_0t(
-  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, i1 false, ptr null)
+  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, ptr null)
   %buffer = tail call target("dx.RawBuffer", <4 x double>, 1, 0)
       @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_v4f64_1_0t(
-          i32 0, i32 0, i32 1, i32 0, i1 false, ptr null)
+          i32 0, i32 0, i32 1, i32 0, ptr null)
 
   ; check we don't modify the code in sm6.3 or later
   ; CHECK63: call void @llvm.dx.resource.store.rawbuffer
@@ -100,6 +100,32 @@ define void @storev4f64(<4 x double> %0, i32 %index) {
   ; CHECK62: call void @llvm.dx.resource.store.rawbuffer.tdx.RawBuffer_v4f64_1_0t.v4i32(target("dx.RawBuffer", <4 x double>, 1, 0) [[Buf]], i32 %index, i32 16, <4 x i32> [[F]])
   call void @llvm.dx.resource.store.rawbuffer(
       target("dx.RawBuffer", <4 x double>, 1, 0) %buffer, i32 %index, i32 0,
+      <4 x double> %0)
+  ret void
+}
+
+define void @storev4f64_byte(<4 x double> %0, i32 %index) {
+  ; CHECK: [[Buf:%.*]] = tail call target("dx.RawBuffer", i8, 1, 0)
+  ; CHECK-SAME: @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_i8_1_0t(
+  ; CHECK-SAME: i32 0, i32 0, i32 1, i32 0, ptr null)
+  %buffer = tail call target("dx.RawBuffer", i8, 1, 0)
+      @llvm.dx.resource.handlefrombinding.tdx.RawBuffer_i8_1_0t(
+          i32 0, i32 0, i32 1, i32 0, ptr null)
+
+  ; CHECK63: call void @llvm.dx.resource.store.rawbuffer
+  ; CHECK63-SAME: target("dx.RawBuffer", i8, 1, 0) [[Buf]], i32 %index, i32 poison, <4 x double> %0)
+
+  ; CHECK62: [[SD:%.*]] = call { <4 x i32>, <4 x i32> } @llvm.dx.splitdouble.v4i32(<4 x double> %0)
+  ; CHECK62: [[Lo:%.*]] = extractvalue { <4 x i32>, <4 x i32> } [[SD]], 0
+  ; CHECK62: [[Hi:%.*]] = extractvalue { <4 x i32>, <4 x i32> } [[SD]], 1
+  ; CHECK62: [[Vec:%.*]] = shufflevector <4 x i32> [[Lo]], <4 x i32> [[Hi]], <8 x i32> <i32 0, i32 4, i32 1, i32 5, i32 2, i32 6, i32 3, i32 7>
+  ; CHECK62: [[Low:%.*]] = shufflevector <8 x i32> [[Vec]], <8 x i32> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
+  ; CHECK62: call void @llvm.dx.resource.store.rawbuffer.tdx.RawBuffer_i8_1_0t.v4i32(target("dx.RawBuffer", i8, 1, 0) [[Buf]], i32 %index, i32 poison, <4 x i32> [[Low]])
+  ; CHECK62: [[NextIndex:%.*]] = add i32 %index, 16
+  ; CHECK62: [[High:%.*]] = shufflevector <8 x i32> [[Vec]], <8 x i32> poison, <4 x i32> <i32 4, i32 5, i32 6, i32 7>
+  ; CHECK62: call void @llvm.dx.resource.store.rawbuffer.tdx.RawBuffer_i8_1_0t.v4i32(target("dx.RawBuffer", i8, 1, 0) [[Buf]], i32 [[NextIndex]], i32 poison, <4 x i32> [[High]])
+  call void @llvm.dx.resource.store.rawbuffer(
+      target("dx.RawBuffer", i8, 1, 0) %buffer, i32 %index, i32 poison,
       <4 x double> %0)
   ret void
 }

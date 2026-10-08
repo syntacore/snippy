@@ -130,7 +130,7 @@ public:
                           std::unique_ptr<SpecialCaseList> Ignorelist)
       : Mod(M), Options(transformOptionsFromCl(std::move(Opts))),
         Ignorelist(std::move(Ignorelist)), TargetTriple(M.getTargetTriple()),
-        VersionStr(utostr(getVersion())), IRB(M.getContext()) {
+        VersionStr(utostr(getVersion())), IRB(M) {
     // FIXME: Make it work with other formats.
     assert(TargetTriple.isOSBinFormatELF() && "ELF only");
     assert(!TargetTriple.isGPU() && "Device targets are not supported");
@@ -481,15 +481,18 @@ StringRef SanitizerBinaryMetadata::getSectionEnd(StringRef SectionSuffix) {
 } // namespace
 
 SanitizerBinaryMetadataPass::SanitizerBinaryMetadataPass(
-    SanitizerBinaryMetadataOptions Opts, ArrayRef<std::string> IgnorelistFiles)
-    : Options(std::move(Opts)), IgnorelistFiles(std::move(IgnorelistFiles)) {}
+    SanitizerBinaryMetadataOptions Opts,
+    IntrusiveRefCntPtr<vfs::FileSystem> VFS,
+    ArrayRef<std::string> IgnorelistFiles)
+    : Options(std::move(Opts)),
+      VFS(VFS ? std::move(VFS) : vfs::getRealFileSystem()),
+      IgnorelistFiles(std::move(IgnorelistFiles)) {}
 
 PreservedAnalyses
 SanitizerBinaryMetadataPass::run(Module &M, AnalysisManager<Module> &AM) {
   std::unique_ptr<SpecialCaseList> Ignorelist;
   if (!IgnorelistFiles.empty()) {
-    Ignorelist = SpecialCaseList::createOrDie(IgnorelistFiles,
-                                              *vfs::getRealFileSystem());
+    Ignorelist = SpecialCaseList::createOrDie(IgnorelistFiles, *VFS);
     if (Ignorelist->inSection("metadata", "src", M.getSourceFileName()))
       return PreservedAnalyses::all();
   }

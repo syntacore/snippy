@@ -114,27 +114,6 @@ std::string floatToString(APFloat F, unsigned Precision) {
   return S.str().str();
 }
 
-unsigned getAutoSenseRadix(StringRef &Str) {
-  if (Str.empty())
-    return 10;
-
-  if (Str.consume_front_insensitive("0x"))
-    return 16;
-
-  if (Str.consume_front_insensitive("0b"))
-    return 2;
-
-  if (Str.consume_front("0o"))
-    return 8;
-
-  if (Str[0] == '0' && Str.size() > 1 && isDigit(Str[1])) {
-    Str = Str.substr(1);
-    return 8;
-  }
-
-  return 10;
-}
-
 void replaceAllSubstrs(std::string &Str, StringRef What, StringRef With) {
   for (auto Pos = Str.find(What); std::string::npos != Pos;
        Pos = Str.find(What, Pos + With.size()))

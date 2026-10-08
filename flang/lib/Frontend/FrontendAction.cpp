@@ -17,8 +17,11 @@
 #include "flang/Frontend/FrontendPluginRegistry.h"
 #include "flang/Parser/parsing.h"
 #include "clang/Basic/DiagnosticFrontend.h"
-#include "llvm/Support/Errc.h"
+#include "clang/Basic/MakeSupport.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace Fortran::frontend;
 
@@ -80,12 +83,16 @@ bool FrontendAction::beginSourceFile(CompilerInstance &ci,
   //  * `-cpp/-nocpp`, or
   //  * the file extension (if the user didn't express any preference)
   // to decide whether to include them or not.
-  if ((invoc.getPreprocessorOpts().macrosFlag == PPMacrosFlag::Include) ||
+  bool includeMacros =
+      (invoc.getPreprocessorOpts().macrosFlag == PPMacrosFlag::Include) ||
+      (invoc.getPreprocessorOpts().showMacros) ||
       (invoc.getPreprocessorOpts().macrosFlag == PPMacrosFlag::Unknown &&
-       getCurrentInput().getMustBePreprocessed())) {
+       getCurrentInput().getMustBePreprocessed());
+  if (includeMacros) {
     invoc.setDefaultPredefinitions();
     invoc.collectMacroDefinitions();
   }
+  invoc.getFortranOpts().preprocessingEnabled = includeMacros;
 
   if (!invoc.getFortranOpts().features.IsEnabled(
           Fortran::common::LanguageFeature::CUDA)) {
@@ -110,6 +117,9 @@ bool FrontendAction::beginSourceFile(CompilerInstance &ci,
     beginSourceFileCleanUp(*this, ci);
     return false;
   }
+
+  // Written after semantics so -MD/-MMD also capture .mod files from `use`.
+  writeDependencyFile();
 
   return true;
 }
@@ -158,11 +168,47 @@ bool FrontendAction::runPrescan() {
   return !reportFatalScanningErrors();
 }
 
+void FrontendAction::writeDependencyFile() {
+  CompilerInstance &ci = this->getInstance();
+  const FrontendOptions &opts = ci.getFrontendOpts();
+  if (opts.dependencyOutputFile.empty())
+    return;
+
+  // Use the -MT targets, or derive one from the output/input file name.
+  std::vector<std::string> targets = opts.dependencyTargets;
+  if (targets.empty()) {
+    llvm::SmallString<128> target;
+    if (opts.outputFile.empty()) {
+      target = llvm::sys::path::filename(getCurrentFileOrBufferName());
+      llvm::sys::path::replace_extension(target, "o");
+    } else {
+      target = opts.outputFile;
+    }
+    llvm::SmallString<128> quoted;
+    clang::quoteMakeTarget(target, quoted);
+    targets.push_back(std::string(quoted));
+  }
+
+  std::error_code ec;
+  llvm::raw_fd_ostream os(opts.dependencyOutputFile, ec,
+                          llvm::sys::fs::OF_TextWithCRLF);
+  if (ec) {
+    unsigned diagID = ci.getDiagnostics().getCustomDiagID(
+        clang::DiagnosticsEngine::Error, "unable to open dependency file %0");
+    ci.getDiagnostics().Report(diagID) << opts.dependencyOutputFile;
+    return;
+  }
+
+  clang::printMakeDependencyFile(os, targets,
+                                 ci.getAllSources().GetIncludedFilePaths());
+}
+
 bool FrontendAction::runParse(bool emitMessages) {
   CompilerInstance &ci = this->getInstance();
 
   // Parse. In case of failure, report and return.
-  ci.getParsing().Parse(llvm::outs());
+  const common::LangOptions &langOpts = ci.getInvocation().getLangOpts();
+  ci.getParsing().Parse(llvm::outs(), langOpts);
 
   if (reportFatalParsingErrors()) {
     return false;
@@ -230,15 +276,14 @@ bool FrontendAction::reportFatalErrors(const char (&message)[N]) {
   const common::LanguageFeatureControl &features{
       instance->getInvocation().getFortranOpts().features};
   const size_t maxErrors{instance->getInvocation().getMaxErrors()};
-  if (!instance->getParsing().messages().empty() &&
-      (instance->getInvocation().getWarnAsErr() ||
-       instance->getParsing().messages().AnyFatalError())) {
+  const bool warningsAreErrors{instance->getInvocation().getWarnAsErr()};
+  if (instance->getParsing().messages().AnyFatalError(warningsAreErrors)) {
     const unsigned diagID = instance->getDiagnostics().getCustomDiagID(
         clang::DiagnosticsEngine::Error, message);
     instance->getDiagnostics().Report(diagID) << getCurrentFileOrBufferName();
     instance->getParsing().messages().Emit(
         llvm::errs(), instance->getAllCookedSources(),
-        /*echoSourceLines=*/true, &features, maxErrors);
+        /*echoSourceLines=*/true, &features, maxErrors, warningsAreErrors);
     return true;
   }
   if (instance->getParsing().parseTree().has_value() &&
@@ -249,7 +294,7 @@ bool FrontendAction::reportFatalErrors(const char (&message)[N]) {
     instance->getDiagnostics().Report(diagID) << getCurrentFileOrBufferName();
     instance->getParsing().messages().Emit(
         llvm::errs(), instance->getAllCookedSources(),
-        /*echoSourceLine=*/true, &features, maxErrors);
+        /*echoSourceLine=*/true, &features, maxErrors, warningsAreErrors);
     instance->getParsing().EmitMessage(
         llvm::errs(), instance->getParsing().finalRestingPlace(),
         "parser FAIL (final position)", "error: ", llvm::raw_ostream::RED);

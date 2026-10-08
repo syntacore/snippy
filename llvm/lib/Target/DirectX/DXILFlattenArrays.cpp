@@ -232,14 +232,10 @@ bool DXILFlattenArraysVisitor::visitGetElementPtrInst(GetElementPtrInst &GEP) {
         cast<GetElementPtrInst>(PtrOpGEPCE->getAsInstruction());
     OldGEPI->insertBefore(GEP.getIterator());
 
-    IRBuilder<> Builder(&GEP);
     SmallVector<Value *> Indices(GEP.indices());
-    Value *NewGEP =
-        Builder.CreateGEP(GEP.getSourceElementType(), OldGEPI, Indices,
-                          GEP.getName(), GEP.getNoWrapFlags());
-    assert(isa<GetElementPtrInst>(NewGEP) &&
-           "Expected newly-created GEP to be an instruction");
-    GetElementPtrInst *NewGEPI = cast<GetElementPtrInst>(NewGEP);
+    GetElementPtrInst *NewGEPI = GetElementPtrInst::Create(
+        GEP.getSourceElementType(), OldGEPI, Indices, GEP.getNoWrapFlags(),
+        GEP.getName(), GEP.getIterator());
 
     GEP.replaceAllUsesWith(NewGEPI);
     GEP.eraseFromParent();
@@ -263,8 +259,13 @@ bool DXILFlattenArraysVisitor::visitGetElementPtrInst(GetElementPtrInst &GEP) {
   // merge the byte offsets. Otherwise, this GEP is itself the root of a GEP
   // chain and we need to deterine the root array type
   if (auto *PtrOpGEP = dyn_cast<GEPOperator>(PtrOperand)) {
-    assert(GEPChainInfoMap.contains(PtrOpGEP) &&
-           "Expected parent GEP to be visited before this GEP");
+
+    // If the parent GEP was not processed, then we do not want to process its
+    // descendants. This can happen if the GEP chain is for an unsupported type
+    // such as a struct -- we do not flatten structs nor GEP chains for structs
+    if (!GEPChainInfoMap.contains(PtrOpGEP))
+      return false;
+
     GEPInfo &PGEPInfo = GEPChainInfoMap[PtrOpGEP];
     Info.RootFlattenedArrayType = PGEPInfo.RootFlattenedArrayType;
     Info.RootPointerOperand = PGEPInfo.RootPointerOperand;
@@ -339,9 +340,10 @@ bool DXILFlattenArraysVisitor::visitGetElementPtrInst(GetElementPtrInst &GEP) {
     }
 
     // Construct a new GEP for the flattened array to replace the current GEP
-    Value *NewGEP = Builder.CreateGEP(
+    GetElementPtrInst *NewGEP = GetElementPtrInst::Create(
         Info.RootFlattenedArrayType, Info.RootPointerOperand,
-        {ZeroIndex, FlattenedIndex}, GEP.getName(), GEP.getNoWrapFlags());
+        {ZeroIndex, FlattenedIndex}, GEP.getNoWrapFlags(), GEP.getName(),
+        Builder.GetInsertPoint());
 
     // Replace the current GEP with the new GEP. Store GEPInfo into the map
     // for later use in case this GEP was not the end of the chain
@@ -444,7 +446,7 @@ static void flattenGlobalArrays(
 
     // Copy relevant attributes
     NewGlobal->setUnnamedAddr(G.getUnnamedAddr());
-    if (G.getAlignment() > 0) {
+    if (G.getAlign()) {
       NewGlobal->setAlignment(G.getAlign());
     }
 

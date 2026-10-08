@@ -42,7 +42,7 @@ using namespace llvm;
 
 XCoreTargetLowering::XCoreTargetLowering(const TargetMachine &TM,
                                          const XCoreSubtarget &Subtarget)
-    : TargetLowering(TM), TM(TM), Subtarget(Subtarget) {
+    : TargetLowering(TM, Subtarget), TM(TM), Subtarget(Subtarget) {
 
   // Set up the register classes.
   addRegisterClass(MVT::i32, &XCore::GRRegsRegClass);
@@ -264,8 +264,7 @@ LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const
     // Ideally we would not fold in offset with an index <= 11.
     Type *Ty = Type::getInt32Ty(*DAG.getContext());
     Constant *Idx = ConstantInt::get(Ty, Offset);
-    Constant *GAI = ConstantExpr::getGetElementPtr(
-        Type::getInt8Ty(*DAG.getContext()), const_cast<GlobalValue *>(GV), Idx);
+    Constant *GAI = ConstantExpr::getPtrAdd(const_cast<GlobalValue *>(GV), Idx);
     SDValue CP = DAG.getConstantPool(GAI, MVT::i32);
     return DAG.getLoad(getPointerTy(DAG.getDataLayout()), DL,
                        DAG.getEntryNode(), CP, MachinePointerInfo());
@@ -429,11 +428,7 @@ SDValue XCoreTargetLowering::LowerLOAD(SDValue Op, SelectionDAG &DAG) const {
   // Lower to a call to __misaligned_load(BasePtr).
   Type *IntPtrTy = DAG.getDataLayout().getIntPtrType(Context);
   TargetLowering::ArgListTy Args;
-  TargetLowering::ArgListEntry Entry;
-
-  Entry.Ty = IntPtrTy;
-  Entry.Node = BasePtr;
-  Args.push_back(Entry);
+  Args.emplace_back(BasePtr, IntPtrTy);
 
   TargetLowering::CallLoweringInfo CLI(DAG);
   CLI.setDebugLoc(DL).setChain(Chain).setLibCallee(
@@ -480,14 +475,8 @@ SDValue XCoreTargetLowering::LowerSTORE(SDValue Op, SelectionDAG &DAG) const {
   // Lower to a call to __misaligned_store(BasePtr, Value).
   Type *IntPtrTy = DAG.getDataLayout().getIntPtrType(Context);
   TargetLowering::ArgListTy Args;
-  TargetLowering::ArgListEntry Entry;
-
-  Entry.Ty = IntPtrTy;
-  Entry.Node = BasePtr;
-  Args.push_back(Entry);
-
-  Entry.Node = Value;
-  Args.push_back(Entry);
+  Args.emplace_back(BasePtr, IntPtrTy);
+  Args.emplace_back(Value, IntPtrTy);
 
   TargetLowering::CallLoweringInfo CLI(DAG);
   CLI.setDebugLoc(dl).setChain(Chain).setCallee(
@@ -902,6 +891,7 @@ LowerATOMIC_FENCE(SDValue Op, SelectionDAG &DAG) const {
 //                      Calling Convention Implementation
 //===----------------------------------------------------------------------===//
 
+#define GET_CALLING_CONV_IMPL
 #include "XCoreGenCallingConv.inc"
 
 //===----------------------------------------------------------------------===//
@@ -1193,7 +1183,7 @@ SDValue XCoreTargetLowering::LowerCCCArguments(
         CFRegNode.push_back(ArgIn.getValue(ArgIn->getNumValues() - 1));
       }
     } else {
-      // Only arguments passed on the stack should make it here. 
+      // Only arguments passed on the stack should make it here.
       assert(VA.isMemLoc());
       // Load the argument to a virtual register
       unsigned ObjSize = VA.getLocVT().getSizeInBits()/8;
@@ -1272,7 +1262,7 @@ SDValue XCoreTargetLowering::LowerCCCArguments(
       InVals.push_back(FIN);
       MemOps.push_back(DAG.getMemcpy(
           Chain, dl, FIN, ArgDI.SDV, DAG.getConstant(Size, dl, MVT::i32),
-          Alignment, false, false, /*CI=*/nullptr, std::nullopt,
+          Alignment, Alignment, false, false, /*CI=*/nullptr, std::nullopt,
           MachinePointerInfo(), MachinePointerInfo()));
     } else {
       InVals.push_back(ArgDI.SDV);
@@ -1675,7 +1665,7 @@ SDValue XCoreTargetLowering::PerformDAGCombine(SDNode *N,
         bool isTail = isInTailCallPosition(DAG, ST, Chain);
         return DAG.getMemmove(Chain, dl, ST->getBasePtr(), LD->getBasePtr(),
                               DAG.getConstant(StoreBits / 8, dl, MVT::i32),
-                              Alignment, false, nullptr, isTail,
+                              Alignment, Alignment, false, nullptr, isTail,
                               ST->getPointerInfo(), LD->getPointerInfo());
       }
     }

@@ -29,6 +29,7 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <ranges>
 #include <vector>
@@ -36,6 +37,7 @@
 #include "almost_satisfies_types.h"
 #include "sized_allocator.h"
 #include "test_iterators.h"
+#include "type_algorithms.h"
 
 struct NotEqualityComparable {};
 
@@ -219,7 +221,7 @@ constexpr bool test() {
     }
 
     // Verify that the std::vector<bool>::iterator optimization works properly for allocators with custom size types
-    // See https://github.com/llvm/llvm-project/issues/122528
+    // See https://llvm.org/PR122528
     {
       using Alloc = sized_allocator<bool, std::uint8_t, std::int8_t>;
       std::vector<bool, Alloc> in(100, false, Alloc(1));

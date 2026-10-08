@@ -7,7 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/SDNodeInfo.h"
+#include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/CodeGen/SelectionDAGNodes.h"
+#include "llvm/CodeGen/TargetLowering.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
 
 using namespace llvm;
 
@@ -39,6 +42,32 @@ static void checkOperandType(const SelectionDAG &DAG, const SDNode *N,
         "operand #" + Twine(OpIdx) + " has invalid type; expected " +
             ExpectedVT.getEVTString() + ", got " + ActualVT.getEVTString());
 }
+
+namespace {
+
+/// Similar to SDValue, but also records whether it is a result or an operand
+/// of a node so we can provide more precise diagnostics.
+class SDNodeValue {
+  const SDNode *N;
+  unsigned Idx;
+  bool IsRes;
+
+public:
+  SDNodeValue(const SDNode *N, unsigned Idx, bool IsRes)
+      : N(N), Idx(Idx), IsRes(IsRes) {}
+
+  SDValue getValue() const {
+    return IsRes ? SDValue(const_cast<SDNode *>(N), Idx) : N->getOperand(Idx);
+  }
+
+  EVT getValueType() const { return getValue().getValueType(); }
+
+  friend raw_ostream &operator<<(raw_ostream &OS, const SDNodeValue &Op) {
+    return OS << (Op.IsRes ? "result" : "operand") << " #" << Op.Idx;
+  }
+};
+
+} // namespace
 
 void SDNodeInfo::verifyNode(const SelectionDAG &DAG, const SDNode *N) const {
   const SDNodeDesc &Desc = getDesc(N->getOpcode());
@@ -123,6 +152,125 @@ void SDNodeInfo::verifyNode(const SelectionDAG &DAG, const SDNode *N) const {
         reportNodeError(DAG, N,
                         "variadic operand #" + Twine(OpIdx) +
                             " must be Register or RegisterMask");
+    }
+  }
+
+  unsigned VTHwMode =
+      DAG.getSubtarget().getHwMode(MCSubtargetInfo::HwMode_ValueType);
+
+  // Returns a constrained or constraining value (result or operand) of a node.
+  // ValIdx is the index of a node's value, as defined by SDTypeConstraint;
+  // that is, it indexes a node's operands after its results and ignores
+  // chain/glue values.
+  auto GetConstraintValue = [&](unsigned ValIdx) {
+    if (ValIdx < Desc.NumResults)
+      return SDNodeValue(N, ValIdx, /*IsRes=*/true);
+    return SDNodeValue(N, HasChain + (ValIdx - Desc.NumResults),
+                       /*IsRes=*/false);
+  };
+
+  auto GetConstraintVT = [&](const SDTypeConstraint &C) {
+    if (!C.NumHwModes)
+      return static_cast<MVT::SimpleValueType>(C.VT);
+    for (auto [Mode, VT] : ArrayRef(&VTByHwModeTable[C.VT], C.NumHwModes))
+      if (Mode == VTHwMode)
+        return VT;
+    llvm_unreachable("No value type for this HW mode");
+  };
+
+  SmallString<128> ES;
+  raw_svector_ostream SS(ES);
+
+  for (const SDTypeConstraint &C : getConstraints(N->getOpcode())) {
+    SDNodeValue Val = GetConstraintValue(C.ConstrainedValIdx);
+    EVT VT = Val.getValueType();
+
+    switch (C.Kind) {
+    case SDTCisVT: {
+      EVT ExpectedVT = GetConstraintVT(C);
+
+      bool IsPtr = ExpectedVT == MVT::iPTR;
+      if (IsPtr)
+        ExpectedVT =
+            DAG.getTargetLoweringInfo().getPointerTy(DAG.getDataLayout());
+
+      if (VT != ExpectedVT) {
+        SS << Val << " must have type " << ExpectedVT;
+        if (IsPtr)
+          SS << " (iPTR)";
+        SS << ", but has type " << VT;
+        reportNodeError(DAG, N, SS.str());
+      }
+      break;
+    }
+    case SDTCisPtrTy: {
+      unsigned AS = 0;
+      if (const auto *MemSD = dyn_cast<MemSDNode>(N))
+        AS = MemSD->getAddressSpace();
+      EVT PtrVT =
+          DAG.getTargetLoweringInfo().getPointerTy(DAG.getDataLayout(), AS);
+      if (VT != PtrVT) {
+        SS << Val << " must have pointer type " << PtrVT << ", but has type "
+           << VT;
+        reportNodeError(DAG, N, SS.str());
+      }
+      break;
+    }
+    case SDTCisInt:
+      if (!VT.isInteger()) {
+        SS << Val << " must have integer type, but has type " << VT;
+        reportNodeError(DAG, N, SS.str());
+      }
+      break;
+    case SDTCisFP:
+      if (!VT.isFloatingPoint()) {
+        SS << Val << " must have floating-point type, but has type " << VT;
+        reportNodeError(DAG, N, SS.str());
+      }
+      break;
+    case SDTCisVec:
+      break;
+    case SDTCisSameAs:
+      break;
+    case SDTCisVTSmallerThanOp:
+      break;
+    case SDTCisOpSmallerThanOp:
+      break;
+    case SDTCisEltOfVec: {
+      SDNodeValue VecVal = GetConstraintValue(C.ConstrainingValIdx);
+      EVT VecVT = VecVal.getValueType();
+
+      if (!VecVT.isVector()) {
+        SS << VecVal << " must have vector type, but has type " << VecVT;
+        reportNodeError(DAG, N, SS.str());
+      }
+      if (!VecVT.isVectorOf(VT)) {
+        SS << Val << " must have " << VecVT.getVectorElementType()
+           << " type (element type of " << VecVal << "), but has type " << VT;
+        reportNodeError(DAG, N, SS.str());
+      }
+      break;
+    }
+    case SDTCisSubVecOfVec:
+      break;
+    case SDTCVecEltisVT: {
+      EVT ExpectedVT = GetConstraintVT(C);
+
+      if (!VT.isVector()) {
+        SS << Val << " must have vector type";
+        reportNodeError(DAG, N, SS.str());
+      }
+      if (VT.getVectorElementType() != ExpectedVT) {
+        SS << Val << " must have " << ExpectedVT << " element type, but has "
+           << VT.getVectorElementType() << " element type";
+        reportNodeError(DAG, N, SS.str());
+      }
+      break;
+    }
+    case SDTCisSameNumEltsAs:
+      break;
+    case SDTCisSameSizeAs:
+      break;
     }
   }
 }

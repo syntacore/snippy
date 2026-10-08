@@ -7,8 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Config/mlir-config.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Iterators.h"
 #include "mlir/IR/RegionKindInterface.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -82,10 +80,10 @@ Pattern::Pattern(const void *rootValue, RootKind rootKind,
   if (generatedNames.empty())
     return;
   generatedOps.reserve(generatedNames.size());
-  std::transform(generatedNames.begin(), generatedNames.end(),
-                 std::back_inserter(generatedOps), [context](StringRef name) {
-                   return OperationName(name, context);
-                 });
+  llvm::append_range(generatedOps,
+                     llvm::map_range(generatedNames, [context](StringRef name) {
+                       return OperationName(name, context);
+                     }));
 }
 
 //===----------------------------------------------------------------------===//
@@ -157,6 +155,11 @@ void RewriterBase::replaceOp(Operation *op, Operation *newOp) {
 void RewriterBase::eraseOp(Operation *op) {
   assert(op->use_empty() && "expected 'op' to have no uses");
   auto *rewriteListener = dyn_cast_if_present<Listener>(listener);
+
+  // If the current insertion point is before the erased operation, we adjust
+  // the insertion point to be after the operation.
+  if (getInsertionPoint() == op->getIterator())
+    setInsertionPointAfter(op);
 
   // Fast path: If no listener is attached, the op can be dropped in one go.
   if (!rewriteListener) {
@@ -241,6 +244,75 @@ void RewriterBase::eraseBlock(Block *block) {
   block->erase();
 }
 
+void RewriterBase::eraseOperands(Operation *op, const BitVector &eraseIndices) {
+  assert(eraseIndices.size() == op->getNumOperands() &&
+         "expected one bit per operand");
+  if (eraseIndices.none())
+    return;
+
+  modifyOpInPlace(op, [&]() {
+    op->eraseOperands(eraseIndices);
+    if (!op->hasTrait<OpTrait::AttrSizedOperandSegments>())
+      return;
+
+    // TODO: Add an interface to update the operand segment-size property
+    // directly, without converting it to and from an attribute.
+    auto attrName = StringAttr::get(
+        op->getContext(),
+        OpTrait::AttrSizedOperandSegments<void>::getOperandSegmentSizeAttr());
+    auto sizes = op->getAttrOfType<DenseI32ArrayAttr>(attrName);
+    assert(sizes && "expected operand segment sizes attribute");
+    SmallVector<int32_t> newSizes(sizes.asArrayRef());
+    unsigned offset = 0;
+    for (int32_t &size : newSizes) {
+      // The attribute and bit vector still use the original operand indices.
+      unsigned end = offset + size;
+      for (; offset < end; ++offset)
+        size -= eraseIndices.test(offset);
+    }
+    op->setInherentAttr(attrName,
+                        DenseI32ArrayAttr::get(op->getContext(), newSizes));
+  });
+}
+
+Operation *RewriterBase::eraseOpResults(Operation *op,
+                                        const BitVector &eraseIndices) {
+  assert(op->getNumResults() == eraseIndices.size() &&
+         "number of op results and bitvector size must match");
+
+  // Gather new result types.
+  SmallVector<Type> newResultTypes;
+  newResultTypes.reserve(op->getNumResults() - eraseIndices.count());
+  for (OpResult result : op->getResults())
+    if (!eraseIndices[result.getResultNumber()])
+      newResultTypes.push_back(result.getType());
+
+  // Create a new operation and inline all regions.
+  InsertionGuard g(*this);
+  setInsertionPoint(op);
+  OperationState state(op->getLoc(), op->getName().getStringRef(),
+                       op->getOperands(), newResultTypes,
+                       op->getDiscardableAttrDictionary().getValue());
+  state.propertiesAttr = op->getPropertiesAsAttribute();
+  for ([[maybe_unused]] auto i : llvm::seq<unsigned>(0, op->getNumRegions()))
+    state.addRegion();
+  Operation *newOp = create(state);
+  for (const auto &[index, region] : llvm::enumerate(op->getRegions())) {
+    // Move all blocks of `region` into `newRegion`.
+    Region &newRegion = newOp->getRegion(index);
+    inlineRegionBefore(region, newRegion, newRegion.begin());
+  }
+
+  // Replace the original operation with the new operation.
+  SmallVector<Value> replacements(op->getNumResults(), Value());
+  unsigned nextResultIdx = 0;
+  for (auto i : llvm::seq<unsigned>(0, op->getNumResults()))
+    if (!eraseIndices[i])
+      replacements[i] = newOp->getResult(nextResultIdx++);
+  replaceOp(op, replacements);
+  return newOp;
+}
+
 void RewriterBase::finalizeOpModification(Operation *op) {
   // Notify the listener that the operation was modified.
   if (auto *rewriteListener = dyn_cast_if_present<Listener>(listener))
@@ -275,9 +347,9 @@ void RewriterBase::replaceUsesWithIf(ValueRange from, ValueRange to,
   assert(from.size() == to.size() && "incorrect number of replacements");
   bool allReplaced = true;
   for (auto it : llvm::zip_equal(from, to)) {
-    bool r;
+    bool r = true;
     replaceUsesWithIf(std::get<0>(it), std::get<1>(it), functor,
-                      /*allUsesReplaced=*/&r);
+                      /*allUsesReplaced=*/allUsesReplaced ? &r : nullptr);
     allReplaced &= r;
   }
   if (allUsesReplaced)
@@ -321,6 +393,11 @@ void RewriterBase::inlineBlockBefore(Block *source, Block *dest,
     while (!source->empty())
       moveOpBefore(&source->front(), dest, before);
   }
+
+  // If the current insertion point is within the source block, adjust the
+  // insertion point to the destination block.
+  if (getInsertionBlock() == source)
+    setInsertionPoint(dest, getInsertionPoint());
 
   // Erase the source block.
   assert(source->empty() && "expected 'source' to be empty");

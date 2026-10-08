@@ -140,8 +140,9 @@ class AsmMatcherInfo;
 // when generating its data structures. This means that the order of two
 // RegisterSets can be seen in the outputted AsmMatcher tables occasionally, and
 // can even affect compiler output (at least seen in diagnostics produced when
-// all matches fail). So we use a type that sorts them consistently.
-typedef std::set<const Record *, LessRecordByID> RegisterSet;
+// all matches fail). So they must be sorted consistently (see LessRegisterSet).
+// Each bit in the BitVector represents the presence of a physical register.
+using RegisterSet = BitVector;
 
 class AsmMatcherEmitter {
   const RecordKeeper &Records;
@@ -166,14 +167,18 @@ struct ClassInfo {
     /// RegisterClass0+1, and so on.
     RegisterClass0,
 
+    /// The (first) register class by hwmode, subsequent register classes by
+    /// hwmode are RegisterClassByHwMode0+1, and so on.
+    RegisterClassByHwMode0 = 1 << 12,
+
     /// The (first) user defined class, subsequent user defined classes are
     /// UserClass0+1, and so on.
-    UserClass0 = 1 << 16
+    UserClass0 = 1 << 24
   };
 
   /// Kind - The class kind, which is either a predefined kind, or (UserClass0 +
   /// N) for the Nth user defined class.
-  unsigned Kind;
+  unsigned Kind = 0;
 
   /// SuperClasses - The super classes of this class. Note that for simplicities
   /// sake user operands only record their immediate super class, while register
@@ -215,7 +220,7 @@ struct ClassInfo {
   std::string DiagnosticString;
 
   /// Is this operand optional and not always required.
-  bool IsOptional;
+  bool IsOptional = false;
 
   /// DefaultMethod - The name of the method that returns the default operand
   /// for optional operand
@@ -224,7 +229,11 @@ struct ClassInfo {
 public:
   /// isRegisterClass() - Check if this is a register class.
   bool isRegisterClass() const {
-    return Kind >= RegisterClass0 && Kind < UserClass0;
+    return Kind >= RegisterClass0 && Kind < RegisterClassByHwMode0;
+  }
+
+  bool isRegisterClassByHwMode() const {
+    return Kind >= RegisterClassByHwMode0 && Kind < UserClass0;
   }
 
   /// isUserClass() - Check if this is a user defined class.
@@ -243,13 +252,11 @@ public:
       if (!isRegisterClass() || !RHS.isRegisterClass())
         return false;
 
-      std::vector<const Record *> Tmp;
-      std::set_intersection(Registers.begin(), Registers.end(),
-                            RHS.Registers.begin(), RHS.Registers.end(),
-                            std::back_inserter(Tmp), LessRecordByID());
-
-      return !Tmp.empty();
+      return Registers.anyCommon(RHS.Registers);
     }
+
+    if (isRegisterClassByHwMode() || RHS.isRegisterClassByHwMode())
+      return isRegisterClassByHwMode() == RHS.isRegisterClassByHwMode();
 
     // Otherwise we have two users operands; they are related if they are in the
     // same class hierarchy.
@@ -315,7 +322,8 @@ public:
       return false;
 
     // First, enforce the ordering between the three different types of class.
-    // Tokens sort before registers, which sort before user classes.
+    // Tokens sort before registers, which sort before regclass by hwmode, which
+    // sort before user classes.
     if (Kind == Token) {
       if (RHS.Kind != Token)
         return true;
@@ -323,9 +331,15 @@ public:
     } else if (isRegisterClass()) {
       if (RHS.Kind == Token)
         return false;
-      else if (RHS.isUserClass())
+      else if (RHS.isUserClass() || RHS.isRegisterClassByHwMode())
         return true;
       assert(RHS.isRegisterClass());
+    } else if (isRegisterClassByHwMode()) {
+      if (RHS.Kind == Token || RHS.isRegisterClass())
+        return false;
+      else if (RHS.isUserClass())
+        return true;
+      assert(RHS.isRegisterClassByHwMode());
     } else if (isUserClass()) {
       if (!RHS.isUserClass())
         return false;
@@ -351,8 +365,12 @@ public:
     } else if (isRegisterClass()) {
       // For register sets, sort by number of registers. This guarantees that
       // a set will always sort before all of it's strict supersets.
-      if (Registers.size() != RHS.Registers.size())
-        return Registers.size() < RHS.Registers.size();
+      if (Registers.count() != RHS.Registers.count())
+        return Registers.count() < RHS.Registers.count();
+    } else if (isRegisterClassByHwMode()) {
+      // Ensure the MCK enum entries are in the same order as RegClassIDs. The
+      // lookup table to from RegByHwMode to concrete class relies on it.
+      return Kind < RHS.Kind;
     } else {
       llvm_unreachable("Unknown ClassInfoKind");
     }
@@ -429,8 +447,9 @@ struct MatchableInfo {
       /// the operand.
       ImmOperand,
 
-      /// RegOperand - This represents a fixed register that is dumped in.
-      RegOperand
+      /// RegOperand - This represents a fixed register (potentially depending
+      /// on the HwMode) that is dumped in.
+      RegOperand,
     } Kind;
 
     /// Tuple containing the index of the (earlier) result operand that should
@@ -757,8 +776,8 @@ public:
   std::vector<OperandMatchEntry> OperandMatchInfo;
 
   /// Map of Register records to their class information.
-  typedef std::map<const Record *, ClassInfo *, LessRecordByID>
-      RegisterClassesTy;
+  using RegisterClassesTy =
+      std::map<const Record *, ClassInfo *, LessRecordByID>;
   RegisterClassesTy RegisterClasses;
 
   /// Map of Predicate records to their subtarget information.
@@ -776,7 +795,7 @@ private:
 
 private:
   /// getTokenClass - Lookup or create the class for the given token.
-  ClassInfo *getTokenClass(StringRef Token);
+  ClassInfo *getTokenClass(StringRef Token, bool WantDiagnostic = false);
 
   /// getOperandClass - Lookup or create the class for the given operand.
   ClassInfo *getOperandClass(const CGIOperandList::OperandInfo &OI,
@@ -842,43 +861,35 @@ LLVM_DUMP_METHOD void MatchableInfo::dump() const {
 
 static std::pair<StringRef, StringRef>
 parseTwoOperandConstraint(StringRef S, ArrayRef<SMLoc> Loc) {
-  // Split via the '='.
-  std::pair<StringRef, StringRef> Ops = S.split('=');
-  if (Ops.second == "")
-    PrintFatalError(Loc, "missing '=' in two-operand alias constraint");
   // Trim whitespace and the leading '$' on the operand names.
-  size_t start = Ops.first.find_first_of('$');
-  if (start == std::string::npos)
-    PrintFatalError(Loc, "expected '$' prefix on asm operand name");
-  Ops.first = Ops.first.substr(start + 1);
-  size_t end = Ops.first.find_last_of(" \t");
-  Ops.first = Ops.first.slice(0, end);
-  // Now the second operand.
-  start = Ops.second.find_first_of('$');
-  if (start == std::string::npos)
-    PrintFatalError(Loc, "expected '$' prefix on asm operand name");
-  Ops.second = Ops.second.substr(start + 1);
-  end = Ops.second.find_last_of(" \t");
-  Ops.first = Ops.first.slice(0, end);
-  return Ops;
+  auto TrimWSDollar = [Loc](StringRef OpName) {
+    OpName = OpName.trim(" \t");
+    if (!OpName.consume_front("$"))
+      PrintFatalError(Loc, "expected '$' prefix on asm operand name");
+    return OpName;
+  };
+
+  // Split via the '='.
+  auto [Src, Dst] = S.split('=');
+  if (Dst == "")
+    PrintFatalError(Loc, "missing '=' in two-operand alias constraint");
+  return {TrimWSDollar(Src), TrimWSDollar(Dst)};
 }
 
 void MatchableInfo::formTwoOperandAlias(StringRef Constraint) {
   // Figure out which operands are aliased and mark them as tied.
-  std::pair<StringRef, StringRef> Ops =
-      parseTwoOperandConstraint(Constraint, TheDef->getLoc());
+  auto [Src, Dst] = parseTwoOperandConstraint(Constraint, TheDef->getLoc());
 
   // Find the AsmOperands that refer to the operands we're aliasing.
-  int SrcAsmOperand = findAsmOperandNamed(Ops.first);
-  int DstAsmOperand = findAsmOperandNamed(Ops.second);
+  int SrcAsmOperand = findAsmOperandNamed(Src);
+  int DstAsmOperand = findAsmOperandNamed(Dst);
   if (SrcAsmOperand == -1)
     PrintFatalError(TheDef->getLoc(),
-                    "unknown source two-operand alias operand '" + Ops.first +
-                        "'.");
+                    "unknown source two-operand alias operand '" + Src + "'.");
   if (DstAsmOperand == -1)
     PrintFatalError(TheDef->getLoc(),
-                    "unknown destination two-operand alias operand '" +
-                        Ops.second + "'.");
+                    "unknown destination two-operand alias operand '" + Dst +
+                        "'.");
 
   // Find the ResOperand that refers to the operand we're aliasing away
   // and update it to refer to the combined operand instead.
@@ -894,15 +905,9 @@ void MatchableInfo::formTwoOperandAlias(StringRef Constraint) {
   // Adjust the ResOperand references to any AsmOperands that followed
   // the one we just deleted.
   for (ResOperand &Op : ResOperands) {
-    switch (Op.Kind) {
-    default:
-      // Nothing to do for operands that don't reference AsmOperands.
-      break;
-    case ResOperand::RenderAsmOperand:
-      if (Op.AsmOperandNum > (unsigned)SrcAsmOperand)
-        --Op.AsmOperandNum;
-      break;
-    }
+    if (Op.Kind == ResOperand::RenderAsmOperand &&
+        Op.AsmOperandNum > (unsigned)SrcAsmOperand)
+      --Op.AsmOperandNum;
   }
 }
 
@@ -925,11 +930,10 @@ static void extractSingletonRegisterForAsmOperand(MatchableInfo::AsmOperand &Op,
     return;
   }
 
-  if (!Tok.starts_with(RegisterPrefix))
+  if (!Tok.consume_front(RegisterPrefix))
     return;
 
-  StringRef RegName = Tok.substr(RegisterPrefix.size());
-  if (const CodeGenRegister *Reg = Info.Target.getRegisterByName(RegName))
+  if (const CodeGenRegister *Reg = Info.Target.getRegisterByName(Tok))
     Op.SingletonReg = Reg->TheDef;
 
   // If there is no register prefix (i.e. "%" in "%eax"), then this may
@@ -1168,7 +1172,7 @@ static std::string getEnumNameForToken(StringRef Str) {
   return Res;
 }
 
-ClassInfo *AsmMatcherInfo::getTokenClass(StringRef Token) {
+ClassInfo *AsmMatcherInfo::getTokenClass(StringRef Token, bool WantDiagnostic) {
   ClassInfo *&Entry = TokenClasses[Token.str()];
 
   if (!Entry) {
@@ -1184,6 +1188,14 @@ ClassInfo *AsmMatcherInfo::getTokenClass(StringRef Token) {
     Entry->DiagnosticType = "";
     Entry->IsOptional = false;
     Entry->DefaultMethod = "<invalid>";
+  }
+
+  // Outside the creation block so a later WantDiagnostic=true call can
+  // update an entry first created with WantDiagnostic=false.
+  if (WantDiagnostic && Entry->DiagnosticType.empty() &&
+      AsmParser->getValueAsBit("EmitTokenDiagnosticTypes")) {
+    Entry->DiagnosticType = "InvalidToken" + getEnumNameForToken(Token);
+    Entry->DiagnosticString = "expected '" + Token.str() + "'";
   }
 
   return Entry;
@@ -1220,9 +1232,13 @@ ClassInfo *AsmMatcherInfo::getOperandClass(const Record *Rec, int SubOpIdx) {
       PrintFatalError(Rec->getLoc(),
                       "RegisterOperand `" + Rec->getName() +
                           "' has no associated register class!\n");
-    if (ClassInfo *CI = RegisterClassClasses[ClassRec])
-      return CI;
-    PrintFatalError(Rec->getLoc(), "register class has no class info!");
+
+    if (ClassRec->isSubClassOf("RegisterClassLike")) {
+      if (ClassInfo *CI = RegisterClassClasses[ClassRec])
+        return CI;
+
+      PrintFatalError(Rec->getLoc(), "register class has no class info!");
+    }
   }
 
   if (Rec->isSubClassOf("RegisterClass")) {
@@ -1231,47 +1247,89 @@ ClassInfo *AsmMatcherInfo::getOperandClass(const Record *Rec, int SubOpIdx) {
     PrintFatalError(Rec->getLoc(), "register class has no class info!");
   }
 
-  if (!Rec->isSubClassOf("Operand"))
+  if (Rec->isSubClassOf("Operand")) {
+    const Record *MatchClass = Rec->getValueAsDef("ParserMatchClass");
+    if (ClassInfo *CI = AsmOperandClasses[MatchClass])
+      return CI;
+  } else if (Rec->isSubClassOf("RegisterClassLike")) {
+    if (ClassInfo *CI = RegisterClassClasses[Rec])
+      return CI;
+    PrintFatalError(Rec->getLoc(), "register class has no class info!");
+  } else {
     PrintFatalError(Rec->getLoc(),
                     "Operand `" + Rec->getName() +
                         "' does not derive from class Operand!\n");
-  const Record *MatchClass = Rec->getValueAsDef("ParserMatchClass");
-  if (ClassInfo *CI = AsmOperandClasses[MatchClass])
-    return CI;
+  }
 
   PrintFatalError(Rec->getLoc(), "operand has no match class!");
 }
 
+// Comparator for RegisterSets (BitVectors). Lexicographically compares the
+// sorted sequence of register IDs present in each set to ensure deterministic
+// ordering of RegisterSets in std::set and std::map.
 struct LessRegisterSet {
   bool operator()(const RegisterSet &LHS, const RegisterSet &RHS) const {
-    // std::set<T> defines its own compariso "operator<", but it
-    // performs a lexicographical comparison by T's innate comparison
-    // for some reason. We don't want non-deterministic pointer
-    // comparisons so use this instead.
-    return std::lexicographical_compare(LHS.begin(), LHS.end(), RHS.begin(),
-                                        RHS.end(), LessRecordByID());
+    int L = LHS.find_first();
+    int R = RHS.find_first();
+    while (L != -1 && R != -1) {
+      if (L != R)
+        return L < R;
+      L = LHS.find_next(L);
+      R = RHS.find_next(R);
+    }
+    return L == -1 && R != -1;
   }
 };
+
+// Map each register to a dense bit index ordered by LessRecordByID so that
+// bit index order matches LessRecordByID order in LessRegisterSet.
+static DenseMap<const Record *, unsigned>
+createRegisterIndexMap(const std::deque<CodeGenRegister> &Registers) {
+  std::vector<const Record *> AllRegDefs;
+  AllRegDefs.reserve(Registers.size());
+  for (const CodeGenRegister &CGR : Registers)
+    AllRegDefs.push_back(CGR.TheDef);
+  llvm::sort(AllRegDefs, LessRecordByID());
+
+  DenseMap<const Record *, unsigned> IndexMap;
+  IndexMap.reserve(AllRegDefs.size());
+  for (const auto &[I, RegDef] : llvm::enumerate(AllRegDefs))
+    IndexMap[RegDef] = I;
+  return IndexMap;
+}
 
 void AsmMatcherInfo::buildRegisterClasses(
     SmallPtrSetImpl<const Record *> &SingletonRegisters) {
   const auto &Registers = Target.getRegBank().getRegisters();
   auto &RegClassList = Target.getRegBank().getRegClasses();
 
-  typedef std::set<RegisterSet, LessRegisterSet> RegisterSetSet;
+  const DenseMap<const Record *, unsigned> RegIndexMap =
+      createRegisterIndexMap(Registers);
+
+  // Helper to build a BitVector representing a set of register records.
+  unsigned NumRegs = Registers.size();
+  auto MakeRegisterSet = [&](ArrayRef<const Record *> Regs) {
+    BitVector BS(NumRegs);
+    for (const Record *Rec : Regs) {
+      auto It = RegIndexMap.find(Rec);
+      assert(It != RegIndexMap.end() && "Unknown register record");
+      BS.set(It->second);
+    }
+    return BS;
+  };
+
+  using RegisterSetSet = std::set<RegisterSet, LessRegisterSet>;
 
   // The register sets used for matching.
   RegisterSetSet RegisterSets;
 
   // Gather the defined sets.
   for (const CodeGenRegisterClass &RC : RegClassList)
-    RegisterSets.insert(
-        RegisterSet(RC.getOrder().begin(), RC.getOrder().end()));
+    RegisterSets.insert(MakeRegisterSet(RC.getOrder()));
 
   // Add any required singleton sets.
-  for (const Record *Rec : SingletonRegisters) {
-    RegisterSets.insert(RegisterSet(&Rec, &Rec + 1));
-  }
+  for (const Record *Rec : SingletonRegisters)
+    RegisterSets.insert(MakeRegisterSet({Rec}));
 
   // Introduce derived sets where necessary (when a register does not determine
   // a unique register set class), and build the mapping of registers to the set
@@ -1280,9 +1338,10 @@ void AsmMatcherInfo::buildRegisterClasses(
   for (const CodeGenRegister &CGR : Registers) {
     // Compute the intersection of all sets containing this register.
     RegisterSet ContainingSet;
+    unsigned RegIdx = RegIndexMap.lookup(CGR.TheDef);
 
     for (const RegisterSet &RS : RegisterSets) {
-      if (!RS.count(CGR.TheDef))
+      if (!RS.test(RegIdx))
         continue;
 
       if (ContainingSet.empty()) {
@@ -1290,14 +1349,10 @@ void AsmMatcherInfo::buildRegisterClasses(
         continue;
       }
 
-      RegisterSet Tmp;
-      std::set_intersection(ContainingSet.begin(), ContainingSet.end(),
-                            RS.begin(), RS.end(),
-                            std::inserter(Tmp, Tmp.begin()), LessRecordByID());
-      ContainingSet = std::move(Tmp);
+      ContainingSet &= RS;
     }
 
-    if (!ContainingSet.empty()) {
+    if (ContainingSet.any()) {
       RegisterSets.insert(ContainingSet);
       RegisterMap.try_emplace(CGR.TheDef, ContainingSet);
     }
@@ -1322,6 +1377,7 @@ void AsmMatcherInfo::buildRegisterClasses(
     CI->DefaultMethod = ""; // unused
     RegisterSetClasses.try_emplace(RS, CI);
     ++Index;
+    assert(CI->isRegisterClass());
   }
 
   // Find the superclasses; we could compute only the subgroup lattice edges,
@@ -1329,7 +1385,7 @@ void AsmMatcherInfo::buildRegisterClasses(
   for (const RegisterSet &RS : RegisterSets) {
     ClassInfo *CI = RegisterSetClasses[RS];
     for (const RegisterSet &RS2 : RegisterSets)
-      if (RS != RS2 && llvm::includes(RS2, RS, LessRecordByID()))
+      if (RS != RS2 && RS.subsetOf(RS2))
         CI->SuperClasses.push_back(RegisterSetClasses[RS2]);
   }
 
@@ -1339,8 +1395,7 @@ void AsmMatcherInfo::buildRegisterClasses(
     const Record *Def = RC.getDef();
     if (!Def)
       continue;
-    ClassInfo *CI = RegisterSetClasses[RegisterSet(RC.getOrder().begin(),
-                                                   RC.getOrder().end())];
+    ClassInfo *CI = RegisterSetClasses[MakeRegisterSet(RC.getOrder())];
     if (CI->ValueName.empty()) {
       CI->ClassName = RC.getName();
       CI->Name = "MCK_" + RC.getName();
@@ -1363,6 +1418,24 @@ void AsmMatcherInfo::buildRegisterClasses(
       CI->DiagnosticType = RC.getName();
 
     RegisterClassClasses.try_emplace(Def, CI);
+    assert(CI->isRegisterClass());
+  }
+
+  unsigned RegClassByHwModeIndex = 0;
+  for (const Record *ClassByHwMode : Target.getAllRegClassByHwMode()) {
+    ClassInfo &CI = Classes.emplace_front();
+    CI.Kind = ClassInfo::RegisterClassByHwMode0 + RegClassByHwModeIndex;
+
+    CI.ClassName = "RegByHwMode_" + ClassByHwMode->getName().str();
+    CI.Name = "MCK_" + CI.ClassName;
+    CI.ValueName = ClassByHwMode->getName();
+    CI.RenderMethod = "addRegOperands";
+    //  FIXME: Set diagnostic type.
+    ++RegClassByHwModeIndex;
+
+    assert(CI.isRegisterClassByHwMode());
+
+    RegisterClassClasses.try_emplace(ClassByHwMode, &CI);
   }
 
   // Populate the map for individual registers.
@@ -1479,7 +1552,7 @@ AsmMatcherInfo::AsmMatcherInfo(const Record *asmParser,
 void AsmMatcherInfo::buildOperandMatchInfo() {
   /// Map containing a mask with all operands indices that can be found for
   /// that class inside a instruction.
-  typedef std::map<ClassInfo *, unsigned, deref<std::less<>>> OpClassMaskTy;
+  using OpClassMaskTy = std::map<ClassInfo *, unsigned, deref<std::less<>>>;
   OpClassMaskTy OpClassMask;
 
   bool CallCustomParserForAllOperands =
@@ -1542,14 +1615,13 @@ void AsmMatcherInfo::buildInfo() {
     Variant.AsmVariantNo = AsmVariant->getValueAsInt("Variant");
 
     for (const CodeGenInstruction *CGI : Target.getInstructions()) {
-
       // If the tblgen -match-prefix option is specified (for tblgen hackers),
       // filter the set of instructions we consider.
-      if (!StringRef(CGI->TheDef->getName()).starts_with(MatchPrefix))
+      if (!CGI->getName().starts_with(MatchPrefix))
         continue;
 
       // Ignore "codegen only" instructions.
-      if (CGI->TheDef->getValueAsBit("isCodeGenOnly"))
+      if (CGI->isCodeGenOnly)
         continue;
 
       // Ignore instructions for different instructions
@@ -1578,8 +1650,7 @@ void AsmMatcherInfo::buildInfo() {
       // If the tblgen -match-prefix option is specified (for tblgen hackers),
       // filter the set of instruction aliases we consider, based on the target
       // instruction.
-      if (!StringRef(Alias->ResultInst->TheDef->getName())
-               .starts_with(MatchPrefix))
+      if (!Alias->ResultInst->getName().starts_with(MatchPrefix))
         continue;
 
       StringRef V = Alias->TheDef->getValueAsString("AsmVariantName");
@@ -1617,14 +1688,14 @@ void AsmMatcherInfo::buildInfo() {
       // Check for singleton registers.
       if (const Record *RegRecord = Op.SingletonReg) {
         Op.Class = RegisterClasses[RegRecord];
-        assert(Op.Class && Op.Class->Registers.size() == 1 &&
+        assert(Op.Class && Op.Class->Registers.count() == 1 &&
                "Unexpected class for singleton register");
         continue;
       }
 
       // Check for simple tokens.
       if (Token[0] != '$') {
-        Op.Class = getTokenClass(Token);
+        Op.Class = getTokenClass(Token, /*WantDiagnostic=*/true);
         continue;
       }
 
@@ -1975,7 +2046,10 @@ emitConvertFuncs(CodeGenTarget &Target, StringRef ClassName,
   SmallSetVector<CachedHashString, 16> OperandConversionKinds;
   SmallSetVector<CachedHashString, 16> InstructionConversionKinds;
   std::vector<std::vector<uint8_t>> ConversionTable;
-  size_t MaxRowLength = 2; // minimum is custom converter plus terminator.
+
+  // minimum is custom converter plus a operand index in parsed OperandVector
+  // (0 for custom converter) and terminator (CVT_Done).
+  size_t MaxRowLength = 3;
 
   // TargetOperandClass - This is the target's operand class, like X86Operand.
   std::string TargetOperandClass = Target.getName().str() + "Operand";
@@ -2149,7 +2223,7 @@ emitConvertFuncs(CodeGenTarget &Target, StringRef ClassName,
           // If optional operand is not present in actual instruction then we
           // should call its DefaultMethod before RenderMethod
           assert(HasOptionalOperands);
-          CvtOS << "      if (OptionalOperandsMask[*(p + 1) - 1]) {\n"
+          CvtOS << "      if (OptionalOperandsMask[*(p + 1)]) {\n"
                 << "        " << Op.Class->DefaultMethod << "()"
                 << "->" << Op.Class->RenderMethod << "(Inst, "
                 << OpInfo.MINumOperands << ");\n"
@@ -2229,12 +2303,14 @@ emitConvertFuncs(CodeGenTarget &Target, StringRef ClassName,
       }
       case MatchableInfo::ResOperand::RegOperand: {
         std::string Reg, Name;
+        bool IsRegByHwMode = false;
         if (!OpInfo.Register) {
           Name = "reg0";
           Reg = "0";
         } else {
           Reg = getQualifiedName(OpInfo.Register);
           Name = "reg" + OpInfo.Register->getName().str();
+          IsRegByHwMode = OpInfo.Register->isSubClassOf("RegisterByHwMode");
         }
         Signature += "__" + Name;
         Name = "CVT_" + Name;
@@ -2247,10 +2323,17 @@ emitConvertFuncs(CodeGenTarget &Target, StringRef ClassName,
 
         if (!IsNewConverter)
           break;
-        CvtOS << "    case " << Name << ":\n"
-              << "      Inst.addOperand(MCOperand::createReg(" << Reg << "));\n"
-              << "      break;\n";
 
+        CvtOS << indent(4) << "case " << Name << ":\n"
+              << indent(6) << "Inst.addOperand(MCOperand::createReg(";
+        if (IsRegByHwMode) {
+          RegisterByHwMode(OpInfo.Register, Target.getRegBank())
+              .emitResolverCall(
+                  CvtOS, "STI->getHwMode(MCSubtargetInfo::HwMode_RegInfo)");
+        } else {
+          CvtOS << Reg;
+        }
+        CvtOS << "));\n" << indent(6) << "break;\n";
         OpOS << "    case " << Name << ":\n"
              << "      Operands[*(p + 1)]->setMCOperandNum(NumMCOperands);\n"
              << "      Operands[*(p + 1)]->setConstraint(\"m\");\n"
@@ -2384,10 +2467,14 @@ static void emitMatchClassEnumeration(CodeGenTarget &Target,
   for (const auto &CI : Infos) {
     if (LastKind == ClassInfo::Token && CI.Kind != ClassInfo::Token) {
       OS << "  MCK_LAST_TOKEN = " << LastName << ",\n";
+    } else if (LastKind < ClassInfo::RegisterClassByHwMode0 &&
+               CI.Kind >= ClassInfo::RegisterClassByHwMode0) {
+      OS << "  MCK_LAST_REGISTER = " << LastName << ",\n";
     } else if (LastKind < ClassInfo::UserClass0 &&
                CI.Kind >= ClassInfo::UserClass0) {
-      OS << "  MCK_LAST_REGISTER = " << LastName << ",\n";
+      OS << "  MCK_LAST_REGCLASS_BY_HWMODE = " << LastName << ",\n";
     }
+
     LastKind = (ClassInfo::ClassInfoKind)CI.Kind;
     LastName = CI.Name;
 
@@ -2399,6 +2486,8 @@ static void emitMatchClassEnumeration(CodeGenTarget &Target,
         OS << "register class '" << CI.ValueName << "'\n";
       else
         OS << "derived register class\n";
+    } else if (CI.isRegisterClassByHwMode()) {
+      OS << "register class by hwmode\n";
     } else {
       OS << "user defined class '" << CI.ValueName << "'\n";
     }
@@ -2467,11 +2556,169 @@ static void emitRegisterMatchErrorFunc(AsmMatcherInfo &Info, raw_ostream &OS) {
   OS << "}\n\n";
 }
 
+/// emitTokenDiagFunction - Emit a function mapping token class kinds to
+/// diagnostics.
+static void emitTokenDiagFunction(AsmMatcherInfo &Info, raw_ostream &OS) {
+  OS << "static unsigned getDiagKindFromTokenClass(MatchClassKind Kind) {\n";
+  OS << "  switch (Kind) {\n";
+  OS << "  default:\n";
+  OS << "    return MCTargetAsmParser::Match_InvalidOperand;\n";
+  for (const auto &CI : Info.Classes) {
+    if (CI.Kind == ClassInfo::Token && !CI.DiagnosticType.empty()) {
+      OS << "  case " << CI.Name << ":\n";
+      OS << "    return " << Info.Target.getName() << "AsmParser::Match_"
+         << CI.DiagnosticType << ";\n";
+    }
+  }
+  OS << "  }\n";
+  OS << "}\n\n";
+}
+
+// Returns true if ClassName corresponds to a RegisterClass defined in the
+// target description (and thus has a generated RegClassID), rather than a
+// singleton register or an anonymous derived register class.
+static bool isDefinedRegisterClass(const AsmMatcherInfo &Info,
+                                   StringRef ClassName) {
+  for (const auto &RC : Info.Target.getRegBank().getRegClasses()) {
+    if (RC.getName() == ClassName)
+      return true;
+  }
+  return false;
+}
+
+static void emitGetRegClassFromMatchKindFunc(AsmMatcherInfo &Info,
+                                             raw_ostream &OS) {
+  OS << "[[maybe_unused]] static const MCRegisterClass "
+        "*getRegClassFromMatchKind(MatchClassKind Kind) {\n";
+  OS << "  switch (Kind) {\n";
+
+  // Emit the straightforward RegisterClass mapping.
+  for (const auto &CI : Info.Classes) {
+    if (CI.isRegisterClass() && !CI.ValueName.empty() &&
+        isDefinedRegisterClass(Info, CI.ClassName)) {
+      OS << "  case " << CI.Name << ":\n";
+      OS << "    return &get" << Info.Target.getName() << "MCRegisterClass("
+         << Info.Target.getName() << "::" << CI.ClassName << "RegClassID);\n";
+    }
+  }
+
+  // Next Collect RegisterOperand MCK_* -> RegisterClass mappings and emit
+  // it for all non-ambiguous RegisterOperands.
+  // Many targets reuse the same ParserMatchClass for different register
+  // classes so we can't emit a these unconditionally.
+  std::map<const ClassInfo *, const ClassInfo *, deref<std::less<>>>
+      UserClassToRegClassMap;
+  for (const Record *RO :
+       Info.Records.getAllDerivedDefinitions("RegisterOperand")) {
+    const RecordVal *R = RO->getValue("ParserMatchClass");
+    if (!R)
+      continue;
+    const DefInit *DI = dyn_cast<DefInit>(R->getValue());
+    if (!DI)
+      continue;
+    const Record *PMC = DI->getDef();
+    const Record *RC = RO->getValueAsDef("RegClass");
+    if (!RC || !RC->isSubClassOf("RegisterClassLike"))
+      continue;
+    auto PMC_It = Info.AsmOperandClasses.find(PMC);
+    auto RC_It = Info.RegisterClassClasses.find(RC);
+    if (PMC_It == Info.AsmOperandClasses.end() ||
+        RC_It == Info.RegisterClassClasses.end())
+      continue;
+    const ClassInfo *UserCI = PMC_It->second;
+    const ClassInfo *RegCI = RC_It->second;
+
+    auto It = UserClassToRegClassMap.find(UserCI);
+    if (It == UserClassToRegClassMap.end()) {
+      UserClassToRegClassMap[UserCI] = RegCI;
+    } else if (It->second && It->second != RegCI) {
+      // TODO: Warn about ambiguous ParserMatchClass mapping when we can.
+      // Many targets currently have ambiguous mappings.
+      It->second = nullptr; // Mark as ambiguous
+    }
+  }
+  for (const auto [UserCI, RegCI] : UserClassToRegClassMap) {
+    if (RegCI && isDefinedRegisterClass(Info, RegCI->ClassName)) {
+      OS << "  case " << UserCI->Name << ":\n";
+      OS << "    return &get" << Info.Target.getName() << "MCRegisterClass("
+         << Info.Target.getName() << "::" << RegCI->ClassName
+         << "RegClassID);\n";
+    }
+  }
+
+  OS << "  default:\n";
+  OS << "    return nullptr;\n";
+  OS << "  }\n";
+  OS << "}\n\n";
+}
+
+/// emitRegClassByHwModeMatchTable - Emit the RegClassByHwMode match table and
+/// helper functions for remapping match classes by hardware mode.
+static void emitRegClassByHwModeMatchTable(const CodeGenTarget &Target,
+                                           AsmMatcherInfo &Info,
+                                           raw_ostream &OS) {
+  ArrayRef<const Record *> RegClassesByHwMode = Target.getAllRegClassByHwMode();
+  if (RegClassesByHwMode.empty())
+    return;
+
+  const CodeGenHwModes &CGH = Target.getHwModes();
+  const CodeGenRegBank &RegBank = Target.getRegBank();
+  unsigned NumModes = CGH.getNumModeIds();
+  unsigned NumClassesByHwMode = RegClassesByHwMode.size();
+
+  OS << "static constexpr MatchClassKind RegClassByHwModeMatchTable["
+     << NumModes << "][" << NumClassesByHwMode << "] = {\n";
+
+  // TODO: If the instruction predicates can statically resolve which hwmode,
+  // directly match the register class
+  for (unsigned M = 0; M < NumModes; ++M) {
+    OS << "  { // " << CGH.getModeName(M, /*IncludeDefault=*/true) << '\n';
+    for (unsigned I = 0; I != NumClassesByHwMode; ++I) {
+      const Record *Class = RegClassesByHwMode[I];
+      const HwModeSelect &ModeSelect = CGH.getHwModeSelect(Class);
+
+      auto FoundMode =
+          find_if(ModeSelect.Items,
+                  [=](const HwModeSelect::PairType P) { return P.first == M; });
+
+      if (FoundMode == ModeSelect.Items.end()) {
+        OS << "    InvalidMatchClass, // Missing mode entry for "
+           << Class->getName() << "\n";
+      } else {
+        const CodeGenRegisterClass *RegClass =
+            RegBank.getRegClass(FoundMode->second);
+        const ClassInfo *CI = Info.RegisterClassClasses.at(RegClass->getDef());
+        OS << "    " << CI->Name << ", // " << Class->getName() << "\n";
+      }
+    }
+
+    OS << "  },\n";
+  }
+
+  OS << "};\n\n";
+
+  OS << "static_assert(MCK_LAST_REGCLASS_BY_HWMODE - MCK_LAST_REGISTER == "
+     << NumClassesByHwMode << ");\n\n";
+
+  OS << "[[maybe_unused]] static inline MatchClassKind\n"
+     << "remapRegClassByHwMode(unsigned Kind, const MCSubtargetInfo &STI) {\n"
+     << "  if (Kind > MCK_LAST_REGISTER && Kind <= "
+        "MCK_LAST_REGCLASS_BY_HWMODE) {\n"
+     << "    unsigned HwMode = "
+        "STI.getHwMode(MCSubtargetInfo::HwMode_RegInfo);\n"
+     << "    assert(HwMode < " << NumModes << " && \"Invalid HwMode\");\n"
+     << "    return RegClassByHwModeMatchTable[HwMode][Kind - "
+        "(MCK_LAST_REGISTER + 1)];\n"
+     << "  }\n"
+     << "  return static_cast<MatchClassKind>(Kind);\n"
+     << "}\n\n";
+}
+
 /// emitValidateOperandClass - Emit the function to validate an operand class.
 static void emitValidateOperandClass(const CodeGenTarget &Target,
                                      AsmMatcherInfo &Info, raw_ostream &OS) {
   OS << "static unsigned validateOperandClass(MCParsedAsmOperand &GOp, "
-     << "MatchClassKind Kind) {\n";
+     << "MatchClassKind Kind, const MCSubtargetInfo &STI) {\n";
   OS << "  " << Info.Target.getName() << "Operand &Operand = ("
      << Info.Target.getName() << "Operand &)GOp;\n";
 
@@ -2480,11 +2727,15 @@ static void emitValidateOperandClass(const CodeGenTarget &Target,
   OS << "    return MCTargetAsmParser::Match_InvalidOperand;\n\n";
 
   // Check for Token operands first.
-  // FIXME: Use a more specific diagnostic type.
-  OS << "  if (Operand.isToken() && Kind <= MCK_LAST_TOKEN)\n";
-  OS << "    return isSubclass(matchTokenString(Operand.getToken()), Kind) ?\n"
-     << "             MCTargetAsmParser::Match_Success :\n"
-     << "             MCTargetAsmParser::Match_InvalidOperand;\n\n";
+  OS << "  if (Kind <= MCK_LAST_TOKEN) {\n";
+  OS << "    if (Operand.isToken() &&\n"
+     << "        isSubclass(matchTokenString(Operand.getToken()), Kind))\n";
+  OS << "      return MCTargetAsmParser::Match_Success;\n";
+  if (Info.AsmParser->getValueAsBit("EmitTokenDiagnosticTypes"))
+    OS << "    return getDiagKindFromTokenClass(Kind);\n";
+  else
+    OS << "    return MCTargetAsmParser::Match_InvalidOperand;\n";
+  OS << "  }\n\n";
 
   // Check the user classes. We don't care what order since we're only
   // actually matching against one of them.
@@ -2511,8 +2762,19 @@ static void emitValidateOperandClass(const CodeGenTarget &Target,
   }
   OS << "  } // end switch (Kind)\n\n";
 
+  ArrayRef<const Record *> RegClassesByHwMode = Target.getAllRegClassByHwMode();
+  if (!RegClassesByHwMode.empty()) {
+    // Resolve RegClassByHwMode kinds to their concrete class regardless of
+    // whether Operand is actually a register, so that the diagnostic
+    // fallback paths below (for both register and non-register operands)
+    // see a concrete class rather than an unresolved by-hwmode one.
+    OS << "  Kind = remapRegClassByHwMode(Kind, STI);\n\n";
+  }
+
+  const CodeGenRegBank &RegBank = Target.getRegBank();
+
   // Check for register operands, including sub-classes.
-  const auto &Regs = Target.getRegBank().getRegisters();
+  const auto &Regs = RegBank.getRegisters();
   StringRef Namespace = Regs.front().TheDef->getValueAsString("Namespace");
   SmallVector<StringRef> Table(1 + Regs.size(), "InvalidMatchClass");
   for (const auto &RC : Info.RegisterClasses) {
@@ -2644,7 +2906,8 @@ static void emitMatchRegisterName(const CodeGenTarget &Target,
                                             "::" + Reg.getName().str() + ';');
   }
 
-  OS << "static MCRegister MatchRegisterName(StringRef Name) {\n";
+  OS << "[[maybe_unused]] static MCRegister MatchRegisterName(StringRef Name) "
+        "{\n";
 
   bool IgnoreDuplicates =
       AsmParser->getValueAsBit("AllowDuplicateRegisterNames");
@@ -2658,33 +2921,52 @@ static void emitMatchRegisterName(const CodeGenTarget &Target,
 /// specific register enum.
 static void emitMatchRegisterAltName(const CodeGenTarget &Target,
                                      const Record *AsmParser, raw_ostream &OS) {
-  // Construct the match list.
-  std::vector<StringMatcher::StringPair> Matches;
   const auto &Regs = Target.getRegBank().getRegisters();
   std::string Namespace =
       Regs.front().TheDef->getValueAsString("Namespace").str();
-  for (const CodeGenRegister &Reg : Regs) {
-
-    auto AltNames = Reg.TheDef->getValueAsListOfStrings("AltNames");
-
-    for (auto AltName : AltNames) {
-      AltName = StringRef(AltName).trim();
-
-      // don't handle empty alternative names
-      if (AltName.empty())
-        continue;
-
-      Matches.emplace_back(AltName.str(), "return " + Namespace +
-                                              "::" + Reg.getName().str() + ';');
-    }
-  }
-
-  OS << "static MCRegister MatchRegisterAltName(StringRef Name) {\n";
-
+  bool WithIndex =
+      AsmParser->getValueAsBit("ShouldEmitMatchRegisterAltNameWithIndex");
   bool IgnoreDuplicates =
       AsmParser->getValueAsBit("AllowDuplicateRegisterNames");
-  StringMatcher("Name", Matches, OS).Emit(0, IgnoreDuplicates);
 
+  auto EmitMatches = [&](const Record *AltIdx, unsigned Indent) {
+    std::vector<StringMatcher::StringPair> Matches;
+    for (const CodeGenRegister &Reg : Regs) {
+      auto AltNames = Reg.TheDef->getValueAsListOfStrings("AltNames");
+      auto AltIndices = Reg.TheDef->getValueAsListOfDefs("RegAltNameIndices");
+      for (auto [I, AltName] : enumerate(AltNames)) {
+        if (AltIdx && (I >= AltIndices.size() || AltIndices[I] != AltIdx))
+          continue;
+        AltName = AltName.trim();
+        if (AltName.empty())
+          continue;
+        Matches.emplace_back(AltName.str(), "return " + Namespace + "::" +
+                                                Reg.getName().str() + ';');
+      }
+    }
+    StringMatcher("Name", Matches, OS).Emit(Indent, IgnoreDuplicates);
+  };
+
+  OS << "[[maybe_unused]] static MCRegister MatchRegisterAltName(StringRef "
+        "Name";
+  if (WithIndex)
+    OS << ", unsigned AltIdx";
+  OS << ") {\n";
+
+  if (WithIndex) {
+    OS << "  switch (AltIdx) {\n"
+          "  default: break;\n";
+    for (const Record *AltIdx : Target.getRegAltNameIndices()) {
+      if (AltIdx->getName() == "NoRegAltName")
+        continue;
+      OS << "  case " << Namespace << "::" << AltIdx->getName() << ": {\n";
+      EmitMatches(AltIdx, 1);
+      OS << "    break;\n  }\n";
+    }
+    OS << "  }\n";
+  } else {
+    EmitMatches(nullptr, 0);
+  }
   OS << "  return " << Namespace << "::NoRegister;\n";
   OS << "}\n\n";
 }
@@ -2693,13 +2975,9 @@ static void emitMatchRegisterAltName(const CodeGenTarget &Target,
 static void emitOperandDiagnosticTypes(AsmMatcherInfo &Info, raw_ostream &OS) {
   // Get the set of diagnostic types from all of the operand classes.
   std::set<StringRef> Types;
-  for (const auto &OpClassEntry : Info.AsmOperandClasses) {
-    if (!OpClassEntry.second->DiagnosticType.empty())
-      Types.insert(OpClassEntry.second->DiagnosticType);
-  }
-  for (const auto &OpClassEntry : Info.RegisterClassClasses) {
-    if (!OpClassEntry.second->DiagnosticType.empty())
-      Types.insert(OpClassEntry.second->DiagnosticType);
+  for (const auto &CI : Info.Classes) {
+    if (!CI.DiagnosticType.empty())
+      Types.insert(CI.DiagnosticType);
   }
 
   if (Types.empty())
@@ -2719,8 +2997,8 @@ static void emitGetSubtargetFeatureName(AsmMatcherInfo &Info, raw_ostream &OS) {
      << "static const char *getSubtargetFeatureName(uint64_t Val) {\n";
   if (!Info.SubtargetFeatures.empty()) {
     OS << "  switch(Val) {\n";
-    for (const auto &SF : Info.SubtargetFeatures) {
-      const SubtargetFeatureInfo &SFI = SF.second;
+    for (const SubtargetFeatureInfo &SFI :
+         make_second_range(Info.SubtargetFeatures)) {
       // FIXME: Totally just a placeholder name to get the algorithm working.
       OS << "  case " << SFI.getEnumBitName() << ": return \""
          << SFI.TheDef->getValueAsString("PredicateName") << "\";\n";
@@ -2738,17 +3016,15 @@ static std::string GetAliasRequiredFeatures(const Record *R,
                                             const AsmMatcherInfo &Info) {
   std::string Result;
 
-  bool First = true;
+  ListSeparator LS(" && ");
   for (const Record *RF : R->getValueAsListOfDefs("Predicates")) {
     const SubtargetFeatureInfo *F = Info.getSubtargetFeature(RF);
     if (!F)
       PrintFatalError(R->getLoc(),
                       "Predicate '" + RF->getName() +
                           "' is not marked as an AssemblerPredicate!");
-    if (!First)
-      Result += " && ";
+    Result += LS;
     Result += "Features.test(" + F->getEnumBitName() + ')';
-    First = false;
   }
 
   return Result;
@@ -3241,6 +3517,32 @@ getNameForFeatureBitset(ArrayRef<const Record *> FeatureBitset) {
   return Name;
 }
 
+static void emitFeatureCheck(raw_ostream &OS, bool ReportMultipleNearMisses) {
+  OS << "    if (!HasRequiredFeatures) {\n";
+  if (!ReportMultipleNearMisses)
+    OS << "      HadMatchOtherThanFeatures = true;\n";
+
+  OS << "      FeatureBitset NewMissingFeatures = RequiredFeatures & "
+        "~AvailableFeatures;\n";
+  OS << "      DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \"Missing target "
+        "features:\";\n";
+  OS << "                      for (unsigned I = 0, E = "
+        "NewMissingFeatures.size(); I != E; ++I)\n";
+  OS << "                        if (NewMissingFeatures[I])\n";
+  OS << "                          dbgs() << ' ' << I;\n";
+  OS << "                      dbgs() << \"\\n\");\n";
+  if (ReportMultipleNearMisses) {
+    OS << "      FeaturesNearMiss = "
+          "NearMissInfo::getMissedFeature(NewMissingFeatures);\n";
+  } else {
+    OS << "      if (NewMissingFeatures.count() <=\n"
+          "          MissingFeatures.count())\n";
+    OS << "        MissingFeatures = NewMissingFeatures;\n";
+    OS << "      continue;\n";
+  }
+  OS << "    }\n";
+}
+
 void AsmMatcherEmitter::run(raw_ostream &OS) {
   CodeGenTarget Target(Records);
   const Record *AsmParser = Target.getAsmParser();
@@ -3308,6 +3610,14 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   bool HasOptionalOperands = Info.hasOptionalOperands();
   bool ReportMultipleNearMisses =
       AsmParser->getValueAsBit("ReportMultipleNearMisses");
+  bool PrioritizeFeatureInMultiMismatchFallback =
+      AsmParser->getValueAsBit("PrioritizeFeatureInMultiMismatchFallback");
+
+  if (PrioritizeFeatureInMultiMismatchFallback && !ReportMultipleNearMisses) {
+    PrintFatalError(AsmParser->getLoc(),
+                    "'PrioritizeFeatureInMultiMismatchFallback' requires "
+                    "'ReportMultipleNearMisses' to be set");
+  }
 
   // Write the output.
 
@@ -3381,11 +3691,11 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
       Info.SubtargetFeatures, OS);
 
   // Emit the function to match a register name to number.
-  // This should be omitted for Mips target
   if (AsmParser->getValueAsBit("ShouldEmitMatchRegisterName"))
     emitMatchRegisterName(Target, AsmParser, OS);
 
-  if (AsmParser->getValueAsBit("ShouldEmitMatchRegisterAltName"))
+  if (AsmParser->getValueAsBit("ShouldEmitMatchRegisterAltName") ||
+      AsmParser->getValueAsBit("ShouldEmitMatchRegisterAltNameWithIndex"))
     emitMatchRegisterAltName(Target, AsmParser, OS);
 
   OS << "#endif // GET_REGISTER_MATCHER\n\n";
@@ -3421,11 +3731,21 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   // Emit a function to map register classes to operand match failure codes.
   emitRegisterMatchErrorFunc(Info, OS);
 
+  // Emit a function to map MatchClassKind to MCRegisterClass.
+  emitGetRegClassFromMatchKindFunc(Info, OS);
+
   // Emit the routine to match token strings to their match class.
   emitMatchTokenString(Target, Info.Classes, OS);
 
   // Emit the subclass predicate routine.
   emitIsSubclass(Target, Info.Classes, OS);
+
+  // Emit the function mapping token class kinds to diagnostic codes.
+  if (AsmParser->getValueAsBit("EmitTokenDiagnosticTypes"))
+    emitTokenDiagFunction(Info, OS);
+
+  // Emit the RegClassByHwMode match table and remap helper functions.
+  emitRegClassByHwModeMatchTable(Target, Info, OS);
 
   // Emit the routine to validate an operand against a match class.
   emitValidateOperandClass(Target, Info, OS);
@@ -3499,7 +3819,7 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
       assert(I != Info.SubtargetFeatures.end() && "Didn't import predicate?");
       OS << I->second.getEnumBitName() << ", ";
     }
-    OS << "},\n";
+    OS << "}, // " << getNameForFeatureBitset(FeatureBitset) << "\n";
   }
   OS << "};\n\n";
 
@@ -3516,7 +3836,7 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   OS << "namespace {\n";
   OS << "  struct MatchEntry {\n";
   OS << "    " << getMinimalTypeForRange(MaxMnemonicIndex) << " Mnemonic;\n";
-  OS << "    uint16_t Opcode;\n";
+  OS << "    uint32_t Opcode;\n";
   OS << "    " << getMinimalTypeForRange(NumConverters) << " ConvertFn;\n";
   OS << "    " << getMinimalTypeForRange(FeatureBitsets.size())
      << " RequiredFeaturesIdx;\n";
@@ -3562,7 +3882,7 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
           char(MI->Mnemonic.size()) + MI->Mnemonic.lower();
       OS << "  { " << *StringTable.GetStringOffset(LenMnemonic) << " /* "
          << MI->Mnemonic << " */, " << Target.getInstNamespace()
-         << "::" << MI->getResultInst()->TheDef->getName() << ", "
+         << "::" << MI->getResultInst()->getName() << ", "
          << MI->ConversionFnKind << ", ";
 
       // Write the required features mask.
@@ -3639,9 +3959,9 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
     OS << "  ErrorInfo = ~0ULL;\n";
   }
 
-  if (HasOptionalOperands) {
-    OS << "  SmallBitVector OptionalOperandsMask(" << MaxNumOperands << ");\n";
-  }
+  if (HasOptionalOperands)
+    OS << "  SmallBitVector OptionalOperandsMask("
+       << MaxNumOperands + HasMnemonicFirst << ");\n";
 
   // Emit code to search the table.
   OS << "  // Find the appropriate table for this asm variant.\n";
@@ -3677,6 +3997,13 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   OS << "  if (MnemonicRange.first == MnemonicRange.second)\n";
   OS << "    return Match_MnemonicFail;\n\n";
 
+  if (ReportMultipleNearMisses) {
+    OS << "  // First operand near-miss of each opcode that mismatched in\n";
+    OS << "  // more than one operand. Used only if no opcode yields a\n";
+    OS << "  // near-miss of its own (see below).\n";
+    OS << "  SmallVector<NearMissInfo, 4> MultiMismatchFallback;\n\n";
+  }
+
   OS << "  for (const MatchEntry *it = MnemonicRange.first, "
      << "*ie = MnemonicRange.second;\n";
   OS << "       it != ie; ++it) {\n";
@@ -3709,11 +4036,12 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   // Emit check that the subclasses match.
   if (!ReportMultipleNearMisses)
     OS << "    bool OperandsValid = true;\n";
-  if (HasOptionalOperands) {
-    OS << "    OptionalOperandsMask.reset(0, " << MaxNumOperands << ");\n";
-  }
+  if (HasOptionalOperands)
+    OS << "    OptionalOperandsMask.reset(0, "
+       << MaxNumOperands + HasMnemonicFirst << ");\n";
+  OS << "    unsigned ActualIdx = " << (HasMnemonicFirst ? "1" : "SIndex")
+     << ";\n";
   OS << "    for (unsigned FormalIdx = " << (HasMnemonicFirst ? "0" : "SIndex")
-     << ", ActualIdx = " << (HasMnemonicFirst ? "1" : "SIndex")
      << "; FormalIdx != " << MaxNumOperands << "; ++FormalIdx) {\n";
   OS << "      auto Formal = "
      << "static_cast<MatchClassKind>(it->Classes[FormalIdx]);\n";
@@ -3725,7 +4053,7 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   OS << "      if (ActualIdx < Operands.size())\n";
   OS << "        DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \" (\";\n";
   OS << "                        Operands[ActualIdx]->print(dbgs(), "
-        "*getContext().getAsmInfo()); dbgs() << "
+        "getContext().getAsmInfo()); dbgs() << "
         "\"): \");\n";
   OS << "      else\n";
   OS << "        DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \": \");\n";
@@ -3759,22 +4087,24 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
     OS << "          DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \"but formal "
           "operand not required\\n\");\n";
     OS << "          if (isSubclass(Formal, OptionalMatchClass)) {\n";
-    OS << "            OptionalOperandsMask.set(FormalIdx);\n";
+    OS << "            OptionalOperandsMask.set("
+       << (HasMnemonicFirst ? "FormalIdx + 1" : "FormalIdx") << ");\n";
     OS << "          }\n";
     OS << "        }\n";
     OS << "        continue;\n";
   } else {
     OS << "        if (Formal == InvalidMatchClass) {\n";
     if (HasOptionalOperands) {
-      OS << "          OptionalOperandsMask.set(FormalIdx, " << MaxNumOperands
-         << ");\n";
+      OS << "          OptionalOperandsMask.set("
+         << (HasMnemonicFirst ? "FormalIdx + 1, " : "FormalIdx, ")
+         << MaxNumOperands + HasMnemonicFirst << ");\n";
     }
     OS << "          break;\n";
     OS << "        }\n";
     OS << "        if (isSubclass(Formal, OptionalMatchClass)) {\n";
-    if (HasOptionalOperands) {
-      OS << "          OptionalOperandsMask.set(FormalIdx);\n";
-    }
+    if (HasOptionalOperands)
+      OS << "          OptionalOperandsMask.set("
+         << (HasMnemonicFirst ? "FormalIdx + 1" : "FormalIdx") << ");\n";
     OS << "          continue;\n";
     OS << "        }\n";
     OS << "        OperandsValid = false;\n";
@@ -3783,7 +4113,7 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   }
   OS << "      }\n";
   OS << "      MCParsedAsmOperand &Actual = *Operands[ActualIdx];\n";
-  OS << "      unsigned Diag = validateOperandClass(Actual, Formal);\n";
+  OS << "      unsigned Diag = validateOperandClass(Actual, Formal, *STI);\n";
   OS << "      if (Diag == Match_Success) {\n";
   OS << "        DEBUG_WITH_TYPE(\"asm-matcher\",\n";
   OS << "                        dbgs() << \"match success using generic "
@@ -3813,9 +4143,9 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
      << "      // then try to match next formal operand\n";
   OS << "      if (Diag == Match_InvalidOperand "
      << "&& isSubclass(Formal, OptionalMatchClass)) {\n";
-  if (HasOptionalOperands) {
-    OS << "        OptionalOperandsMask.set(FormalIdx);\n";
-  }
+  if (HasOptionalOperands)
+    OS << "        OptionalOperandsMask.set("
+       << (HasMnemonicFirst ? "FormalIdx + 1" : "FormalIdx") << ");\n";
   OS << "        DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \"ignoring "
         "optional operand\\n\");\n";
   OS << "        continue;\n";
@@ -3847,6 +4177,22 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
     OS << "        break;\n";
     OS << "      }\n";
     OS << "    }\n\n";
+    OS << "    // Reject surplus operands as one more operand mismatch.\n";
+    OS << "    if (!MultipleInvalidOperands && ActualIdx < Operands.size()) "
+          "{\n";
+    OS << "      if (!OperandNearMiss) {\n";
+    OS << "        DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \"too many "
+          "operands, recording near-miss at index \"\n";
+    OS << "                        << ActualIdx << \"\\n\");\n";
+    OS << "        OperandNearMiss = NearMissInfo::getMissedOperand(\n";
+    OS << "            Match_InvalidOperand, InvalidMatchClass, it->Opcode, "
+          "ActualIdx);\n";
+    OS << "      } else {\n";
+    OS << "        DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \"too many "
+          "operands after an earlier mismatch, skipping this opcode\\n\");\n";
+    OS << "        MultipleInvalidOperands = true;\n";
+    OS << "      }\n";
+    OS << "    }\n\n";
   } else {
     OS << "      // If this operand is broken for all of the instances of "
           "this\n";
@@ -3867,41 +4213,44 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
     OS << "    }\n\n";
   }
 
-  if (ReportMultipleNearMisses)
+  if (ReportMultipleNearMisses && PrioritizeFeatureInMultiMismatchFallback) {
+    emitFeatureCheck(OS, ReportMultipleNearMisses);
+  }
+
+  if (ReportMultipleNearMisses) {
     OS << "    if (MultipleInvalidOperands) {\n";
-  else
+  } else {
     OS << "    if (!OperandsValid) {\n";
+  }
   OS << "      DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \"Opcode result: "
         "multiple \"\n";
   OS << "                                               \"operand mismatches, "
         "ignoring \"\n";
   OS << "                                               \"this opcode\\n\");\n";
+  if (ReportMultipleNearMisses) {
+    OS << "      // Too many invalid operands to report a single near-miss;\n";
+    OS << "      // keep the first one as a fallback in case no opcode\n";
+    OS << "      // matches more closely.\n";
+    if (PrioritizeFeatureInMultiMismatchFallback) {
+      OS << "      // If the opcode also has missing features, promote the\n";
+      OS << "      // feature near-miss instead of the operand near-miss so\n";
+      OS << "      // that the diagnostic points to the missing extension.\n";
+      OS << "      if (FeaturesNearMiss)\n";
+      OS << "        MultiMismatchFallback.push_back(FeaturesNearMiss);\n";
+      OS << "      else if (OperandNearMiss)\n";
+      OS << "        MultiMismatchFallback.push_back(OperandNearMiss);\n";
+    } else {
+      OS << "      if (OperandNearMiss)\n";
+      OS << "        MultiMismatchFallback.push_back(OperandNearMiss);\n";
+    }
+  }
   OS << "      continue;\n";
   OS << "    }\n";
 
-  // Emit check that the required features are available.
-  OS << "    if (!HasRequiredFeatures) {\n";
-  if (!ReportMultipleNearMisses)
-    OS << "      HadMatchOtherThanFeatures = true;\n";
-  OS << "      FeatureBitset NewMissingFeatures = RequiredFeatures & "
-        "~AvailableFeatures;\n";
-  OS << "      DEBUG_WITH_TYPE(\"asm-matcher\", dbgs() << \"Missing target "
-        "features:\";\n";
-  OS << "                      for (unsigned I = 0, E = "
-        "NewMissingFeatures.size(); I != E; ++I)\n";
-  OS << "                        if (NewMissingFeatures[I])\n";
-  OS << "                          dbgs() << ' ' << I;\n";
-  OS << "                      dbgs() << \"\\n\");\n";
-  if (ReportMultipleNearMisses) {
-    OS << "      FeaturesNearMiss = "
-          "NearMissInfo::getMissedFeature(NewMissingFeatures);\n";
-  } else {
-    OS << "      if (NewMissingFeatures.count() <=\n"
-          "          MissingFeatures.count())\n";
-    OS << "        MissingFeatures = NewMissingFeatures;\n";
-    OS << "      continue;\n";
+  if (!PrioritizeFeatureInMultiMismatchFallback) {
+    emitFeatureCheck(OS, ReportMultipleNearMisses);
   }
-  OS << "    }\n";
+
   OS << "\n";
   OS << "    Inst.clear();\n\n";
   OS << "    Inst.setOpcode(it->Opcode);\n";
@@ -3970,12 +4319,12 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   if (HasOptionalOperands) {
     OS << "    unsigned DefaultsOffset[" << (MaxNumOperands + 1)
        << "] = { 0 };\n";
-    OS << "    assert(OptionalOperandsMask.size() == " << (MaxNumOperands)
-       << ");\n";
+    OS << "    assert(OptionalOperandsMask.size() == "
+       << (MaxNumOperands + HasMnemonicFirst) << ");\n";
     OS << "    for (unsigned i = 0, NumDefaults = 0; i < " << (MaxNumOperands)
        << "; ++i) {\n";
-    OS << "      DefaultsOffset[i + 1] = NumDefaults;\n";
     OS << "      NumDefaults += (OptionalOperandsMask[i] ? 1 : 0);\n";
+    OS << "      DefaultsOffset[i + 1] = NumDefaults;\n";
     OS << "    }\n\n";
   }
 
@@ -4076,7 +4425,7 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
     OS << "        MII.getDeprecatedInfo(Inst, getSTI(), Info)) {\n";
     OS << "      SMLoc Loc = ((" << Target.getName()
        << "Operand &)*Operands[0]).getStartLoc();\n";
-    OS << "      getParser().Warning(Loc, Info, std::nullopt);\n";
+    OS << "      getParser().Warning(Loc, Info, {});\n";
     OS << "    }\n";
   }
 
@@ -4103,7 +4452,13 @@ void AsmMatcherEmitter::run(raw_ostream &OS) {
   OS << "  }\n\n";
 
   if (ReportMultipleNearMisses) {
-    OS << "  // No instruction variants matched exactly.\n";
+    OS << "  // No instruction variants matched exactly. If nothing produced\n";
+    OS << "  // a near-miss, fall back to the multi-mismatch list so we can\n";
+    OS << "  // still give a specific diagnostic rather than a generic\n";
+    OS << "  // \"invalid instruction\".\n";
+    OS << "  if (NearMisses && NearMisses->empty())\n";
+    OS << "    NearMisses->append(MultiMismatchFallback.begin(),\n";
+    OS << "                       MultiMismatchFallback.end());\n";
     OS << "  return Match_NearMisses;\n";
   } else {
     OS << "  // Okay, we had no match.  Try to return a useful error code.\n";

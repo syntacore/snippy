@@ -10,8 +10,8 @@
 #include "snippy/Support/RandUtil.h"
 
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/ADT/identity.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/YAMLTraits.h"
 

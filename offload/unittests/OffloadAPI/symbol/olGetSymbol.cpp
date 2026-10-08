@@ -18,7 +18,7 @@ struct olGetSymbolGlobalTest : OffloadQueueTest {
     RETURN_ON_FATAL_FAILURE(OffloadQueueTest::SetUp());
     ASSERT_TRUE(TestEnvironment::loadDeviceBinary("global", Device, DeviceBin));
     ASSERT_GE(DeviceBin->getBufferSize(), 0lu);
-    ASSERT_SUCCESS(olCreateProgram(Device, DeviceBin->getBufferStart(),
+    ASSERT_SUCCESS(olCreateProgram(Context, Device, DeviceBin->getBufferStart(),
                                    DeviceBin->getBufferSize(), &Program));
   }
 
@@ -39,6 +39,14 @@ TEST_P(olGetSymbolKernelTest, Success) {
   ol_symbol_handle_t Kernel = nullptr;
   ASSERT_SUCCESS(olGetSymbol(Program, "foo", OL_SYMBOL_KIND_KERNEL, &Kernel));
   ASSERT_NE(Kernel, nullptr);
+}
+
+TEST_P(olGetSymbolKernelTest, SuccessSamePtr) {
+  ol_symbol_handle_t KernelA = nullptr;
+  ol_symbol_handle_t KernelB = nullptr;
+  ASSERT_SUCCESS(olGetSymbol(Program, "foo", OL_SYMBOL_KIND_KERNEL, &KernelA));
+  ASSERT_SUCCESS(olGetSymbol(Program, "foo", OL_SYMBOL_KIND_KERNEL, &KernelB));
+  ASSERT_EQ(KernelA, KernelB);
 }
 
 TEST_P(olGetSymbolKernelTest, InvalidNullProgram) {
@@ -70,6 +78,16 @@ TEST_P(olGetSymbolGlobalTest, Success) {
   ASSERT_SUCCESS(
       olGetSymbol(Program, "global", OL_SYMBOL_KIND_GLOBAL_VARIABLE, &Global));
   ASSERT_NE(Global, nullptr);
+}
+
+TEST_P(olGetSymbolGlobalTest, SuccessSamePtr) {
+  ol_symbol_handle_t GlobalA = nullptr;
+  ol_symbol_handle_t GlobalB = nullptr;
+  ASSERT_SUCCESS(
+      olGetSymbol(Program, "global", OL_SYMBOL_KIND_GLOBAL_VARIABLE, &GlobalA));
+  ASSERT_SUCCESS(
+      olGetSymbol(Program, "global", OL_SYMBOL_KIND_GLOBAL_VARIABLE, &GlobalB));
+  ASSERT_EQ(GlobalA, GlobalB);
 }
 
 TEST_P(olGetSymbolGlobalTest, InvalidNullProgram) {

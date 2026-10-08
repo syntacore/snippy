@@ -186,6 +186,10 @@ bool Operator::skipDefaultBuilders() const {
   return def.getValueAsBit("skipDefaultBuilders");
 }
 
+bool Operator::hasCustomPropertiesPrinter() const {
+  return def.getValueAsBit("hasCustomPropertiesPrinter");
+}
+
 auto Operator::result_begin() const -> const_value_iterator {
   return results.begin();
 }
@@ -268,6 +272,35 @@ const Trait *Operator::getTrait(StringRef trait) const {
     }
   }
   return nullptr;
+}
+
+bool Operator::hasNonEmptyProperties() const {
+  if (!properties.empty())
+    return true;
+  if (getTrait("::mlir::OpTrait::AttrSizedOperandSegments") ||
+      getTrait("::mlir::OpTrait::AttrSizedResultSegments"))
+    return true;
+  return llvm::any_of(attributes, [](const NamedAttribute &attr) {
+    return !attr.attr.isDerivedAttr();
+  });
+}
+
+SmallVector<StringRef> Operator::getInherentAttrNames() const {
+  SmallVector<StringRef> names;
+  for (const NamedAttribute &attr : attributes)
+    if (!attr.attr.isDerivedAttr())
+      names.push_back(attr.name);
+  for (const NamedProperty &property : properties)
+    names.push_back(property.name);
+  if (getTrait("::mlir::OpTrait::AttrSizedOperandSegments")) {
+    names.push_back(operandSegmentAttrName);
+    names.push_back(legacyOperandSegmentAttrName);
+  }
+  if (getTrait("::mlir::OpTrait::AttrSizedResultSegments")) {
+    names.push_back(resultSegmentAttrName);
+    names.push_back(legacyResultSegmentAttrName);
+  }
+  return names;
 }
 
 auto Operator::region_begin() const -> const_region_iterator {
@@ -385,7 +418,8 @@ void Operator::populateTypeInferenceInfo(
   if (getTrait("::mlir::OpTrait::SameOperandsAndResultType")) {
     // Check for a non-variable length operand to use as the type anchor.
     auto *operandI = llvm::find_if(arguments, [](const Argument &arg) {
-      NamedTypeConstraint *operand = llvm::dyn_cast_if_present<NamedTypeConstraint *>(arg);
+      NamedTypeConstraint *operand =
+          llvm::dyn_cast_if_present<NamedTypeConstraint *>(arg);
       return operand && !operand->isVariableLength();
     });
     if (operandI == arguments.end())
@@ -663,15 +697,17 @@ void Operator::populateOpStructure() {
       argDef = argDef->getValueAsDef("constraint");
 
     if (argDef->isSubClassOf(typeConstraintClass)) {
-      attrOrOperandMapping.push_back(
-          {OperandOrAttribute::Kind::Operand, operandIndex});
+      attrPropOrOperandMapping.push_back(
+          {OperandAttrOrProp::Kind::Operand, operandIndex});
       arguments.emplace_back(&operands[operandIndex++]);
     } else if (argDef->isSubClassOf(attrClass)) {
-      attrOrOperandMapping.push_back(
-          {OperandOrAttribute::Kind::Attribute, attrIndex});
+      attrPropOrOperandMapping.push_back(
+          {OperandAttrOrProp::Kind::Attribute, attrIndex});
       arguments.emplace_back(&attributes[attrIndex++]);
     } else {
       assert(argDef->isSubClassOf(propertyClass));
+      attrPropOrOperandMapping.push_back(
+          {OperandAttrOrProp::Kind::Property, propIndex});
       arguments.emplace_back(&properties[propIndex++]);
     }
   }
@@ -849,7 +885,7 @@ bool Operator::hasAssemblyFormat() const {
 
 StringRef Operator::getAssemblyFormat() const {
   return TypeSwitch<const Init *, StringRef>(def.getValueInit("assemblyFormat"))
-      .Case<StringInit>([&](auto *init) { return init->getValue(); });
+      .Case([&](const StringInit *init) { return init->getValue(); });
 }
 
 void Operator::print(llvm::raw_ostream &os) const {
@@ -867,9 +903,8 @@ auto Operator::VariableDecoratorIterator::unwrap(const Init *init)
   return VariableDecorator(cast<DefInit>(init)->getDef());
 }
 
-auto Operator::getArgToOperandOrAttribute(int index) const
-    -> OperandOrAttribute {
-  return attrOrOperandMapping[index];
+auto Operator::getArgToOperandAttrOrProp(int index) const -> OperandAttrOrProp {
+  return attrPropOrOperandMapping[index];
 }
 
 std::string Operator::getGetterName(StringRef name) const {

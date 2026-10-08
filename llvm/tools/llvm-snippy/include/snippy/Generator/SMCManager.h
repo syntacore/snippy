@@ -80,7 +80,8 @@ public:
   }
 
   size_t getOverwriteSize(const MachineBasicBlock *MBB) const {
-    return OverwriteSizes.at(MBB);
+    assert(OverwriteSizes.contains(MBB));
+    return OverwriteSizes.lookup(MBB);
   }
 
   std::vector<unsigned> getSMCRegList() const { return SMCRegList; }

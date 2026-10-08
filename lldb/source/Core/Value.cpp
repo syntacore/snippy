@@ -347,15 +347,12 @@ Status Value::GetValueAsData(ExecutionContext *exe_ctx, DataExtractor &data,
     else
       data.SetAddressByteSize(sizeof(void *));
 
-    uint32_t limit_byte_size = UINT32_MAX;
+    if (!type_size)
+      return Status::FromErrorString("type does not have a size");
 
-    if (type_size)
-      limit_byte_size = *type_size;
-
-    if (limit_byte_size <= m_value.GetByteSize()) {
-      if (m_value.GetData(data, limit_byte_size))
-        return error; // Success;
-    }
+    uint32_t result_byte_size = *type_size;
+    if (m_value.GetData(data, result_byte_size))
+      return error; // Success;
 
     error = Status::FromErrorString("extracting data from value failed");
     break;
@@ -494,9 +491,15 @@ Status Value::GetValueAsData(ExecutionContext *exe_ctx, DataExtractor &data,
     address = m_value.ULongLong(LLDB_INVALID_ADDRESS);
     address_type = eAddressTypeHost;
     if (exe_ctx) {
-      Target *target = exe_ctx->GetTargetPtr();
-      if (target) {
-        data.SetByteOrder(target->GetArchitecture().GetByteOrder());
+      if (Target *target = exe_ctx->GetTargetPtr()) {
+        ByteOrder byte_order = target->GetArchitecture().GetByteOrder();
+        // ValueObjectRegister stores typed vectors in target byte order and
+        // all other register buffers in host byte order.
+        if (m_context_type == ContextType::RegisterInfo &&
+            !llvm::isa_and_present<RegisterTypeVector>(
+                GetRegisterInfo()->register_type))
+          byte_order = endian::InlHostByteOrder();
+        data.SetByteOrder(byte_order);
         data.SetAddressByteSize(target->GetArchitecture().GetAddressByteSize());
         break;
       }

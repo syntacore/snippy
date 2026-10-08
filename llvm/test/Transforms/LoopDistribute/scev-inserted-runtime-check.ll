@@ -12,7 +12,6 @@ define void @f(ptr noalias %a, ptr noalias %b, ptr noalias %c, ptr noalias %d, p
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N:%.*]], -1
 ; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP0]] to i32
 ; CHECK-NEXT:    [[MUL1:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 2, i32 [[TMP2]])
-; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL1]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL1]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
 ; CHECK-NEXT:    [[TMP3:%.*]] = or i1 [[MUL_OVERFLOW]], [[TMP1]]
@@ -41,7 +40,7 @@ define void @f(ptr noalias %a, ptr noalias %b, ptr noalias %c, ptr noalias %d, p
 ; CHECK-NEXT:    [[ARRAYIDXC_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[C:%.*]], i64 [[MUL_EXT_LVER_ORIG]]
 ; CHECK-NEXT:    store i32 [[MULC_LVER_ORIG]], ptr [[ARRAYIDXC_LVER_ORIG]], align 4
 ; CHECK-NEXT:    [[EXITCOND_LVER_ORIG:%.*]] = icmp eq i64 [[ADD_LVER_ORIG]], [[N]]
-; CHECK-NEXT:    br i1 [[EXITCOND_LVER_ORIG]], label [[FOR_END_LOOPEXIT:%.*]], label [[FOR_BODY_LVER_ORIG]]
+; CHECK-NEXT:    br i1 [[EXITCOND_LVER_ORIG]], label [[FOR_END_LOOPEXIT:%.*]], label [[FOR_BODY_LVER_ORIG]], !llvm.loop [[LOOP0:![0-9]+]]
 ; CHECK:       for.body.ph.ldist1:
 ; CHECK-NEXT:    br label [[FOR_BODY_LDIST1:%.*]]
 ; CHECK:       for.body.ldist1:
@@ -50,14 +49,14 @@ define void @f(ptr noalias %a, ptr noalias %b, ptr noalias %c, ptr noalias %d, p
 ; CHECK-NEXT:    [[MUL_LDIST1:%.*]] = mul i32 [[IND1_LDIST1]], 2
 ; CHECK-NEXT:    [[MUL_EXT_LDIST1:%.*]] = zext i32 [[MUL_LDIST1]] to i64
 ; CHECK-NEXT:    [[ARRAYIDXA_LDIST1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[MUL_EXT_LDIST1]]
-; CHECK-NEXT:    [[LOADA_LDIST1:%.*]] = load i32, ptr [[ARRAYIDXA_LDIST1]], align 4, !alias.scope [[META0:![0-9]+]]
+; CHECK-NEXT:    [[LOADA_LDIST1:%.*]] = load i32, ptr [[ARRAYIDXA_LDIST1]], align 4, !alias.scope [[META2:![0-9]+]]
 ; CHECK-NEXT:    [[ARRAYIDXB_LDIST1:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[MUL_EXT_LDIST1]]
 ; CHECK-NEXT:    [[LOADB_LDIST1:%.*]] = load i32, ptr [[ARRAYIDXB_LDIST1]], align 4
 ; CHECK-NEXT:    [[MULA_LDIST1:%.*]] = mul i32 [[LOADB_LDIST1]], [[LOADA_LDIST1]]
 ; CHECK-NEXT:    [[ADD_LDIST1]] = add nuw nsw i64 [[IND_LDIST1]], 1
 ; CHECK-NEXT:    [[INC1_LDIST1]] = add i32 [[IND1_LDIST1]], 1
 ; CHECK-NEXT:    [[ARRAYIDXA_PLUS_4_LDIST1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[ADD_LDIST1]]
-; CHECK-NEXT:    store i32 [[MULA_LDIST1]], ptr [[ARRAYIDXA_PLUS_4_LDIST1]], align 4, !alias.scope [[META3:![0-9]+]]
+; CHECK-NEXT:    store i32 [[MULA_LDIST1]], ptr [[ARRAYIDXA_PLUS_4_LDIST1]], align 4, !alias.scope [[META5:![0-9]+]]
 ; CHECK-NEXT:    [[EXITCOND_LDIST1:%.*]] = icmp eq i64 [[ADD_LDIST1]], [[N]]
 ; CHECK-NEXT:    br i1 [[EXITCOND_LDIST1]], label [[FOR_BODY_PH:%.*]], label [[FOR_BODY_LDIST1]]
 ; CHECK:       for.body.ph:
@@ -142,7 +141,6 @@ define void @f_with_offset(ptr noalias %b, ptr noalias %c, ptr noalias %d, ptr n
 ; CHECK-NEXT:    [[TMP0:%.*]] = add i64 [[N:%.*]], -1
 ; CHECK-NEXT:    [[TMP2:%.*]] = trunc i64 [[TMP0]] to i32
 ; CHECK-NEXT:    [[MUL1:%.*]] = call { i32, i1 } @llvm.umul.with.overflow.i32(i32 2, i32 [[TMP2]])
-; CHECK-NEXT:    [[MUL_RESULT:%.*]] = extractvalue { i32, i1 } [[MUL1]], 0
 ; CHECK-NEXT:    [[MUL_OVERFLOW:%.*]] = extractvalue { i32, i1 } [[MUL1]], 1
 ; CHECK-NEXT:    [[TMP1:%.*]] = icmp ugt i64 [[TMP0]], 4294967295
 ; CHECK-NEXT:    [[TMP3:%.*]] = or i1 [[MUL_OVERFLOW]], [[TMP1]]
@@ -171,7 +169,7 @@ define void @f_with_offset(ptr noalias %b, ptr noalias %c, ptr noalias %d, ptr n
 ; CHECK-NEXT:    [[ARRAYIDXC_LVER_ORIG:%.*]] = getelementptr inbounds i32, ptr [[C:%.*]], i64 [[MUL_EXT_LVER_ORIG]]
 ; CHECK-NEXT:    store i32 [[MULC_LVER_ORIG]], ptr [[ARRAYIDXC_LVER_ORIG]], align 4
 ; CHECK-NEXT:    [[EXITCOND_LVER_ORIG:%.*]] = icmp eq i64 [[ADD_LVER_ORIG]], [[N]]
-; CHECK-NEXT:    br i1 [[EXITCOND_LVER_ORIG]], label [[FOR_END_LOOPEXIT:%.*]], label [[FOR_BODY_LVER_ORIG]]
+; CHECK-NEXT:    br i1 [[EXITCOND_LVER_ORIG]], label [[FOR_END_LOOPEXIT:%.*]], label [[FOR_BODY_LVER_ORIG]], !llvm.loop [[LOOP7:![0-9]+]]
 ; CHECK:       for.body.ph.ldist1:
 ; CHECK-NEXT:    br label [[FOR_BODY_LDIST1:%.*]]
 ; CHECK:       for.body.ldist1:
@@ -180,14 +178,14 @@ define void @f_with_offset(ptr noalias %b, ptr noalias %c, ptr noalias %d, ptr n
 ; CHECK-NEXT:    [[MUL_LDIST1:%.*]] = mul i32 [[IND1_LDIST1]], 2
 ; CHECK-NEXT:    [[MUL_EXT_LDIST1:%.*]] = zext i32 [[MUL_LDIST1]] to i64
 ; CHECK-NEXT:    [[ARRAYIDXA_LDIST1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[MUL_EXT_LDIST1]]
-; CHECK-NEXT:    [[LOADA_LDIST1:%.*]] = load i32, ptr [[ARRAYIDXA_LDIST1]], align 4, !alias.scope [[META5:![0-9]+]]
+; CHECK-NEXT:    [[LOADA_LDIST1:%.*]] = load i32, ptr [[ARRAYIDXA_LDIST1]], align 4, !alias.scope [[META8:![0-9]+]]
 ; CHECK-NEXT:    [[ARRAYIDXB_LDIST1:%.*]] = getelementptr inbounds i32, ptr [[B]], i64 [[MUL_EXT_LDIST1]]
 ; CHECK-NEXT:    [[LOADB_LDIST1:%.*]] = load i32, ptr [[ARRAYIDXB_LDIST1]], align 4
 ; CHECK-NEXT:    [[MULA_LDIST1:%.*]] = mul i32 [[LOADB_LDIST1]], [[LOADA_LDIST1]]
 ; CHECK-NEXT:    [[ADD_LDIST1]] = add nuw nsw i64 [[IND_LDIST1]], 1
 ; CHECK-NEXT:    [[INC1_LDIST1]] = add i32 [[IND1_LDIST1]], 1
 ; CHECK-NEXT:    [[ARRAYIDXA_PLUS_4_LDIST1:%.*]] = getelementptr inbounds i32, ptr [[A]], i64 [[ADD_LDIST1]]
-; CHECK-NEXT:    store i32 [[MULA_LDIST1]], ptr [[ARRAYIDXA_PLUS_4_LDIST1]], align 4, !alias.scope [[META8:![0-9]+]]
+; CHECK-NEXT:    store i32 [[MULA_LDIST1]], ptr [[ARRAYIDXA_PLUS_4_LDIST1]], align 4, !alias.scope [[META11:![0-9]+]]
 ; CHECK-NEXT:    [[EXITCOND_LDIST1:%.*]] = icmp eq i64 [[ADD_LDIST1]], [[N]]
 ; CHECK-NEXT:    br i1 [[EXITCOND_LDIST1]], label [[FOR_BODY_PH:%.*]], label [[FOR_BODY_LDIST1]]
 ; CHECK:       for.body.ph:

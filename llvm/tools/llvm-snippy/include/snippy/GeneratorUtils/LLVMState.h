@@ -90,15 +90,11 @@ public:
   }
 
   const MCRegisterInfo &getRegInfo() const {
-    auto *RegInfo = getTargetMachine().getMCRegisterInfo();
-    assert(RegInfo);
-    return *RegInfo;
+    return getTargetMachine().getMCRegisterInfo();
   }
 
   const MCSubtargetInfo &getSubtargetInfo() const {
-    const auto *Ret = TheTargetMachine->getMCSubtargetInfo();
-    assert(Ret);
-    return *Ret;
+    return TheTargetMachine->getMCSubtargetInfo();
   }
 
   Function &createFunction(Module &M, StringRef FunctionName,

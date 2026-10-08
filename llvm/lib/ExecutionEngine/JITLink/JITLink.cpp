@@ -16,6 +16,9 @@
 #include "llvm/ExecutionEngine/JITLink/XCOFF.h"
 #include "llvm/ExecutionEngine/JITLink/aarch64.h"
 #include "llvm/ExecutionEngine/JITLink/loongarch.h"
+#include "llvm/ExecutionEngine/JITLink/mips.h"
+#include "llvm/ExecutionEngine/JITLink/ppc64.h"
+#include "llvm/ExecutionEngine/JITLink/systemz.h"
 #include "llvm/ExecutionEngine/JITLink/x86.h"
 #include "llvm/ExecutionEngine/JITLink/x86_64.h"
 #include "llvm/Support/raw_ostream.h"
@@ -280,6 +283,9 @@ std::vector<Block *> LinkGraph::splitBlockImpl(std::vector<Block *> Blocks,
 void LinkGraph::dump(raw_ostream &OS) {
   DenseMap<Block *, std::vector<Symbol *>> BlockSymbols;
 
+  OS << "LinkGraph \"" << getName()
+     << "\" (triple = " << getTargetTriple().str() << ")\n";
+
   // Map from blocks to the symbols pointing at them.
   for (auto *Sym : defined_symbols())
     BlockSymbols[&Sym->getBlock()].push_back(Sym);
@@ -476,6 +482,16 @@ AnonymousPointerCreator getAnonymousPointerCreator(const Triple &TT) {
   case Triple::loongarch32:
   case Triple::loongarch64:
     return loongarch::createAnonymousPointer;
+  case Triple::mips:
+  case Triple::mipsel:
+  case Triple::mips64:
+  case Triple::mips64el:
+    return mips::createAnonymousPointer;
+  case Triple::systemz:
+    return systemz::createAnonymousPointer;
+  case Triple::ppc64:
+  case Triple::ppc64le:
+    return ppc64::createAnonymousPointer;
   default:
     return nullptr;
   }
@@ -492,6 +508,18 @@ PointerJumpStubCreator getPointerJumpStubCreator(const Triple &TT) {
   case Triple::loongarch32:
   case Triple::loongarch64:
     return loongarch::createAnonymousPointerJumpStub;
+  case Triple::mips:
+  case Triple::mipsel:
+  case Triple::mips64:
+  case Triple::mips64el:
+    return mips::createAnonymousPointerJumpStub;
+  case Triple::systemz:
+    return systemz::createAnonymousPointerJumpStub;
+  case Triple::ppc64:
+    return ppc64::createDefaultAnonymousPointerJumpStub<llvm::endianness::big>;
+  case Triple::ppc64le:
+    return ppc64::createDefaultAnonymousPointerJumpStub<
+        llvm::endianness::little>;
   default:
     return nullptr;
   }
@@ -520,9 +548,10 @@ absoluteSymbolsLinkGraph(Triple TT, std::shared_ptr<orc::SymbolStringPool> SSP,
                          orc::SymbolMap Symbols) {
   static std::atomic<uint64_t> Counter = {0};
   auto Index = Counter.fetch_add(1, std::memory_order_relaxed);
+  unsigned PointerSize = TT.getArchPointerBitWidth() / 8;
   auto G = std::make_unique<LinkGraph>(
       "<Absolute Symbols " + std::to_string(Index) + ">", std::move(SSP),
-      std::move(TT), SubtargetFeatures(), getGenericEdgeKindName);
+      std::move(TT), PointerSize, SubtargetFeatures(), getGenericEdgeKindName);
   for (auto &[Name, Def] : Symbols) {
     auto &Sym =
         G->addAbsoluteSymbol(*Name, Def.getAddress(), /*Size=*/0,

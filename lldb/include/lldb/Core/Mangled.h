@@ -17,7 +17,7 @@
 #include "llvm/ADT/StringRef.h"
 
 #include <cstddef>
-#include <memory>
+#include <optional>
 
 namespace lldb_private {
 
@@ -135,26 +135,14 @@ public:
   ///     A const reference to the display demangled name string object.
   ConstString GetDisplayDemangledName() const;
 
-  void SetDemangledName(ConstString name) {
-    m_demangled = name;
-    m_demangled_info.reset();
-  }
+  void SetDemangledName(ConstString name) { m_demangled = name; }
 
-  void SetMangledName(ConstString name) {
-    m_mangled = name;
-    m_demangled_info.reset();
-  }
+  void SetMangledName(ConstString name) { m_mangled = name; }
 
   /// Mangled name get accessor.
   ///
   /// \return
-  ///     A reference to the mangled name string object.
-  ConstString &GetMangledName() { return m_mangled; }
-
-  /// Mangled name get accessor.
-  ///
-  /// \return
-  ///     A const reference to the mangled name string object.
+  ///     The mangled name string object.
   ConstString GetMangledName() const { return m_mangled; }
 
   /// Best name get accessor.
@@ -181,16 +169,6 @@ public:
     return GetDemangledName() == name;
   }
   bool NameMatches(const RegularExpression &regex) const;
-
-  /// Get the memory cost of this object.
-  ///
-  /// Return the size in bytes that this object takes in memory. This returns
-  /// the size in bytes of this object, not any shared string values it may
-  /// refer to.
-  ///
-  /// \return
-  ///     The number of bytes that this object occupies in memory.
-  size_t MemorySize() const;
 
   /// Set the string value in this object.
   ///
@@ -251,7 +229,7 @@ public:
   /// \return
   ///     eManglingSchemeNone if no known mangling scheme could be identified
   ///     for s, otherwise the enumerator for the mangling scheme detected.
-  static Mangled::ManglingScheme GetManglingScheme(llvm::StringRef const name);
+  static Mangled::ManglingScheme GetManglingScheme(llvm::StringRef name);
 
   static bool IsMangledName(llvm::StringRef name);
 
@@ -284,27 +262,37 @@ public:
   ///   table offsets in the cache data.
   void Encode(DataEncoder &encoder, ConstStringTable &strtab) const;
 
-  /// Retrieve \c DemangledNameInfo of the demangled name held by this object.
-  const std::optional<DemangledNameInfo> &GetDemangledInfo() const;
+  /// Compute the \c DemangledNameInfo of the demangled name.
+  ///
+  /// Note that this always re-runs the demangler. \see DemangledNameInfoCache
+  /// for caching the result.
+  ///
+  /// \return
+  ///     std::nullopt if no info could be computed (for example because the
+  ///     name is mangled with a scheme that doesn't provide any info).
+  std::optional<DemangledNameInfo> ComputeDemangledInfo() const;
+
+  /// Compute the base name (without namespace/class qualifiers) from the
+  /// demangled name.
+  ///
+  /// For a demangled name like "ns::MyClass<int>::templateFunc", this returns
+  /// just "templateFunc".
+  ///
+  /// \return
+  ///     A ConstString containing the basename, or nullptr if computation
+  ///     fails.
+  ConstString GetBaseName() const;
 
 private:
-  /// If \c force is \c false, this function will re-use the previously
-  /// demangled name (if any). If \c force is \c true (or the mangled name
-  /// on this object was not previously demangled), demangle and cache the
-  /// name.
-  ConstString GetDemangledNameImpl(bool force) const;
-
   /// The mangled version of the name.
   ConstString m_mangled;
 
   /// Mutable so we can get it on demand with
   /// a const version of this object.
   mutable ConstString m_demangled;
-
-  /// If available, holds information about where in \c m_demangled certain
-  /// parts of the name (e.g., basename, arguments, etc.) begin and end.
-  mutable std::optional<DemangledNameInfo> m_demangled_info = std::nullopt;
 };
+static_assert(sizeof(Mangled) <= 2 * sizeof(ConstString),
+              "High-volume object, size of object must be increased with care");
 
 Stream &operator<<(Stream &s, const Mangled &obj);
 

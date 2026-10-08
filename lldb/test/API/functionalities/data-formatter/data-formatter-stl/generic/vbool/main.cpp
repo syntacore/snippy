@@ -1,65 +1,92 @@
-#include <cstdio>
-#include <string>
 #include <vector>
 
 int main() {
-  std::vector<bool> vBool;
+  std::vector<bool> vBoolEmpty;
 
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
+  std::vector<bool> vBoolSmall = {true,  false, true,  true, false,
+                                  false, true,  false, true, true};
 
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
+  // Make a bit vector that is larger than 64 bit.
+  std::vector<bool> vBool = {
+      // 0..=47: alternating false, true
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      // 48..=55: pattern breaks at 48
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      // 56..=63: alternating again
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      // 64..=71: pattern breaks at 68
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      // 72
+      true,
+  };
 
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(false);
-  vBool.push_back(true);
-  vBool.push_back(true);
-
-  std::puts("// Set break point at this line.");
-  return 0;
+  return 0; // break here
 }

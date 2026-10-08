@@ -218,7 +218,7 @@ const MCConstantExpr *MCConstantExpr::create(int64_t Value, MCContext &Ctx,
 /* *** */
 
 MCSymbolRefExpr::MCSymbolRefExpr(const MCSymbol *Symbol, Spec specifier,
-                                 const MCAsmInfo *MAI, SMLoc Loc)
+                                 SMLoc Loc)
     : MCExpr(MCExpr::SymbolRef, Loc, specifier), Symbol(Symbol) {
   assert(Symbol);
 }
@@ -226,7 +226,7 @@ MCSymbolRefExpr::MCSymbolRefExpr(const MCSymbol *Symbol, Spec specifier,
 const MCSymbolRefExpr *MCSymbolRefExpr::create(const MCSymbol *Sym,
                                                uint16_t specifier,
                                                MCContext &Ctx, SMLoc Loc) {
-  return new (Ctx) MCSymbolRefExpr(Sym, specifier, Ctx.getAsmInfo(), Loc);
+  return new (Ctx) MCSymbolRefExpr(Sym, specifier, Loc);
 }
 
 /* *** */
@@ -324,7 +324,7 @@ static void attemptToFoldSymbolOffsetDifference(const MCAssembler *Asm,
     // symbols is limited to specific cases where the fragments between two
     // symbols (including the fragments the symbols are defined in) are
     // fixed-size fragments so the difference can be calculated. For example,
-    // this is important when the Subtarget is changed and a new MCDataFragment
+    // this is important when the Subtarget is changed and a new MCFragment
     // is created in the case of foo: instr; .arch_extension ext; instr .if . -
     // foo.
     if (SA.isVariable() || SB.isVariable())
@@ -346,24 +346,20 @@ static void attemptToFoldSymbolOffsetDifference(const MCAssembler *Asm,
       Displacement *= -1;
     }
 
-    // Track whether B is before a relaxable instruction and whether A is after
-    // a relaxable instruction. If SA and SB are separated by a linker-relaxable
-    // instruction, the difference cannot be resolved as it may be changed by
-    // the linker.
+    // Track whether B is before a relaxable instruction/alignment and whether A
+    // is after a relaxable instruction/alignment. If SA and SB are separated by
+    // a linker-relaxable instruction/alignment, the difference cannot be
+    // resolved as it may be changed by the linker.
     bool BBeforeRelax = false, AAfterRelax = false;
     for (auto F = FB; F; F = F->getNext()) {
-      auto DF = dyn_cast<MCDataFragment>(F);
-      if (DF && DF->isLinkerRelaxable()) {
-        if (&*F != FB || SBOffset != DF->getContents().size())
+      if (F && F->isLinkerRelaxable()) {
+        if (&*F != FB || SBOffset != F->getSize())
           BBeforeRelax = true;
-        if (&*F != FA || SAOffset == DF->getContents().size())
+        if (&*F != FA || SAOffset == F->getSize())
           AAfterRelax = true;
         if (BBeforeRelax && AAfterRelax)
           return;
       }
-      const auto *RF = dyn_cast<MCRelaxableFragment>(F);
-      if (RF && RF->isLinkerRelaxable())
-        return;
       if (&*F == FA) {
         // If FA and FB belong to the same subsection, the loop will find FA and
         // we can resolve the difference.
@@ -373,20 +369,15 @@ static void attemptToFoldSymbolOffsetDifference(const MCAssembler *Asm,
       }
 
       int64_t Num;
-      unsigned Count;
-      if (DF) {
-        Displacement += DF->getContents().size();
-      } else if (auto *RF = dyn_cast<MCRelaxableFragment>(F);
-                 RF && Asm->hasFinalLayout()) {
+      if (F->getKind() == MCFragment::FT_Data) {
+        Displacement += F->getFixedSize();
+      } else if ((F->getKind() == MCFragment::FT_Relaxable ||
+                  F->getKind() == MCFragment::FT_Align) &&
+                 Asm->hasFinalLayout()) {
         // Before finishLayout, a relaxable fragment's size is indeterminate.
         // After layout, during relocation generation, it can be treated as a
         // data fragment.
-        Displacement += RF->getContents().size();
-      } else if (auto *AF = dyn_cast<MCAlignFragment>(F);
-                 AF && Layout && AF->hasEmitNops() &&
-                 !Asm->getBackend().shouldInsertExtraNopBytesForCodeAlign(
-                     *AF, Count)) {
-        Displacement += Asm->computeFragmentSize(*AF);
+        Displacement += F->getSize();
       } else if (auto *FF = dyn_cast<MCFillFragment>(F);
                  FF && FF->getNumValues().evaluateAsAbsolute(Num)) {
         Displacement += Num * FF->getValueSize();
@@ -494,9 +485,9 @@ bool MCExpr::evaluateAsRelocatableImpl(MCValue &Res, const MCAssembler *Asm,
     }
     if (Sym.isVariable() && (Kind == 0 || Layout) && !Sym.isWeakExternal()) {
       Sym.setIsResolving(true);
-      auto _ = make_scope_exit([&] { Sym.setIsResolving(false); });
+      llvm::scope_exit _([&] { Sym.setIsResolving(false); });
       bool IsMachO =
-          Asm && Asm->getContext().getAsmInfo()->hasSubsectionsViaSymbols();
+          Asm && Asm->getContext().getAsmInfo().hasSubsectionsViaSymbols();
       if (!Sym.getVariableValue()->evaluateAsRelocatableImpl(Res, Asm,
                                                              InSet || IsMachO))
         return false;
@@ -691,7 +682,7 @@ bool MCExpr::evaluateAsRelocatableImpl(MCValue &Res, const MCAssembler *Asm,
   case Specifier:
     // Fold the expression during relocation generation. As parse time Asm might
     // be null, and targets should not rely on the folding.
-    return Asm && Asm->getContext().getAsmInfo()->evaluateAsRelocatableImpl(
+    return Asm && Asm->getContext().getAsmInfo().evaluateAsRelocatableImpl(
                       cast<MCSpecifierExpr>(*this), Res, Asm);
   }
 

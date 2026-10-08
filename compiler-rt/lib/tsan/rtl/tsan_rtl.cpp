@@ -21,6 +21,7 @@
 #include "sanitizer_common/sanitizer_placement_new.h"
 #include "sanitizer_common/sanitizer_stackdepot.h"
 #include "sanitizer_common/sanitizer_symbolizer.h"
+#include "tsan_adaptive_delay.h"
 #include "tsan_defs.h"
 #include "tsan_interface.h"
 #include "tsan_mman.h"
@@ -38,6 +39,13 @@ extern "C" void __tsan_resume() {
 #if SANITIZER_APPLE
 SANITIZER_WEAK_DEFAULT_IMPL
 void __tsan_test_only_on_fork() {}
+#endif
+
+#if SANITIZER_APPLE && !SANITIZER_GO
+// Override weak symbol from sanitizer_common
+extern void __tsan_set_in_internal_write_call(bool value) {
+  __tsan::cur_thread_init()->in_internal_write_call = value;
+}
 #endif
 
 namespace __tsan {
@@ -382,7 +390,6 @@ void SlotUnlock(ThreadState* thr) {
 
 Context::Context()
     : initialized(),
-      report_mtx(MutexTypeReport),
       nreported(),
       thread_registry([](Tid tid) -> ThreadContextBase* {
         return new (Alloc(sizeof(ThreadContext))) ThreadContext(tid);
@@ -507,8 +514,7 @@ static void *BackgroundThread(void *arg) {
       u64 last = atomic_load(&ctx->last_symbolize_time_ns,
                              memory_order_relaxed);
       if (last != 0 && last + flags()->flush_symbolizer_ms * kMs2Ns < now) {
-        Lock l(&ctx->report_mtx);
-        ScopedErrorReportLock l2;
+        ScopedErrorReportLock l;
         SymbolizeFlush();
         atomic_store(&ctx->last_symbolize_time_ns, 0, memory_order_relaxed);
       }
@@ -768,6 +774,10 @@ void Initialize(ThreadState *thr) {
     while (__tsan_resumed == 0) {}
   }
 
+#if !SANITIZER_GO
+  AdaptiveDelay::Init();
+#endif
+
   OnInitialize();
 }
 
@@ -807,12 +817,12 @@ int Finalize(ThreadState *thr) {
 
   ThreadFinalize(thr);
 
-  if (ctx->nreported) {
+  if (u32 nreported = atomic_load_relaxed(&ctx->nreported)) {
     failed = true;
 #if !SANITIZER_GO
-    Printf("ThreadSanitizer: reported %d warnings\n", ctx->nreported);
+    Printf("ThreadSanitizer: reported %u warnings\n", nreported);
 #else
-    Printf("Found %d data race(s)\n", ctx->nreported);
+    Printf("Found %u data race(s)\n", nreported);
 #endif
   }
 
@@ -831,13 +841,13 @@ void ForkBefore(ThreadState* thr, uptr pc) SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
   // Detaching from the slot makes OnUserFree skip writing to the shadow.
   // The slot will be locked so any attempts to use it will deadlock anyway.
   SlotDetach(thr);
+  ScopedErrorReportLock::Lock();
   for (auto& slot : ctx->slots) slot.mtx.Lock();
   ctx->thread_registry.Lock();
   ctx->slot_mtx.Lock();
-  ScopedErrorReportLock::Lock();
   AllocatorLockBeforeFork();
   // Suppress all reports in the pthread_atfork callbacks.
-  // Reports will deadlock on the report_mtx.
+  // Reports may deadlock.
   // We could ignore sync operations as well,
   // but so far it's unclear if it will do more good or harm.
   // Unnecessarily ignoring things can lead to false positives later.
@@ -861,10 +871,10 @@ static void ForkAfter(ThreadState* thr,
   thr->ignore_interceptors--;
   thr->ignore_reads_and_writes--;
   AllocatorUnlockAfterFork(child);
-  ScopedErrorReportLock::Unlock();
   ctx->slot_mtx.Unlock();
   ctx->thread_registry.Unlock();
   for (auto& slot : ctx->slots) slot.mtx.Unlock();
+  ScopedErrorReportLock::Unlock();
   SlotAttachAndLock(thr);
   SlotUnlock(thr);
   GlobalProcessorUnlock();
@@ -893,6 +903,13 @@ void ForkChildAfter(ThreadState* thr, uptr pc, bool start_thread) {
     ThreadIgnoreBegin(thr, pc);
     ThreadIgnoreSyncBegin(thr, pc);
   }
+
+#  if SANITIZER_APPLE && !SANITIZER_GO
+  // This flag can have inheritance disabled - we are the child so act
+  // accordingly
+  if (flags()->lock_during_write == kNoLockDuringWritesCurrentProcess)
+    flags()->lock_during_write = kLockDuringAllWrites;
+#  endif
 }
 #endif
 
@@ -1123,11 +1140,8 @@ namespace __sanitizer {
 using namespace __tsan;
 MutexMeta mutex_meta[] = {
     {MutexInvalid, "Invalid", {}},
-    {MutexThreadRegistry,
-     "ThreadRegistry",
-     {MutexTypeSlots, MutexTypeTrace, MutexTypeReport}},
-    {MutexTypeReport, "Report", {MutexTypeTrace}},
-    {MutexTypeSyncVar, "SyncVar", {MutexTypeReport, MutexTypeTrace}},
+    {MutexThreadRegistry, "ThreadRegistry", {MutexTypeSlots, MutexTypeTrace}},
+    {MutexTypeSyncVar, "SyncVar", {MutexTypeTrace}},
     {MutexTypeAnnotations, "Annotations", {}},
     {MutexTypeAtExit, "AtExit", {}},
     {MutexTypeFired, "Fired", {MutexLeaf}},
@@ -1139,7 +1153,7 @@ MutexMeta mutex_meta[] = {
      "Slot",
      {MutexMulti, MutexTypeTrace, MutexTypeSyncVar, MutexThreadRegistry,
       MutexTypeSlots}},
-    {MutexTypeSlots, "Slots", {MutexTypeTrace, MutexTypeReport}},
+    {MutexTypeSlots, "Slots", {MutexTypeTrace}},
     {},
 };
 

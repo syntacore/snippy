@@ -25,6 +25,20 @@ struct RISCVRegToStorage : public testing::SnippyState {
   RISCVRegToStorage() : SnippyState("riscv32", "", "", "+f,+d,+v") {}
 };
 
+TEST_F(RISCVRegToStorage, ArchitecturalRegisterIndices) {
+  const auto &Target = State.getSnippyTarget();
+  const auto &RI = State.getRegInfo();
+  for (const auto *RC : {&GPRRegClass, &FPR16RegClass, &FPR32RegClass,
+                         &FPR64RegClass, &VRRegClass})
+    for (auto Reg : *RC)
+      EXPECT_EQ(Target.regToIndex(Reg), RI.getEncodingValue(Reg))
+          << RI.getName(Reg);
+  for (unsigned I = 0; I < 32; ++I) {
+    EXPECT_EQ(Target.regToIndex(X0_H + I), I);
+    EXPECT_EQ(Target.regToIndex(X0_W + I), I);
+  }
+}
+
 #define CHECK_REG_STORAGE(Reg, Storage)                                        \
   EXPECT_EQ(SnippyTarget.regToStorage(Reg), RegStorageType::Storage)
 #define CHECK_X_STORAGE(Reg) CHECK_REG_STORAGE(Reg, XReg)

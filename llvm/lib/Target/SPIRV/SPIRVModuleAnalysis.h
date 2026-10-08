@@ -20,11 +20,11 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/PassManager.h"
 
 namespace llvm {
 class SPIRVSubtarget;
 class MachineFunction;
-class MachineModuleInfo;
 
 namespace SPIRV {
 // The enum contains logical module sections for the instruction collection.
@@ -54,8 +54,8 @@ struct Requirements {
                std::optional<Capability::Capability> Cap = {},
                ExtensionList Exts = {}, VersionTuple MinVer = VersionTuple(),
                VersionTuple MaxVer = VersionTuple())
-      : IsSatisfiable(IsSatisfiable), Cap(Cap), Exts(Exts), MinVer(MinVer),
-        MaxVer(MaxVer) {}
+      : IsSatisfiable(IsSatisfiable), Cap(Cap), Exts(std::move(Exts)),
+        MinVer(MinVer), MaxVer(MaxVer) {}
   Requirements(Capability::Capability Cap) : Requirements(true, {Cap}) {}
 };
 
@@ -81,7 +81,7 @@ private:
   void initAvailableCapabilitiesForVulkan(const SPIRVSubtarget &ST);
 
 public:
-  RequirementHandler() {}
+  RequirementHandler() = default;
   void clear() {
     MinimalCaps.clear();
     AllCaps.clear();
@@ -144,8 +144,8 @@ struct ModuleAnalysisInfo {
   DenseMap<unsigned, MCRegister> ExtInstSetMap;
   // Contains the list of all global OpVariables in the module.
   SmallVector<const MachineInstr *, 4> GlobalVarList;
-  // Maps functions to corresponding function ID registers.
-  DenseMap<const Function *, MCRegister> FuncMap;
+  // Maps functions and global variables to corresponding ID registers.
+  DenseMap<const GlobalObject *, MCRegister> GlobalObjMap;
   // The set contains machine instructions which are necessary
   // for correct MIR but will not be emitted in function bodies.
   DenseSet<const MachineInstr *> InstrsToDelete;
@@ -159,12 +159,17 @@ struct ModuleAnalysisInfo {
   InstrList MS[NUM_MODULE_SECTIONS];
   // The table maps MBB number to SPIR-V unique ID register.
   DenseMap<std::pair<const MachineFunction *, int>, MCRegister> BBNumToRegMap;
+  // The table maps function pointers to their default FP fast math info. It can
+  // be assumed that the SmallVector is sorted by the bit width of the type. The
+  // first element is the smallest bit width, and the last element is the
+  // largest bit width, therefore, we will have {half, float, double} in
+  // the order of their bit widths.
+  DenseMap<const Function *, SPIRV::FPFastMathDefaultInfoVector>
+      FPFastMathDefaultInfoMap;
 
-  MCRegister getFuncReg(const Function *F) {
-    assert(F && "Function is null");
-    auto FuncPtrRegPair = FuncMap.find(F);
-    return FuncPtrRegPair == FuncMap.end() ? MCRegister()
-                                           : FuncPtrRegPair->second;
+  MCRegister getGlobalObjReg(const GlobalObject *GO) {
+    assert(GO && "GlobalObject is null");
+    return GlobalObjMap.lookup(GO);
   }
   MCRegister getExtInstSetReg(unsigned SetNum) { return ExtInstSetMap[SetNum]; }
   InstrList &getMSInstrs(unsigned MSType) { return MS[MSType]; }
@@ -206,22 +211,26 @@ struct ModuleAnalysisInfo {
       It->second = getNextIDRegister();
     return It->second;
   }
+  // Must stay alive until the AsmPrinter consumes it.
+  bool invalidate(Module &, const PreservedAnalyses &,
+                  ModuleAnalysisManager::Invalidator &) {
+    return false;
+  }
 };
 } // namespace SPIRV
 
 using InstrSignature = SmallVector<size_t>;
 using InstrTraces = std::set<InstrSignature>;
 using InstrGRegsMap = std::map<SmallVector<size_t>, unsigned>;
+using MachineFunctionGetter = function_ref<MachineFunction *(const Function &)>;
 
-struct SPIRVModuleAnalysis : public ModulePass {
-  static char ID;
-
+class SPIRVModuleAnalysisImpl {
 public:
-  SPIRVModuleAnalysis() : ModulePass(ID) {}
+  SPIRVModuleAnalysisImpl(const SPIRVSubtarget &ST,
+                          SPIRV::ModuleAnalysisInfo &MAI,
+                          MachineFunctionGetter GetMF);
 
-  bool runOnModule(Module &M) override;
-  void getAnalysisUsage(AnalysisUsage &AU) const override;
-  static struct SPIRV::ModuleAnalysisInfo MAI;
+  void run(const Module &M);
 
 private:
   void setBaseInfo(const Module &M);
@@ -242,15 +251,38 @@ private:
   handleFunctionOrParameter(const MachineFunction *MF, const MachineInstr &MI,
                             std::map<const Value *, unsigned> &GlobalToGReg,
                             bool &IsFunDef);
-  void visitFunPtrUse(Register OpReg, InstrGRegsMap &SignatureToGReg,
+  void visitFunPtrUse(Register OpReg, const MachineOperand *FunPtrOp,
+                      InstrGRegsMap &SignatureToGReg,
                       std::map<const Value *, unsigned> &GlobalToGReg,
-                      const MachineFunction *MF, const MachineInstr &MI);
+                      const MachineFunction *MF);
   bool isDeclSection(const MachineRegisterInfo &MRI, const MachineInstr &MI);
 
   const SPIRVSubtarget *ST;
   SPIRVGlobalRegistry *GR;
   const SPIRVInstrInfo *TII;
-  MachineModuleInfo *MMI;
+  SPIRV::ModuleAnalysisInfo &MAI;
+  MachineFunctionGetter GetMF;
+};
+
+struct SPIRVModuleAnalysisWrapperPass : public ModulePass {
+  static char ID;
+
+public:
+  SPIRVModuleAnalysisWrapperPass() : ModulePass(ID) {}
+
+  bool runOnModule(Module &M) override;
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
+  SPIRV::ModuleAnalysisInfo MAI;
+};
+
+class SPIRVModuleAnalysis : public AnalysisInfoMixin<SPIRVModuleAnalysis> {
+  friend AnalysisInfoMixin<SPIRVModuleAnalysis>;
+  static AnalysisKey Key;
+
+public:
+  using Result = SPIRV::ModuleAnalysisInfo;
+
+  Result run(Module &M, ModuleAnalysisManager &MAM);
 };
 } // namespace llvm
 #endif // LLVM_LIB_TARGET_SPIRV_SPIRVMODULEANALYSIS_H

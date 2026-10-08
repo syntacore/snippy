@@ -34,7 +34,6 @@
 #include <cassert>
 #include <iomanip>
 #include <limits>
-#include <memory>
 #include <sstream>
 
 using namespace llvm;
@@ -951,7 +950,7 @@ SUnit *ConvergingVLIWScheduler::pickNode(bool &IsTopNode) {
     return nullptr;
   }
   SUnit *SU;
-  if (PreRADirection == MISched::TopDown) {
+  if (getPreRADirection() == MISched::TopDown) {
     SU = Top.pickOnlyChoice();
     if (!SU) {
       SchedCandidate TopCand;
@@ -962,7 +961,7 @@ SUnit *ConvergingVLIWScheduler::pickNode(bool &IsTopNode) {
       SU = TopCand.SU;
     }
     IsTopNode = true;
-  } else if (PreRADirection == MISched::BottomUp) {
+  } else if (getPreRADirection() == MISched::BottomUp) {
     SU = Bot.pickOnlyChoice();
     if (!SU) {
       SchedCandidate BotCand;

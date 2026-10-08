@@ -11,7 +11,7 @@ define double @test_atan_0() {
 
 define double @test_atan_one() {
 ; CHECK-LABEL: define double @test_atan_one() {
-; CHECK-NEXT:    ret double 0x3FE921FB54442D18
+; CHECK-NEXT:    ret double f0x3FE921FB54442D18
 ;
   %res = call double @llvm.atan.f64(double 1.0)
   ret double %res
@@ -35,8 +35,7 @@ define double @test_atan_neg0() {
 
 define double @test_atan_poison() {
 ; CHECK-LABEL: define double @test_atan_poison() {
-; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double poison)
-; CHECK-NEXT:    ret double [[RES]]
+; CHECK-NEXT:    ret double poison
 ;
   %res = call double @llvm.atan.f64(double poison)
   ret double %res
@@ -53,7 +52,7 @@ define double @test_atan_undef() {
 
 define double @test_atan_snan() {
 ; CHECK-LABEL: define double @test_atan_snan() {
-; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double 0x7FF0000000000001)
+; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double +snan(0x1))
 ; CHECK-NEXT:    ret double [[RES]]
 ;
   %res = call double @llvm.atan.f64(double 0x7ff0000000000001)
@@ -62,27 +61,27 @@ define double @test_atan_snan() {
 
 define double @test_atan_qnan() {
 ; CHECK-LABEL: define double @test_atan_qnan() {
-; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double 0x7FF8000000000000)
+; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double +qnan)
 ; CHECK-NEXT:    ret double [[RES]]
 ;
-  %res = call double @llvm.atan.f64(double 0x7ff8000000000000)
+  %res = call double @llvm.atan.f64(double +qnan)
   ret double %res
 }
 
 define double @test_atan_pos_inf() {
 ; CHECK-LABEL: define double @test_atan_pos_inf() {
-; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double 0x7FF0000000000000)
+; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double +inf)
 ; CHECK-NEXT:    ret double [[RES]]
 ;
-  %res = call double @llvm.atan.f64(double 0x7ff0000000000000)
+  %res = call double @llvm.atan.f64(double +inf)
   ret double %res
 }
 
 define double @test_atan_neg_inf() {
 ; CHECK-LABEL: define double @test_atan_neg_inf() {
-; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double 0xFFF0000000000000)
+; CHECK-NEXT:    [[RES:%.*]] = call double @llvm.atan.f64(double -inf)
 ; CHECK-NEXT:    ret double [[RES]]
 ;
-  %res = call double @llvm.atan.f64(double 0xfff0000000000000)
+  %res = call double @llvm.atan.f64(double -inf)
   ret double %res
 }

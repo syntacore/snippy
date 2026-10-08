@@ -58,7 +58,7 @@ class MatrixShTest(lit.formats.ShTest):
     def __init__(self, seeds_per_model=None, execute_external=True,
                  simulators_allowed=True, models_with_callbacks=None,
                  single_run=False):
-        super().__init__(execute_external)
+        super().__init__(execute_external, force_execute_external=True)
         self.simulators_allowed = simulators_allowed
         # When True each test runs as a single (model, seed) config; otherwise
         # it runs every model/seed combination. Used for a fast smoke pass

@@ -13,7 +13,7 @@
 #ifndef MLIR_DIALECT_AMDGPU_TRANSFORMS_PASSES_H_
 #define MLIR_DIALECT_AMDGPU_TRANSFORMS_PASSES_H_
 
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
@@ -22,14 +22,14 @@ class ConversionTarget;
 namespace amdgpu {
 
 #define GEN_PASS_DECL_AMDGPUEMULATEATOMICSPASS
-#define GEN_PASS_DECL_AMDGPURESOLVESTRIDEDMETADATAPASS
 #define GEN_PASS_DECL_AMDGPUMASKEDLOADTOLOADPASS
+#define GEN_PASS_DECL_AMDGPURESOLVESTRIDEDMETADATAPASS
 #define GEN_PASS_REGISTRATION
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h.inc"
 
 void populateAmdgpuEmulateAtomicsPatterns(ConversionTarget &target,
                                           RewritePatternSet &patterns,
-                                          Chipset chipset,
+                                          const ROCDL::TargetInfo &targetInfo,
                                           PatternBenefit benefit = 1);
 
 void populateAmdgpuResolveStridedMetadataPatterns(RewritePatternSet &patterns,

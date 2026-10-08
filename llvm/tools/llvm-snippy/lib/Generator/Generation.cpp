@@ -712,10 +712,13 @@ static MachineOperand createRegAsOperand(Register Reg, unsigned Flags,
                                          unsigned SubReg = 0) {
   assert((Flags & 0x1) == 0 && "0x1 is not a RegState flag");
   return MachineOperand::CreateReg(
-      Reg, Flags & RegState::Define, Flags & RegState::Implicit,
-      Flags & RegState::Kill, Flags & RegState::Dead, Flags & RegState::Undef,
-      Flags & RegState::EarlyClobber, SubReg, Flags & RegState::Debug,
-      Flags & RegState::InternalRead, Flags & RegState::Renamable);
+      Reg, Flags & unsigned(RegState::Define),
+      Flags & unsigned(RegState::Implicit), Flags & unsigned(RegState::Kill),
+      Flags & unsigned(RegState::Dead), Flags & unsigned(RegState::Undef),
+      Flags & unsigned(RegState::EarlyClobber), SubReg,
+      Flags & unsigned(RegState::Debug),
+      Flags & unsigned(RegState::InternalRead),
+      Flags & unsigned(RegState::Renamable));
 }
 
 static MachineOperand pregenerateOneOperand(
@@ -736,7 +739,7 @@ static MachineOperand pregenerateOneOperand(
   auto OpType = Operand.OperandType;
   auto OperandRegClassID = Operand.RegClass;
 
-  if (OpType == MCOI::OperandType::OPERAND_REGISTER) {
+  if (SnippyTgt.isRegisterOperand(Operand)) {
     assert(OperandRegClassID != -1);
     Register Reg;
     if (Preselected.isTiedTo()) {
@@ -747,14 +750,14 @@ static MachineOperand pregenerateOneOperand(
       if (SnippyTgt.isPhysRegClass(OperandRegClassID, RegInfo))
         Reg = SnippyTgt.getFirstPhysReg(Reg, RegInfo);
     } else {
-      auto RegClass = SnippyTgt.getRegClass(InstrGenCtx, OperandRegClassID,
-                                            OpIndex, InstrDesc, RegInfo);
+      const auto &RegClass = SnippyTgt.getRegClass(
+          InstrGenCtx, OperandRegClassID, OpIndex, InstrDesc, RegInfo);
       SmallVector<Register> Exclude;
       SmallVector<Register> Include;
       SnippyTgt.excludeRegsForOperand(InstrGenCtx, RegClass, InstrDesc, OpIndex,
                                       PregeneratedOperands, Exclude);
       SnippyTgt.includeRegs(Opcode, RegClass, Include);
-      bool IsDst = Preselected.getFlags() & RegState::Define;
+      bool IsDst = Preselected.getFlags() & unsigned(RegState::Define);
       AccessMaskBit Mask = IsDst ? AccessMaskBit::W : AccessMaskBit::R;
 
       auto CustomMask =
@@ -788,7 +791,7 @@ static MachineOperand pregenerateOneOperand(
       SnippyTgt.excludeFromMemRegsForInstr(InstrDesc, RegInfo, Exclude,
                                            AccessAddress, &Cfg);
 
-      auto RegClass = RegInfo.getRegClass(OperandRegClassID);
+      const auto &RegClass = RegInfo.getRegClass(OperandRegClassID);
       auto ExpectedReg = RegGen.generate(RegClass, OperandRegClassID, RegInfo,
                                          RP, MBB, SnippyTgt, Exclude);
       if (auto Err = ExpectedReg.takeError())
@@ -802,6 +805,8 @@ static MachineOperand pregenerateOneOperand(
 
   if (OpType >= MCOI::OperandType::OPERAND_FIRST_TARGET ||
       OpType == MCOI::OperandType::OPERAND_IMMEDIATE) {
+    if (Preselected.isReg())
+      return createRegAsOperand(Preselected.getReg(), Preselected.getFlags());
     assert(Preselected.isUnset() || Preselected.isImm());
     StridedImmediate StridedImm;
     if (Preselected.isImm())
@@ -1242,7 +1247,7 @@ randomInstruction(const MCInstrDesc &InstrDesc,
   assert(Preselected.size() == TotalNum);
   for (auto &&[OpIdx, OpInfo] : enumerate(Preselected)) {
     OpInfo.setFlags(OpInfo.getFlags() |
-                    (OpIdx < NumDefs ? RegState::Define : 0));
+                    (OpIdx < NumDefs ? unsigned(RegState::Define) : 0));
     auto TiedTo = InstrDesc.getOperandConstraint(OpIdx, MCOI::TIED_TO);
     if (TiedTo >= 0)
       OpInfo.setTiedTo(TiedTo);

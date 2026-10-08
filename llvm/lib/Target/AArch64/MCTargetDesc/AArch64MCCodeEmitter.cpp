@@ -25,7 +25,6 @@
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/EndianStream.h"
-#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <cstdint>
 
@@ -736,6 +735,15 @@ void AArch64MCCodeEmitter::encodeInstruction(const MCInst &MI,
                      ? ELF::R_AARCH64_P32_TLSDESC_CALL
                      : ELF::R_AARCH64_TLSDESC_CALL;
     addFixup(Fixups, 0, MI.getOperand(0).getExpr(), Reloc);
+    return;
+  }
+
+  if (MI.getOpcode() == AArch64::TLSAUTHDESCCALL) {
+    // This is a directive which applies an R_AARCH64_AUTH_TLSDESC_CALL to the
+    // following (BLRAA) instruction. It doesn't emit any code itself so it
+    // doesn't go through the normal TableGenerated channels.
+    addFixup(Fixups, 0, MI.getOperand(0).getExpr(),
+             ELF::R_AARCH64_AUTH_TLSDESC_CALL);
     return;
   }
 

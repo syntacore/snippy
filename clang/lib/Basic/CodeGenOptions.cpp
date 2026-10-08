@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/Basic/CodeGenOptions.h"
+#include "llvm/Support/Path.h"
 
 namespace clang {
 
@@ -36,18 +37,27 @@ void CodeGenOptions::resetNonModularOptions(StringRef ModuleFormat) {
   // emitted into the PCM (-gmodules).
   if (ModuleFormat == "raw" && !DebugTypeExtRefs) {
 #define DEBUGOPT(Name, Bits, Default, Compatibility)                           \
-  if constexpr (CK::Compatibility == CK::Affecting)                            \
+  if constexpr (CK::Compatibility != CK::Benign)                               \
     Name = Default;
 #define VALUE_DEBUGOPT(Name, Bits, Default, Compatibility)                     \
-  if constexpr (CK::Compatibility == CK::Affecting)                            \
+  if constexpr (CK::Compatibility != CK::Benign)                               \
     Name = Default;
 #define ENUM_DEBUGOPT(Name, Type, Bits, Default, Compatibility)                \
-  if constexpr (CK::Compatibility == CK::Affecting)                            \
+  if constexpr (CK::Compatibility != CK::Benign)                               \
     set##Name(Default);
 #include "clang/Basic/DebugOptions.def"
   }
 
   RelocationModel = llvm::Reloc::PIC_;
+}
+
+std::string CodeGenOptions::remapDebugPathPrefix(StringRef Path) const {
+  SmallString<256> P = Path;
+
+  for (auto &[From, To] : llvm::reverse(DebugPrefixMap))
+    if (llvm::sys::path::replace_path_prefix(P, From, To))
+      break;
+  return P.str().str();
 }
 
 }  // end namespace clang

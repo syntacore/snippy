@@ -189,6 +189,10 @@ public:
     Record->push_back(Value);
   }
 
+  void writeDynAllocKind(DynAllocKind Value) {
+    Record->push_back(llvm::to_underlying(Value));
+  }
+
   void writeUnsignedOrNone(UnsignedOrNone Value) {
     Record->push_back(Value.toInternalRepresentation());
   }
@@ -247,8 +251,7 @@ public:
   void AddTypeLoc(TypeLoc TL);
 
   /// Emits a template argument location info.
-  void AddTemplateArgumentLocInfo(TemplateArgument::ArgKind Kind,
-                                  const TemplateArgumentLocInfo &Arg);
+  void AddTemplateArgumentLocInfo(const TemplateArgumentLoc &Arg);
 
   /// Emits a template argument location.
   void AddTemplateArgumentLoc(const TemplateArgumentLoc &Arg);
@@ -280,7 +283,7 @@ public:
   void AddQualifierInfo(const QualifierInfo &Info);
 
   /// Emit a nested name specifier.
-  void AddNestedNameSpecifier(NestedNameSpecifier *NNS) {
+  void AddNestedNameSpecifier(NestedNameSpecifier NNS) {
     writeNestedNameSpecifier(NNS);
   }
 

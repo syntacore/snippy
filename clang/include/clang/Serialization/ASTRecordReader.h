@@ -223,7 +223,7 @@ public:
   void readQualifierInfo(QualifierInfo &Info);
 
   /// Return a nested name specifier, advancing Idx.
-  // NestedNameSpecifier *readNestedNameSpecifier(); (inherited)
+  // NestedNameSpecifier readNestedNameSpecifier(); (inherited)
 
   NestedNameSpecifierLoc readNestedNameSpecifierLoc();
 
@@ -318,6 +318,10 @@ public:
   /// Read a 64-bit unsigned value; required to satisfy BasicReader.
   uint64_t readUInt64() {
     return readInt();
+  }
+
+  DynAllocKind readDynAllocKind() {
+    return static_cast<DynAllocKind>(readInt());
   }
 
   UnsignedOrNone readUnsignedOrNone() {

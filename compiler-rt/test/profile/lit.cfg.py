@@ -30,7 +30,12 @@ if (
 
 target_is_msvc = bool(re.match(r".*-windows-msvc$", config.target_triple))
 
-if config.host_os in ["Linux"]:
+if target_is_msvc:
+    config.environment["LIB"] = os.path.pathsep.join(
+        [config.compiler_rt_libdir, config.environment.get("LIB", "")]
+    )
+
+if config.target_os in ["Linux"]:
     extra_link_flags = ["-ldl"]
 elif target_is_msvc:
     # InstrProf is incompatible with incremental linking. Disable it as a
@@ -154,7 +159,7 @@ config.substitutions.append(
     )
 )
 
-if config.host_os not in [
+if config.target_os not in [
     "Windows",
     "Darwin",
     "FreeBSD",
@@ -167,10 +172,10 @@ if config.host_os not in [
     config.unsupported = True
 
 config.substitutions.append(
-    ("%shared_lib_flag", "-dynamiclib" if (config.host_os == "Darwin") else "-shared")
+    ("%shared_lib_flag", "-dynamiclib" if (config.target_os == "Darwin") else "-shared")
 )
 
-if config.host_os in ["AIX"]:
+if config.target_os in ["AIX"]:
     config.available_features.add("system-aix")
     exclude_unsupported_files_for_aix(config.test_source_root)
     exclude_unsupported_files_for_aix(config.test_source_root + "/Posix")
@@ -184,5 +189,7 @@ if config.android:
 if config.have_curl:
     config.available_features.add("curl")
 
-if config.host_os in ("AIX", "Darwin", "Linux"):
+if config.target_os in ("AIX", "Darwin", "Linux"):
     config.available_features.add("continuous-mode")
+
+config.suffixes.append(".hip")

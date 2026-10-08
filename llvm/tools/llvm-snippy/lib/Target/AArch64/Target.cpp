@@ -35,9 +35,13 @@
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/MC/MCRegister.h"
 #include "llvm/MC/MCStreamer.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include <vector>
+
+namespace llvm {
+namespace snippy {
 
 // FIX: experimental AArch64 support, remove after bringup
 #define SNIPPY_UNIMPLEMENTED()                                                 \
@@ -111,15 +115,15 @@ static bool expandMOVImm(APInt Value, MCRegister DstReg,
 
     case AArch64::ORRWri:
     case AArch64::ORRXri:
-      if (I->Op1 == 0) {
+      if (*I->Op1 == 0) {
         Insts.push_back(MCInstBuilder(I->Opcode)
                             .addReg(DstReg)
                             .addReg(BitSize == 32 ? AArch64::WZR : AArch64::XZR)
-                            .addImm(I->Op2));
+                            .addImm(*I->Op2));
       } else {
         Insts.push_back(
             MCInstBuilder(I->Opcode).addReg(DstReg).addReg(DstReg).addImm(
-                I->Op2));
+                *I->Op2));
       }
       break;
     case AArch64::ORRWrs:
@@ -128,19 +132,19 @@ static bool expandMOVImm(APInt Value, MCRegister DstReg,
                           .addReg(DstReg)
                           .addReg(DstReg)
                           .addReg(DstReg)
-                          .addImm(I->Op2));
+                          .addImm(*I->Op2));
     } break;
     case AArch64::ANDXri:
     case AArch64::EORXri:
-      if (I->Op1 == 0) {
+      if (*I->Op1 == 0) {
         Insts.push_back(MCInstBuilder(I->Opcode)
                             .addReg(DstReg)
                             .addReg(BitSize == 32 ? AArch64::WZR : AArch64::XZR)
-                            .addImm(I->Op2));
+                            .addImm(*I->Op2));
       } else {
         Insts.push_back(
             MCInstBuilder(I->Opcode).addReg(DstReg).addReg(DstReg).addImm(
-                I->Op2));
+                *I->Op2));
       }
       break;
     case AArch64::MOVNWi:
@@ -148,23 +152,21 @@ static bool expandMOVImm(APInt Value, MCRegister DstReg,
     case AArch64::MOVZWi:
     case AArch64::MOVZXi: {
       Insts.push_back(
-          MCInstBuilder(I->Opcode).addReg(DstReg).addImm(I->Op1).addImm(
-              I->Op2));
+          MCInstBuilder(I->Opcode).addReg(DstReg).addImm(*I->Op1).addImm(
+              *I->Op2));
     } break;
     case AArch64::MOVKWi:
     case AArch64::MOVKXi: {
       Insts.push_back(MCInstBuilder(I->Opcode)
                           .addReg(DstReg)
                           .addReg(DstReg)
-                          .addImm(I->Op1)
-                          .addImm(I->Op2));
+                          .addImm(*I->Op1)
+                          .addImm(*I->Op2));
     } break;
     }
   }
   return true;
 }
-namespace llvm {
-namespace snippy {
 namespace {
 
 class SnippyAArch64Target : public SnippyTarget {
@@ -920,7 +922,7 @@ public:
 
   void addTargetLegalizationPasses(PassManagerWrapper &PM) const override {
     // Expand pseudo MOVi{64,32}imm
-    PM.add(createAArch64ExpandPseudoPass());
+    PM.add(createAArch64ExpandPseudoLegacyPass());
   }
 
   bool is64Bit(const TargetMachine &TM) const override {
@@ -1402,7 +1404,8 @@ public:
   std::unique_ptr<AsmPrinter>
   createAsmPrinter(TargetMachine &TM,
                    std::unique_ptr<MCStreamer> Streamer) const override {
-    return std::make_unique<AArch64AsmPrinter>(TM, std::move(Streamer));
+    return std::unique_ptr<AsmPrinter>(
+        TM.getTarget().createAsmPrinter(TM, std::move(Streamer)));
   }
 
   CLMBBAddrSelectParams

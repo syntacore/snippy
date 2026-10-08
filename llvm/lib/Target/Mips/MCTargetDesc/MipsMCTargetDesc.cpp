@@ -16,7 +16,6 @@
 #include "MipsELFStreamer.h"
 #include "MipsInstPrinter.h"
 #include "MipsMCAsmInfo.h"
-#include "MipsMCNaCl.h"
 #include "MipsTargetStreamer.h"
 #include "TargetInfo/MipsTargetInfo.h"
 #include "llvm/DebugInfo/CodeView/CodeView.h"
@@ -45,6 +44,77 @@ using namespace llvm;
 
 #define GET_REGINFO_MC_DESC
 #include "MipsGenRegisterInfo.inc"
+
+#define GET_REGISTER_MATCHER
+#include "MipsGenAsmMatcher.inc"
+
+MCRegister MIPS_MC::matchRegisterName(StringRef Name, const MCRegisterInfo &MRI,
+                                      unsigned RegClassID, unsigned AltIdx) {
+  MCRegister Reg = MatchRegisterAltName(Name, AltIdx);
+  if (!Reg)
+    Reg = MatchRegisterName(Name);
+  if (!Reg)
+    return MCRegister();
+
+  const MCRegisterClass &RC = MRI.getRegClass(RegClassID);
+  // GPR32 and GPR64 share names; select the requested width.
+  if (!RC.contains(Reg)) {
+    if (RegClassID == Mips::GPR32RegClassID &&
+        MRI.getRegClass(Mips::GPR64RegClassID).contains(Reg))
+      Reg = MRI.getSubReg(Reg, Mips::sub_32);
+    else if (RegClassID == Mips::GPR64RegClassID &&
+             MRI.getRegClass(Mips::GPR32RegClassID).contains(Reg))
+      Reg = MRI.getMatchingSuperReg(Reg, Mips::sub_32, &RC);
+  }
+  return RC.contains(Reg) ? Reg : MCRegister();
+}
+
+int MIPS_MC::getCPURegisterIndex(StringRef Name, const MCRegisterInfo &MRI,
+                                 unsigned AltIdx, bool *IsDeprecated) {
+  if (IsDeprecated)
+    *IsDeprecated = false;
+
+  if (MCRegister Reg =
+          matchRegisterName(Name, MRI, Mips::GPR32RegClassID, AltIdx))
+    return MRI.getEncodingValue(Reg);
+
+  static const struct {
+    StringLiteral Name;
+    MCPhysReg Reg;
+    // NoRegAltName applies to all ABIs.
+    unsigned AltIdx;
+  } Aliases[] = {
+      {"AT", Mips::AT, Mips::NoRegAltName},
+      {"s8", Mips::FP, Mips::NoRegAltName},
+      {"kt0", Mips::K0, Mips::NABIRegAltName},
+      {"kt1", Mips::K1, Mips::NABIRegAltName},
+  };
+  for (const auto &Alias : Aliases)
+    if (Name == Alias.Name &&
+        (Alias.AltIdx == Mips::NoRegAltName || Alias.AltIdx == AltIdx))
+      return MRI.getEncodingValue(Alias.Reg);
+
+  // GNU also accepts t4-t7 for NABI's t0-t3.
+  if (AltIdx == Mips::NABIRegAltName) {
+    static const struct {
+      StringLiteral Name;
+      MCPhysReg Reg;
+    } Deprecated[] = {
+        {"t4", Mips::T4},
+        {"t5", Mips::T5},
+        {"t6", Mips::T6},
+        {"t7", Mips::T7},
+    };
+    for (const auto &Alias : Deprecated) {
+      if (Name == Alias.Name) {
+        if (IsDeprecated)
+          *IsDeprecated = true;
+        return MRI.getEncodingValue(Alias.Reg);
+      }
+    }
+  }
+  return -1;
+}
 
 void MIPS_MC::initLLVMToCVRegMapping(MCRegisterInfo *MRI) {
   // Mapping from CodeView to MC register id.
@@ -175,7 +245,7 @@ static MCAsmInfo *createMipsMCAsmInfo(const MCRegisterInfo &MRI,
   MCAsmInfo *MAI;
 
   if (TT.isOSBinFormatCOFF())
-    MAI = new MipsCOFFMCAsmInfo();
+    MAI = new MipsCOFFMCAsmInfo(Options);
   else
     MAI = new MipsELFMCAsmInfo(TT, Options);
 
@@ -199,12 +269,8 @@ static MCStreamer *createMCStreamer(const Triple &T, MCContext &Context,
                                     std::unique_ptr<MCObjectWriter> &&OW,
                                     std::unique_ptr<MCCodeEmitter> &&Emitter) {
   MCStreamer *S;
-  if (!T.isOSNaCl())
-    S = createMipsELFStreamer(Context, std::move(MAB), std::move(OW),
-                              std::move(Emitter));
-  else
-    S = createMipsNaClELFStreamer(Context, std::move(MAB), std::move(OW),
-                                  std::move(Emitter));
+  S = createMipsELFStreamer(Context, std::move(MAB), std::move(OW),
+                            std::move(Emitter));
   return S;
 }
 
