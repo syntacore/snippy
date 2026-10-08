@@ -211,8 +211,20 @@ getSupportedSysRegs(const RISCVSubtarget &ST) {
     SupportedRegs.push_back(RISCVSimulatorSysReg::FRM);
     SupportedRegs.push_back(RISCVSimulatorSysReg::FFLAGS);
   }
+  if (ST.hasStdExtV()) {
+    SupportedRegs.push_back(RISCVSimulatorSysReg::VSTART);
+    SupportedRegs.push_back(RISCVSimulatorSysReg::VXSAT);
+    SupportedRegs.push_back(RISCVSimulatorSysReg::VXRM);
+    SupportedRegs.push_back(RISCVSimulatorSysReg::VCSR);
+    // vl and vtype are updated only by vset{i}vl{i}. A CSR write such as
+    // csrwi vtype is an illegal instruction, so they are not restored here.
+  }
   if (ST.hasStdExtZcmt())
     SupportedRegs.push_back(RISCVSimulatorSysReg::JVT);
+  // FP and vector instructions set mstatus.FS / mstatus.VS as a side effect.
+  // Self-check restores CSRs it has snapshotted, so mstatus has to be here or
+  // that restore aborts.
+  SupportedRegs.push_back(RISCVSimulatorSysReg::MSTATUS);
   return SupportedRegs;
 }
 
@@ -225,7 +237,15 @@ unsigned RISCVSimulatorSysRegs::getBitWidth(const RISCVSubtarget &ST,
     return 3;
   case RISCVSimulatorSysReg::FCSR:
     return 32;
+  case RISCVSimulatorSysReg::VXSAT:
+    return 1;
+  case RISCVSimulatorSysReg::VXRM:
+    return 2;
+  case RISCVSimulatorSysReg::VCSR:
+    return 3;
   case RISCVSimulatorSysReg::JVT:
+  case RISCVSimulatorSysReg::MSTATUS:
+  case RISCVSimulatorSysReg::VSTART:
     return ST.getXLen();
   }
   llvm_unreachable("unhandled enum value");

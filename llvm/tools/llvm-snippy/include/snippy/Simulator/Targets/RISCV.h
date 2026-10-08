@@ -35,8 +35,13 @@ enum RISCVSimulatorSysReg : uint16_t {
   FFLAGS = 0x001,
   FRM = 0x002,
   FCSR = 0x003,
+  VSTART = 0x008,
+  VXSAT = 0x009,
+  VXRM = 0x00A,
+  VCSR = 0x00F,
   // Table jump base vector and control register
   JVT = 0x017,
+  MSTATUS = 0x300,
 };
 
 /// Lookup SysReg by its encoding.
