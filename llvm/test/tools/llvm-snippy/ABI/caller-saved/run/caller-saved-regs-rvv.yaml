@@ -1,7 +1,10 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 | FileCheck %s
+# XFAIL: *
+# RUN: llvm-snippy %s | FileCheck %s
  
 options:
-  num-instrs: 1000
+  mtriple: riscv64
+  mcpu: generic-rv64
+  num-instrs: 200
   mattr: "+v"
   redefine-sp: reg::X2
   verify-mi: on

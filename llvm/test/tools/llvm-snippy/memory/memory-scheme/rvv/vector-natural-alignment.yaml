@@ -12,7 +12,7 @@ include:
 sections:
   - name:      0
     VMA:       0x8000
-    SIZE:      0x4000
+    SIZE:      0x400000
     LMA:       0x8000
     ACCESS:    r
   - name:      1

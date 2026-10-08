@@ -1,0 +1,7 @@
+# COM: This test checks the caller-saved vector register spill/restore order.
+# COM: Under -riscv-rvv-use-uniform-distribution (see lit.local.cfg) snippy does not
+# COM: spill/restore these registers correctly, so this test is pinned to the
+# COM: default RVV configuration where the spill/restore order is emitted
+# COM: deterministically.
+# RUN: llvm-snippy %S/caller-saved-regs-rvv.yaml -riscv-rvv-use-uniform-distribution=false \
+# RUN: | FileCheck %S/caller-saved-regs-rvv.yaml

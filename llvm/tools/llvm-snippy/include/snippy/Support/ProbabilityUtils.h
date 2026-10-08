@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include <initializer_list>
 #include <random>
 #include <tuple>
 #include <type_traits>
@@ -380,6 +381,14 @@ public:
   MappedArray(ArgsT &&...Args)
       : Storage(makeStorageWithValues(std::make_index_sequence<N>(),
                                       std::forward<ArgsT>(Args)...)) {}
+
+  // Construct with the given enum keys set to 1.0 (and everything else 0.0).
+  // This allows e.g. `SEWInfo SEW{VSEW::SEW_64}` instead of spelling out every
+  // entry in the underlying array.
+  MappedArray(std::initializer_list<key_type> Keys) : MappedArray() {
+    for (const auto &K : Keys)
+      atIdx(Mapping::toIdx(K)) = 1.0;
+  }
   MappedArray(const MappedArray &) = default;
   MappedArray(MappedArray &&) = default;
 
