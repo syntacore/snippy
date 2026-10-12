@@ -1926,9 +1926,11 @@ generate(planning::BasicBlockRequest &BB,
   // In the register block we start interpretation from the beginning
   // In other blocks we begin from a pre-established iterator (Ins)
   if (SimCtx.hasTrackingMode()) {
-    auto *SFM = InstrGenCtx.SFM;
-    if (!SFM || (SFM->RegsInitBlock == MBB))
+    if (auto *SFM = InstrGenCtx.SFM; !SFM || SFM->RegsInitBlock == MBB)
       interpretMBBInstrs(State, SimCtx, MBB->begin(),
+                         MBB->getFirstTerminator());
+    else if (SFM->MemInitBlock != MBB)
+      interpretMBBInstrs(State, SimCtx, InstrGenCtx.Ins,
                          MBB->getFirstTerminator());
   }
   return InstrGenCtx.Stats;

@@ -1,0 +1,128 @@
+# REQUIRES: riscv-snippy-model-spike
+# RUN: llvm-snippy %s \
+# RUN:    -mtriple=riscv64 \
+# RUN:    -num-instrs=1000 -init-regs-in-elf \
+# RUN:    -honor-target-abi -trace-log %t --redefine-sp=reg::x23
+# RUN: FileCheck %s --input-file %t --dump-input fail
+
+sections:
+  - name:      0
+    VMA:       0x40000f000
+    SIZE:           0x1000
+    LMA:       0x40000f000
+    ACCESS:    r
+  - name:      1
+    VMA:       0x400010000
+    SIZE:          0xf0000
+    LMA:       0x400010000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x400100000
+    SIZE:         0x100000
+    LMA:       0x400100000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x400200000
+    SIZE:         0x100000
+    LMA:       0x400200000
+    ACCESS:    rw
+  - name:      selfcheck
+    VMA:       0x400300000
+    SIZE:         0x100000
+    LMA:       0x400300000
+    ACCESS:    rw
+
+access-ranges:
+  - start: 0x400100000
+    size:     0x100000
+    stride: 16
+    first-offset: 0
+    last-offset: 0
+
+branches:
+  loop-ratio: 1
+  number-of-loop-iterations:
+      min: 2  # 4 by default
+      max: 2  # 4 by default
+
+histogram:
+  - [BEQ, 1.0]
+  - [LB, 1.0]
+  - [SW, 1.0]
+  - [ADD, 1.0]
+
+selfcheck:
+  mode: code 
+
+# COM: Match the first stack change after registers initialization and check
+# COM: that SP value is the same at selfcheck stage and final execution
+# CHECK: x1 0x
+# CHECK: x2 0x
+# CHECK: x3 0x
+# CHECK: x4 0x
+# CHECK: x5 0x
+# CHECK: x6 0x
+# CHECK: x7 0x
+# CHECK: x8 0x
+# CHECK: x9 0x
+# CHECK: x10 0x
+# CHECK: x11 0x
+# CHECK: x12 0x
+# CHECK: x13 0x
+# CHECK: x14 0x
+# CHECK: x15 0x
+# CHECK: x16 0x
+# CHECK: x17 0x
+# CHECK: x18 0x
+# CHECK: x19 0x
+# CHECK: x20 0x
+# CHECK: x21 0x
+# CHECK: x22 0x
+# COM: Skip x23 -- real SP
+# CHECK: x24 0x
+# CHECK: x25 0x
+# CHECK: x26 0x
+# CHECK: x27 0x
+# CHECK: x28 0x
+# CHECK: x29 0x
+# CHECK: x30 0x
+# CHECK: x31 0x
+
+# CHECK: addi s7, s7, -16
+# CHECK-NEXT: x23 0x00000004002[[ADDR:[0-9a-f]+]]
+
+# CHECK: #===Simulation Start===
+
+# CHECK: x1 0x
+# CHECK: x2 0x
+# CHECK: x3 0x
+# CHECK: x4 0x
+# CHECK: x5 0x
+# CHECK: x6 0x
+# CHECK: x7 0x
+# CHECK: x8 0x
+# CHECK: x9 0x
+# CHECK: x10 0x
+# CHECK: x11 0x
+# CHECK: x12 0x
+# CHECK: x13 0x
+# CHECK: x14 0x
+# CHECK: x15 0x
+# CHECK: x16 0x
+# CHECK: x17 0x
+# CHECK: x18 0x
+# CHECK: x19 0x
+# CHECK: x20 0x
+# CHECK: x21 0x
+# CHECK: x22 0x
+# CHECK: x24 0x
+# CHECK: x25 0x
+# CHECK: x26 0x
+# CHECK: x27 0x
+# CHECK: x28 0x
+# CHECK: x29 0x
+# CHECK: x30 0x
+# CHECK: x31 0x
+
+# CHECK: addi s7, s7, -16
+# CHECK-NEXT: x23 0x00000004002[[ADDR]]
