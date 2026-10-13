@@ -100,7 +100,7 @@ The snippy output includes:
    file equals to the name of generated ELF file with ".elf" suffix
    replaced with ".ld". It is required, for example, for `global constants`_.
 
--  An optional `selfcheck annotation file`_. 
+-  An optional `selfcheck annotation file`_.
    The file name matches the name of the generated ELF file,
    but with the suffix ".elf" replaced by ".selfcheck.yaml".
 
@@ -661,11 +661,9 @@ In addition to just opcodes, you can specify patterns in the histogram. For exam
 
 A pattern is a sequence of machine instructions (such as *ADD, MUL, LD, SD*) that
 together perform a specific, complex action defined by the user. Patterns can be
-specified in the dedicated `Histogram patterns <#histogram-patterns>`__ field.
+specified in the dedicated `Histogram Patterns`_ field.
 
-.. _`_histogram-patterns`:
-
-Histogram patterns
+Histogram Patterns
 ^^^^^^^^^^^^^^^^^^
 The ``histogram-patterns`` allows you to define histograms from opcodes and other
 histograms (defined within the same configuration) using various algebraic
@@ -688,9 +686,12 @@ operations, such as:
 
     -  For instance, ``ADD ^ [3 : 4]`` would signify either three or four consecutive ``ADD`` instructions.
 
-The Cartesian products (``*``) and Repetitions (``^``) produce 
+The Cartesian products (``*``) and Repetitions (``^``) produce
 indivisible sequences of primary instructions,
 i.e. snippy never inserts ancillary instructions into these sequences.
+The features that emit ancillary instructions,
+like `NaN Overwriting`_ and `Address Hazard Mode`_,
+are inactive there.
 
 In the ``histogram-patterns``, you can define any number of patterns as a list, using
 previously created patterns to build new ones. A pattern is initialized using
@@ -808,6 +809,13 @@ or
    -  Patterns are currently incompatible with ``--valuegram-operands-regs``.
    -  You cannot yet use vector or branch instructions in patterns.
 
+.. note::
+
+   Patterns are insensitive to `Random scheduling`_.
+   Patterns are designed to generate instruction sequences
+   with as much user control as possible, including
+   how those sequences are randomized.
+
 .. _`_immediate_histograms`:
 
 Immediate Histograms
@@ -898,7 +906,7 @@ increasing the diversity of floating-point operations results.
 .. important::
 
    **RISC-V:** Currently, the NaN Overwriting feature
-   does not track NaN values in vector registers and does not overwrite them, 
+   does not track NaN values in vector registers and does not overwrite them,
    and thus it cannot control the results of Vector Floating-Point Instructions.
 
 The settings of this feature are specified under the
@@ -1001,7 +1009,7 @@ where you define the ``overwrite`` settings by the following:
       the ancillary instructions that perform NaN overwriting can be inserted
       only after the complete group.
 
-   *  When `Histogram patterns`_ are used.
+   *  When `Histogram Patterns`_ are used.
       The code generated from Cartesian products (``*``)
       and from Repetitions (``^``) is like burst groups,
       i.e. the produced sequences of primary instructions are indivisible.
@@ -1912,7 +1920,7 @@ scheme <#addresses-enumeration-scheme>`__:
    addresses for the burst group under generation. When multiple memory
    schemes are passed, any appropriate scheme is selected.
 
-.. _`_burst_mode`:
+.. _`burst groups`:
 
 Burst Mode
 ----------
@@ -1922,6 +1930,9 @@ groups of a specific size in the generated snippet.
 
 The sequences of primary instructions produced in Burst Mode are indivisible,
 i.e. snippy never inserts ancillary instructions into these sequences.
+That is why the features that emit ancillary instructions,
+like `NaN Overwriting`_ and `Address Hazard Mode`_,
+are inactive within burst groups.
 
 To manage the burst mode, provide burst mode attributes in your layout
 in the ``burst`` key, which you can add:
@@ -1991,13 +2002,20 @@ Based on these settings, snippy will generate separate permuted groups
 (some groups of LWs and FENCEs, and some groups of SWs) divided by other
 instructions (optionally).
 
-   .. note::
+.. note::
 
-      The burst config determines which opcodes are generated within burst groups.
-      However, this does not prohibit the use of these opcodes outside of burst groups.
-      Although llvm-snippy attempts to generate burst-config opcodes only within burst groups, there is no guarantee.
-      Depending on config complexity, llvm-snippy version, and seed, certain opcodes may bypass the burst group construction, resulting in the generation of standalone primary instructions.
-      This is normal behavior and not a bug.
+   The burst config determines which opcodes are generated within burst groups.
+   However, this does not prohibit the use of these opcodes outside of burst groups.
+   Although llvm-snippy attempts to generate burst-config opcodes only within burst groups, there is no guarantee.
+   Depending on config complexity, llvm-snippy version, and seed, certain opcodes may bypass the burst group construction, resulting in the generation of standalone primary instructions.
+   This is normal behavior and not a bug.
+
+.. note::
+
+   Burst groups are insensitive to `Random scheduling`_.
+   Burst Mode uses its own randomization machinery
+   and produces bursts of primary instructions which should not be
+   mixed with ancillary instructions.
 
 You can then have the result of the generation dumped. For more details,
 see `Dumping Memory Access Scheme <#dumping-memory-access-scheme>`__.
@@ -2735,8 +2753,6 @@ where:
    after they are overwritten.
 
 
-.. _`_random_scheduling`:
-
 Random Scheduling
 -----------------
 
@@ -2744,11 +2760,13 @@ Use the ``random-scheduling`` feature to apply a random scheduling pass
 for the generated code. It reorders instructions according to a topology
 sort of data dependency graph for each basic block of each function.
 
+Random scheduling does not change the behavior of the generated program.
+
 To enable ``random-scheduling``, use one of the following approaches:
 
 -  Using the ``scheduling`` top-level key (preferred):
 
-   ::
+   .. code:: yaml
 
       scheduling:
         enabled: true
@@ -2756,7 +2774,7 @@ To enable ``random-scheduling``, use one of the following approaches:
 -  Using the ``random-scheduling`` key in ``options`` (outdated, but
    still supported):
 
-   ::
+   .. code:: yaml
 
       options:
         random-scheduling: true
@@ -2767,86 +2785,78 @@ To enable ``random-scheduling``, use one of the following approaches:
 
       -random-scheduling
 
-Random scheduling does not change the behavior of the program. However,
-it might be ineffective for large basic blocks, as they force it to run
-for a long time. To control this behavior, you can `configure the
-maximum size of scheduling
-regions <#configuring-max-size-of-scheduling-region>`__.
-
-Random scheduling also does not affect barrier instructions |nbsp| -- |nbsp| these are
-instructions that have various side effects, for example:
-
--  ``EBREAK`` and ``ECALL``
-
--  ``VSET*``
-
--  ``UNIMP``
-
--  ``WFI``
-
--  Fence instructions (``FENCE``, ``FENCE_I``)
-
--  ``SFENCE_VMA``
-
-.. _`_limitations_2`:
-
 Limitations
 ~~~~~~~~~~~
 
-The following is a list of instructions snippy does not currently
-schedule:
+Snippy does not allow random scheduling for some instructions.
+The reasons for this may vary.
+There are instructions whose relocation could
+cause changes in program behavior, which is prohibited.
+For some opcodes, rescheduling is just not implemented yet.
 
--  RVV instructions
+When snippy encounters instructions for which rescheduling is disallowed,
+it splits the basic block into regions consisting of
+either only allowed instructions
+or only disallowed instructions.
+It then reschedules instructions in the former regions,
+keeping the latter ones untouched.
 
--  Floating point instructions
+.. note::
 
--  Branches
+   Due to technical limitations, rescheduling of very small regions
+   (smaller than 4 instructions) is not performed.
 
--  EBREAK and ECALL
+Snippy does not allow rescheduling for the following instructions:
 
+-  Branches and calls
+-  Barriers/fences
+-  Floating point ops
+-  Traps/software interrupts
 -  The last instruction in the last basic block of ``EntryFunction``
+-  **RISC-V targets only**:
 
-However, if you have such instructions in the basic block, the pass:
+   -  All vector opcodes, including ``VSET*``
+   -  ``EBREAK``, ``ECALL``
+   -  ``FENCE``, ``FENCE_I``, ``SFENCE_VMA``
+   -  ``UNIMP``, ``WFI``
 
-1. Splits the block into regions that only consist of the supported
-   instructions.
+.. note::
 
-2. Schedules all these regions.
+   Random scheduling does not affect `burst groups`_.
+   This is intentional. Burst Mode uses its own randomization machinery
+   and produces bursts of primary instructions which should not be
+   mixed with ancillary instructions.
+
+.. note::
+
+   Random scheduling does not affect the code produced by `Histogram Patterns`_,
+   because patterns are designed to generate instruction sequences
+   with as much user control as possible, including
+   how those sequences are randomized.
 
 Configuring Max Size of Scheduling Region
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Specify the maximum number of instructions for random scheduling using
-the ``max-region-size`` feature. It changes the default value ``131072``
-to a certain reasonable number, this way controlling the size of the
-scheduling region.
+The larger the size of the basic code block,
+the longer it takes to randomize it,
+with the time growing considerably faster than linearly.
+That is why random scheduling of large basic blocks is expensive.
 
-.. note::
+To avoid slowdowns, snippy observes the size of each basic block and,
+if its size exceeds certain limit,
+splits the block into smaller regions of code.
+Then snippy reschedules instructions within these regions,
+which is faster than rescheduling the entire basic block.
 
-   The reasonable maximum number of instructions for this option depends
-   on the configuration, but it must not be too small, as this will
-   result in long runtimes.
+The default limit (max size) is ``131072`` instructions.
+The ``scheduling.max-region-size`` key allows to set the arbitrary limit.
+Example:
 
-To use the ``max-region-size`` feature, ``random-scheduling`` must be
-explicitly enabled in your configuration, as described above.
+.. code:: yaml
 
--  If you used the ``scheduling`` key, add ``max-region-size`` to it:
-
-   .. code:: yaml
-
-      scheduling:
-        enabled: true
-        max-region-size: 20000
-
--  If you used the ``options`` key, add the ``scheduling`` key with
-   ``max-region-size``:
-
-   ::
-
-      options:
-        random-scheduling: true
-      scheduling:
-        max-region-size: 20000
+   scheduling:
+      enabled: true
+      max-region-size: 20000
 
 .. _`_options`:
 
@@ -3571,7 +3581,7 @@ Currently, only ``valuegram`` data source type is supported. It should include:
    Reinitialization of ``VSET*`` operands via ``operands-reinitialization``
    is not supported, i.e. any matches to ``VSET*`` opcodes are ignored.
    To set operands of ``VSET*`` instructions, use
-   `riscv-vector-unit config <#vector-unit-configurations>`__. 
+   `riscv-vector-unit config <#vector-unit-configurations>`__.
 
 .. _`_final_registers_state`:
 
@@ -3624,7 +3634,12 @@ standard output. To redirect the log:
 -  To a standard error (instead of the standard output), use ``-``
    instead of ``<filename>``, For example: ``--trace-log -``.
 
-The program injects a special watermark line ``#===Simulation Start===``
+The program injects a special watermark line
+
+::
+
+   #===Simulation Start===
+
 to clearly separate executions of the generation phase from the final
 snippy execution.
 
@@ -3633,7 +3648,7 @@ Address Hazard Mode
 
 .. important::
 
-   Currently, this functionality does not supported without model plugin
+   This feature is not supported without model plugin.
 
 In this mode, snippy tries to create a data dependency when forming an
 address part of the memory instruction. To enable this mode use the
@@ -3644,15 +3659,25 @@ In the following example, an address for the second load in the register
 That way, the value of ``s1`` that was formed by the first load becomes
 important, and a data hazard is formed here:
 
-::
+.. code:: asm
 
    ...
-   lw s1, 0(a2)
+   lw s1, 0(a2)         // primary load instruction #1
    lui a0, 12
    addiw a0, a0, 1234
    add s1, s1, a0
-   lw a1, 0(s1)
+   lw a1, 0(s1)         // primary load instruction #2
    ...
+
+In some cases this feature does nothing:
+
+*  Within `burst groups`_,
+   since they cannot contain ancillary instructions, and therefore
+   the instructions that form data hazards cannot be inserted.
+
+*  Within code generated from Cartesian products (``*``)
+   and from Repetitions (``^``) when `Histogram Patterns`_ are used,
+   because it cannot contain ancillary instructions as well.
 
 .. _`_stack_section`:
 
@@ -4473,7 +4498,7 @@ Then Snippy will produce only disjoint memory addresses for these opcodes.
    intersecting memory accesses but prohibited from doing so
    (by this option) take addresses only from the ``access-range`` memory
    schemes and ignore all others.
-   
+
    The above means that
    when different kinds of memory schemes are used in the snippet,
    and ``riscv-disallow-intersecting-mem-accesses`` is engaged as well,
@@ -4662,7 +4687,7 @@ the ``options`` key in the configuration file.
    The ``--selfcheck`` option has the default value ``<N>`` of ``1``,
    so all the primary instructions are self-checked if this option is used
    without parameters.
-   
+
    If the ``selfcheck-ref-value-storage`` option is
    not provided, then the ``code`` mode is selected by default.
 
@@ -4772,7 +4797,7 @@ To use this feature:
 
 #. In Memory-based modes, the address and size of the ``selfcheck`` section
    together with some other parameters can be exported as global variables.
-   This allows accessing the section contents after snippet execution 
+   This allows accessing the section contents after snippet execution
    from the code linked to the snippet.
    See more in `Exporting "selfcheck" Section Properties to Global Variables`_.
    To enable this feature:
