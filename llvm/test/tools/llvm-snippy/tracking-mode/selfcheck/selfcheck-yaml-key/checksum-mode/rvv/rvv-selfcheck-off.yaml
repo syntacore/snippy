@@ -1,0 +1,38 @@
+# UNSUPPORTED: riscv-snippy-model-None
+
+# RUN: llvm-snippy %s |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s --check-prefix=NEGATIVE-CHECK
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 20
+  init-regs-in-elf: true
+  dump-mf: true
+  rvv-init-mode: loads
+# COM: X0, should not be a register that we check
+# COM: (simulator can silently process these as no-op instructions)
+  reserved-regs-list: ["X0"]
+
+include:
+  - "../../../Inputs/sections.yaml"
+  - "../../Inputs/rvv-unit-e16m1.yaml"
+
+histogram:
+    - [VSETIVLI, 0.0005]
+    - [VADD_VV, 1.0]
+    - [ADD, 1.0]
+
+selfcheck:
+  mode: checksum
+
+# COM: When RVV selfcheck is not requested, the check-sum is computed over
+# COM: scalar definitions only.
+
+# CHECK: [[Acc:\$x[1-9][0-9]?]] = ADD {{\$x[0-9]+}}, {{\$x[0-9]+}}
+# CHECK: BEQ {{\$x[0-9]+}}, [[Acc]], 8
+# CHECK-NEXT: EBREAK
+
+# NEGATIVE-CHECK-NOT: = VREDXOR_VS
+# NEGATIVE-CHECK-NOT: = VMV_X_S
+# NEGATIVE-CHECK-NOT: = VMV_V_I

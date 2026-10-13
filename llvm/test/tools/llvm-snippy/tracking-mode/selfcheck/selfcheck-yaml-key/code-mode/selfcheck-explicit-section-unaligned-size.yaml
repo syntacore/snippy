@@ -1,12 +1,11 @@
-# REQUIRES: riscv-snippy-model-any
 # REQUIRES: riscv-rvv
-# RUN: llvm-snippy %s \
+# RUN: not llvm-snippy %s \
 # RUN:    -mtriple=riscv64 -mattr=+v \
-# RUN:     -num-instrs=2 -init-regs-in-elf -dump-mf -selfcheck-mem \
-# RUN: |& FileCheck %s --dump-input always
+# RUN:     -num-instrs=2 -init-regs-in-elf \
+# RUN: |& FileCheck %s --check-prefix=UNALIGNED_SIZE
 
 include:
-- "../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml"
+- ../../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml
 
 sections:
     - name:      0
@@ -25,23 +24,15 @@ sections:
       LMA:       0x210000
       ACCESS:    rw
     - name:      selfcheck
-      VMA:       0x310000
-      SIZE:      0x100000
-      LMA:       0x310000
-      ACCESS:    rw
-    - name:      stack
-      VMA:       0x410000
-      SIZE:      0x100000
-      LMA:       0x410000
+      VMA:       0x810000
+      SIZE:      0x500001
+      LMA:       0x810000
       ACCESS:    rw
 
 histogram: 
     - [VADD_VV, 1.0]
-
 selfcheck:
-  mode: code
-
-# CHECK-NOT: VS1R_V
-# CHECK: EBREAK
-
-
+  mode: code 
+  selfcheck-td-options:
+    enable-selfcheck-rvv: true
+# UNALIGNED_SIZE: error: Cannot use "selfcheck" section from layout: it has unaligned memory settings

@@ -1,13 +1,13 @@
 # REQUIRES: riscv-snippy-model-any
 # REQUIRES: riscv-rvv
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+v \
-# RUN:     -num-instrs=2 -init-regs-in-elf -dump-mf \
+# RUN:    -mtriple=riscv64 -mattr=+v -rvv-init-mode=loads --riscv-preference-for-rvv-mode-change=vsetvl \
+# RUN:     -num-instrs=1 -init-regs-in-elf -dump-mf \
 # RUN:     -selfcheck-mem \
-# RUN: |& FileCheck %s
+# RUN: |& FileCheck %s --dump-input always
 
 include:
-- "../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-non-zero-vl.yaml"
+- "../../../../RISCV/rvv/rvv-config-histogram/Inputs/rvv-unit-sew8-lmul4-max_encodable-bias.yaml"
 
 sections:
     - name:      0
@@ -36,8 +36,8 @@ sections:
       LMA:       0x410000
       ACCESS:    rw
 
-histogram: 
-    - [VADD_VV, 1.0]
+histogram:
+    - [VADD_VV, 10000.0]
 
 selfcheck:
   mode: code 
@@ -45,8 +45,7 @@ selfcheck:
     enable-selfcheck-rvv: true
 
 # CHECK: [[REG:\$v[0-9]+]] = VADD_VV
-# CHECK: VS1R_V [[REG]]
-# CHECK: VS1R_V {{\$v[0-9]+}}
+# CHECK-COUNT-8: VS1R_V
 # CHECK: EBREAK
 
 

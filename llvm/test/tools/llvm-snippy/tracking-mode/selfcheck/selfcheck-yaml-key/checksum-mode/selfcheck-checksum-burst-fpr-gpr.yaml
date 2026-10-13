@@ -7,6 +7,9 @@ options:
   num-instrs: 20
   init-regs-in-elf: true
   mattr: +f
+# COM: X0, should not be a register that we check
+# COM: (simulator can silently process these as no-op instructions)
+  reserved-regs-list: ["X0"]
 
 selfcheck:
   mode: checksum

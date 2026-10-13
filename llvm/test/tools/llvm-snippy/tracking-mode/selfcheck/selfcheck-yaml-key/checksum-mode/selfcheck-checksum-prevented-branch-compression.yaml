@@ -3,21 +3,21 @@
 # RUN: llvm-snippy %t.1.period.yaml \
 # RUN:    -mtriple=riscv64 \
 # RUN:    -dump-mf -init-regs-in-elf \
-# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml \
+# RUN: -valuegram-operands-regs=%S/../Inputs/zero-regs.yaml \
 # RUN: |& FileCheck %s
 
 # RUN: sed -e s/PERIOD/10/ %s >%t.10.period.yaml
 # RUN: llvm-snippy %t.10.period.yaml \
 # RUN:    -mtriple=riscv64 \
 # RUN:    -dump-mf -init-regs-in-elf \
-# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml \
+# RUN: -valuegram-operands-regs=%S/../Inputs/zero-regs.yaml \
 # RUN: |& FileCheck %s
 
 # RUN: sed -e s/PERIOD/100/ %s >%t.100.period.yaml
 # RUN: llvm-snippy %t.100.period.yaml \
 # RUN:    -mtriple=riscv64 \
 # RUN:    -dump-mf -init-regs-in-elf \
-# RUN: -valuegram-operands-regs=%S/Inputs/zero-regs.yaml \
+# RUN: -valuegram-operands-regs=%S/../Inputs/zero-regs.yaml \
 # RUN: |& FileCheck %s
 
 sections:

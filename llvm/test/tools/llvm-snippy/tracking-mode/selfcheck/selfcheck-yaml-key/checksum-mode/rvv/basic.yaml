@@ -1,0 +1,54 @@
+# UNSUPPORTED: riscv-snippy-model-None
+# REQUIRES: riscv-rvv
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 2
+  init-regs-in-elf: true
+  dump-mf: true
+
+include:
+  - "../../../Inputs/sections.yaml"
+  - "../../Inputs/selfcheck-checksum-rvv.yaml"
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: deduced
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_8: 1.0
+        sew_16: 1.0
+        sew_32: 1.0
+        sew_64: 1.0
+      LMUL:
+        m4: 1.0
+      VMA:
+        mu: 1.0
+        ma: 1.0
+      VTA:
+        tu: 1.0
+        ta: 1.0
+
+histogram:
+    - [VSETIVLI, 0.0005]
+    - [VADD_VV, 1.0]
+
+# CHECK: VADD_VV
+# CHECK-NEXT: VSETIVLI
+# CHECK: [[AccVReg:\$v[0-9]+]] = VMV_V_I 0
+# CHECK-COUNT-4: [[AccVReg]] = VREDXOR_VS {{\$v[0-9]+}}, [[AccVReg]]
+# CHECK-NEXT: [[AccXReg:\$x[0-9]+]] = VMV_X_S [[AccVReg]]
+# CHECK-NEXT: VSETIVLI
+
+# CHECK: BEQ {{\$x[0-9]+}}, [[AccXReg]], 8
+# CHECK-NEXT: EBREAK
