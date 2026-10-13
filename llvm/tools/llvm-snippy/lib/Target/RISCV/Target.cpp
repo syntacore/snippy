@@ -328,16 +328,26 @@ getIncOpcodeForLoopCounter(const InstructionGenerationContext &IGC) {
 }
 
 static RegStorageType regToStorage(Register Reg) {
-  if ((RISCV::X0 <= Reg && Reg <= RISCV::X31) ||
-      (RISCV::X0_W <= Reg && Reg <= RISCV::X31_W) ||
-      (RISCV::X0_H <= Reg && Reg <= RISCV::X31_H))
+  using namespace llvm::RISCV;
+  auto ContainedIn =
+      [Reg](std::initializer_list<const TargetRegisterClass *> Classes) {
+        return any_of(Classes,
+                      [Reg](const auto *RC) { return RC->contains(Reg); });
+      };
+
+  if (ContainedIn({&GPRRegClass, &GPRF16RegClass, &GPRF32RegClass}))
     return RegStorageType::XReg;
-  if ((RISCV::F0_D <= Reg && Reg <= RISCV::F31_D) ||
-      (RISCV::F0_F <= Reg && Reg <= RISCV::F31_F) ||
-      (RISCV::F0_H <= Reg && Reg <= RISCV::F31_H))
+  if (ContainedIn(
+          {&FPR16RegClass, &FPR32RegClass, &FPR64RegClass, &FPR128RegClass}))
     return RegStorageType::FReg;
-  assert(RISCV::V0 <= Reg && Reg <= RISCV::V31 && "unknown register");
-  return RegStorageType::VReg;
+  if (ContainedIn({&VRRegClass, &VRM2RegClass, &VRM4RegClass, &VRM8RegClass,
+                   &VRN2M1RegClass, &VRN2M2RegClass, &VRN2M4RegClass,
+                   &VRN3M1RegClass, &VRN3M2RegClass, &VRN4M1RegClass,
+                   &VRN4M2RegClass, &VRN5M1RegClass, &VRN6M1RegClass,
+                   &VRN7M1RegClass, &VRN8M1RegClass}))
+    return RegStorageType::VReg;
+
+  llvm_unreachable("Unknown register");
 }
 
 static bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
@@ -561,8 +571,13 @@ static RVVModeInfo
 getSEWXlenVLMaxSupportRVVMode(InstructionGenerationContext &IGC,
                               const MachineBasicBlock &MBB) {
   auto &RGC = IGC.ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
-  auto SEW = IGC.getSubtarget<RISCVSubtarget>().getELen();
+  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+  // Values get in and out of the vector unit in this mode through an X
+  // register, so an element must not be wider than one.
+  auto SEW = std::min<unsigned>(ST.getELen(), ST.getXLen());
   const auto VL = RGC.getVLEN() / SEW;
+  APInt VM = APInt::getMaxValue(VL);
+
   RVVConfiguration Config = {{static_cast<VSEW>(SEW), VLMUL::LMUL_1, VL},
                              VMAMode::MU,
                              VTAMode::TU,
@@ -1695,6 +1710,8 @@ public:
   std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
                       InstructionGenerationContext &IGC) const override {
+    // NOTE: This function can return X0 as a register to be checked.
+
     constexpr auto DestIdx = 0u;
     const auto &FirstDestOperand = MI.getOperand(DestIdx);
     assert(FirstDestOperand.isReg());
@@ -1733,11 +1750,6 @@ public:
             RVSelfcheckTgtCfg->SelfcheckRVVEnabled, SelfcheckRVV,
             "enable-selfcheck-rvv"))
       return toString(std::move(Err));
-
-    if (SelfcheckCfg.isCheckSumSelfcheckModeEnabled() &&
-        RVSelfcheckTgtCfg->SelfcheckRVVEnabled)
-      return std::string(
-          "selfcheck checksum mode is unsupported with RVV selfcheck enabled");
 
     return std::string();
   }
@@ -4697,22 +4709,9 @@ public:
     return getNonZeroReg("for accumulating check-sum", RI, RP, IGC.MBB);
   }
 
-  MCRegister generateInitRegisterValueForCheckSumSelfcheck(
-      InstructionGenerationContext &IGC, MachineBasicBlock::iterator Ins,
-      const RegPoolWrapper &RP, MCRegister Reg) const override {
-    assert(is_contained(RISCV::GPRRegClass, Reg));
-    if (Reg != RISCV::X0)
-      return Reg;
-
-    auto &ProgCtx = IGC.ProgCtx;
-    auto &State = ProgCtx.getLLVMState();
-
-    auto TmpReg = getTmpRegisterForCheckSumSelfcheck(IGC, RP);
-
-    generateRegMove(IGC.MBB, Ins, State.getCtx(), State.getInstrInfo(), Reg,
-                    TmpReg);
-
-    return TmpReg;
+  bool canHoldCheckSum(MCRegister Reg) const override {
+    // The check-sum is accumulated with XOR, so it lives in a writable GPR.
+    return RISCV::GPRRegClass.contains(Reg) && Reg != RISCV::X0;
   }
 
   void generateRegMove(MachineBasicBlock &MBB, MachineBasicBlock::iterator Ins,
@@ -4747,52 +4746,14 @@ public:
         .addReg(SrcReg);
   }
 
-  void generateCheckSumForSelfcheck(
-      InstructionGenerationContext &IGC, MCRegister DstReg, MCRegister SrcReg,
-      std::optional<MCRegister> TmpReg) const override {
-    auto &ProgCtx = IGC.ProgCtx;
-    auto &State = ProgCtx.getLLVMState();
-    auto &Tgt = State.getSnippyTarget();
-    auto &MBB = IGC.MBB;
-    auto &InsertPos = IGC.Ins;
-    auto &Ctx = State.getCtx();
-    auto &InstrInfo = State.getInstrInfo();
-    if (isFloatingPointReg(SrcReg)) {
-      assert(TmpReg.has_value());
-      generateRegMove(MBB, InsertPos, Ctx, InstrInfo, SrcReg, *TmpReg);
-      SrcReg = *TmpReg;
-    }
-
-    getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(RISCV::XOR),
-                          DstReg)
-        .addReg(DstReg)
-        .addReg(SrcReg);
-  }
+  void
+  generateCheckSumForSelfcheck(InstructionGenerationContext &IGC,
+                               MCRegister AccReg, bool OverwriteAcc,
+                               ArrayRef<MCRegister> SrcRegs) const override;
 
   void generateCheckForCheckSumSelfcheck(InstructionGenerationContext &IGC,
                                          MCRegister AccReg,
-                                         MCRegister RefReg) const override {
-    auto &ProgCtx = IGC.ProgCtx;
-    auto &State = ProgCtx.getLLVMState();
-    auto &Tgt = State.getSnippyTarget();
-    auto &MBB = IGC.MBB;
-    auto &InsertPos = IGC.Ins;
-    auto &Ctx = State.getCtx();
-    auto &InstrInfo = State.getInstrInfo();
-
-    unsigned TrapOpcode = !IGC.getSubtarget<RISCVSubtarget>().hasStdExtC()
-                              ? RISCV::EBREAK
-                              : RISCV::C_EBREAK;
-
-    getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(RISCV::BEQ))
-        .addReg(AccReg)
-        .addReg(RefReg)
-        .addImm(kMaxSupportedInstrSize + (TrapOpcode == RISCV::EBREAK
-                                              ? kMaxSupportedInstrSize
-                                              : kCompressedInstrSize));
-
-    getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(TrapOpcode));
-  }
+                                         MCRegister RefReg) const override;
 
   void storeRegToAddr(InstructionGenerationContext &IGC, uint64_t Addr,
                       MCRegister Reg,
@@ -5317,7 +5278,15 @@ public:
     return snippy::isSPRelative(Opcode);
   }
 
-private:
+  void generateRVVModeUpdate(InstructionGenerationContext &IGC,
+                             const MCInstrInfo &InstrInfo,
+                             const RVVModeInfo &NewRVVMode,
+                             MDNode *MetadataMark) const;
+
+  bool generateRVVModeUpdateIfNeeded(InstructionGenerationContext &IGC,
+                                     const MCInstrInfo &InstrInfo,
+                                     const RVVModeInfo &NewRVVMode) const;
+
   void rvvWriteValue(InstructionGenerationContext &IGC, APInt Value,
                      unsigned DstReg) const;
 
@@ -5327,6 +5296,7 @@ private:
   void rvvWriteValueUsingXReg(InstructionGenerationContext &IGC, APInt Value,
                               unsigned DstReg) const;
 
+private:
   std::optional<RVVModeInfo>
   rvvWriteValueUsingXRegAndGetOldMode(InstructionGenerationContext &IGC,
                                       APInt Value, unsigned DstReg) const;
@@ -5359,15 +5329,6 @@ private:
                            const MCInstrInfo &InstrInfo,
                            const RVVModeInfo &NewRVVMode,
                            MDNode *MetadataMark) const;
-
-  void generateRVVModeUpdate(InstructionGenerationContext &IGC,
-                             const MCInstrInfo &InstrInfo,
-                             const RVVModeInfo &NewRVVMode,
-                             MDNode *MetadataMark) const;
-
-  bool generateRVVModeUpdateIfNeeded(InstructionGenerationContext &IGC,
-                                     const MCInstrInfo &InstrInfo,
-                                     const RVVModeInfo &NewRVVMode) const;
 
   void generateV0MaskUpdate(InstructionGenerationContext &IGC, const APInt VM,
                             const MCInstrInfo &InstrInfo) const;
@@ -5532,11 +5493,216 @@ private:
     if (!checkMetadata(MI, SnippyMetadata::Support))
       MI.setAsmPrinterFlag(RISCV::DoNotCompress);
   }
-};
+}; // class SnippyRISCVTarget
 
 // Check that SnippyRISCVTarget contains only vtable pointer
 static_assert(sizeof(SnippyRISCVTarget) == sizeof(SnippyTarget),
               "SnippyRISCVTarget must be stateless");
+
+static void xorRegIntoCheckSum(const SnippyRISCVTarget &Tgt,
+                               InstructionGenerationContext &IGC,
+                               MCRegister AccReg, MCRegister SrcReg) {
+  auto &State = IGC.ProgCtx.getLLVMState();
+  getSupportInstBuilder(Tgt, IGC.MBB, IGC.Ins, State.getCtx(),
+                        State.getInstrInfo().get(RISCV::XOR), AccReg)
+      .addReg(AccReg)
+      .addReg(SrcReg);
+}
+
+template <typename RangeT>
+static void foldGPRsIntoCheckSum(const SnippyRISCVTarget &Tgt,
+                                 InstructionGenerationContext &IGC,
+                                 MCRegister AccReg, bool OverwriteAcc,
+                                 RangeT &&SrcRegs) {
+  assert(!SrcRegs.empty() && "Expected at least one register");
+
+  auto &State = IGC.ProgCtx.getLLVMState();
+
+  // If overwrite is allowed, simply move the first reg instead of XORing
+  if (OverwriteAcc)
+    Tgt.generateRegMove(IGC.MBB, IGC.Ins, State.getCtx(), State.getInstrInfo(),
+                        *SrcRegs.begin(), AccReg);
+
+  auto Regs = drop_begin(SrcRegs, OverwriteAcc ? 1 : 0);
+  for (auto SrcReg : Regs)
+    xorRegIntoCheckSum(Tgt, IGC, AccReg, SrcReg);
+}
+
+template <typename RangeT>
+static void foldFPRsIntoCheckSum(const SnippyRISCVTarget &Tgt,
+                                 InstructionGenerationContext &IGC,
+                                 MCRegister AccReg, bool OverwriteAcc,
+                                 RangeT &&SrcRegs) {
+  assert(!SrcRegs.empty() && "Expected at least one register");
+
+  auto &State = IGC.ProgCtx.getLLVMState();
+  auto &Ctx = State.getCtx();
+  const auto &InstrInfo = State.getInstrInfo();
+
+  auto RP = IGC.pushRegPool();
+  RP->addReserved(AccReg);
+
+  // If overwrite is allowed, simply move the first reg instead of XORing
+  if (OverwriteAcc)
+    Tgt.generateRegMove(IGC.MBB, IGC.Ins, Ctx, InstrInfo, *SrcRegs.begin(),
+                        AccReg);
+
+  // Other FP values reach the check-sum through a GPR.
+  auto TmpReg = Tgt.getTmpRegisterForCheckSumSelfcheck(IGC, *RP);
+
+  auto Regs = drop_begin(SrcRegs, OverwriteAcc ? 1 : 0);
+  for (auto SrcReg : Regs) {
+    Tgt.generateRegMove(IGC.MBB, IGC.Ins, Ctx, InstrInfo, SrcReg, TmpReg);
+    xorRegIntoCheckSum(Tgt, IGC, AccReg, TmpReg);
+  }
+}
+
+static void foldPhysRegIntoVectorCheckSum(const SnippyRISCVTarget &Tgt,
+                                          InstructionGenerationContext &IGC,
+                                          MCRegister Reg, MCRegister VAccReg) {
+  auto &State = IGC.ProgCtx.getLLVMState();
+  auto &Ctx = State.getCtx();
+  const auto &InstrInfo = State.getInstrInfo();
+  auto &MBB = IGC.MBB;
+  auto &Ins = IGC.Ins;
+
+  Register RedXorSrc = Reg;
+
+  // VAcc[0] = VAcc[0] ^ xor of all elements of RedXorSrc
+  getSupportInstBuilder(Tgt, MBB, Ins, Ctx, InstrInfo.get(RISCV::VREDXOR_VS),
+                        VAccReg)
+      .addReg(RedXorSrc)
+      .addReg(VAccReg)
+      .addReg(RISCV::NoRegister);
+}
+
+template <typename RangeT>
+static void foldVRsIntoCheckSum(const SnippyRISCVTarget &Tgt,
+                                InstructionGenerationContext &IGC,
+                                MCRegister AccReg, bool OverwriteAcc,
+                                RangeT &&SrcRegs) {
+  assert(!SrcRegs.empty() && "Expected at least one register");
+
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  auto &RI = State.getRegInfo();
+  auto &Ctx = State.getCtx();
+  const auto &InstrInfo = State.getInstrInfo();
+  auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+  auto &MBB = IGC.MBB;
+  auto RP = IGC.pushRegPool();
+  RP->addReserved(AccReg);
+
+  // Check that we have only physical registers (width = VLEN)
+  assert(none_of(SrcRegs,
+                 [&](Register Reg) { return Tgt.isMultipleReg(Reg, RI); }) &&
+         "We expect single (non-multi) vector registers only");
+
+  // Reserve physical src registers, to select scratch registers
+  for (auto Reg : SrcRegs)
+    RP->addReserved(Reg);
+
+  const auto &VRegClass = RI.getRegClass(RISCV::VRNoV0RegClassID);
+  auto VAccReg =
+      RP->getAvailableRegister("for RVV check-sum accumulator", RI, VRegClass,
+                               MBB, AccessMaskBit::SupportRW);
+  RP->addReserved(VAccReg);
+
+  // Reducing at SEW = GPRegSize makes every element as wide as the scalar
+  // accumulator can take, so no bits of the check-sum are wasted.
+  const auto &RVVModeToRestore = RGC.getRVVModeIfActive(MBB);
+  const auto &SupportRVVMode = getSEWXlenVLMaxSupportRVVMode(IGC, MBB);
+  bool DidRVVModeChange =
+      Tgt.generateRVVModeUpdateIfNeeded(IGC, InstrInfo, SupportRVVMode);
+
+  // vmv.v.i writes a whole group, so zeroing is only valid at LMUL 1.
+  assert(RGC.getCurrentRVVCfg(MBB).PrimaryCfg.LMUL == VLMUL::LMUL_1);
+  getSupportInstBuilder(Tgt, MBB, IGC.Ins, Ctx, InstrInfo.get(RISCV::VMV_V_I),
+                        VAccReg)
+      .addImm(0);
+
+  // Fold all source registers into the accumulator
+  for (auto Reg : SrcRegs)
+    foldPhysRegIntoVectorCheckSum(Tgt, IGC, Reg, VAccReg);
+
+  // The reduction result goes right into AccReg when it has nothing to keep
+  auto XDstReg = std::invoke([&]() -> MCRegister {
+    if (OverwriteAcc)
+      return AccReg;
+    return getNonZeroReg("for RVV check-sum transfer", RI, *RP, MBB,
+                         AccessMaskBit::SupportRW);
+  });
+
+  getSupportInstBuilder(Tgt, MBB, IGC.Ins, Ctx, InstrInfo.get(RISCV::VMV_X_S),
+                        XDstReg)
+      .addReg(VAccReg);
+  if (!OverwriteAcc)
+    xorRegIntoCheckSum(Tgt, IGC, AccReg, XDstReg);
+
+  if (DidRVVModeChange) {
+    assert(RVVModeToRestore.has_value());
+    Tgt.generateRVVModeUpdate(IGC, InstrInfo, *RVVModeToRestore,
+                              getMetadataMark(Ctx, SnippyMetadata::Support));
+  }
+}
+
+void SnippyRISCVTarget::generateCheckSumForSelfcheck(
+    InstructionGenerationContext &IGC, MCRegister AccReg, bool OverwriteAcc,
+    ArrayRef<MCRegister> SrcRegs) const {
+  assert(canHoldCheckSum(AccReg));
+  assert((!OverwriteAcc || !SrcRegs.empty()) &&
+         "There is nothing to override DstReg with");
+
+  auto RP = IGC.pushRegPool();
+  RP->addReserved(AccReg);
+
+  auto FilterByStorage = [&](RegStorageType Storage) {
+    return make_filter_range(
+        SrcRegs, [=](MCRegister Reg) { return regToStorage(Reg) == Storage; });
+  };
+
+  auto GPRs = FilterByStorage(RegStorageType::XReg);
+  auto FPRs = FilterByStorage(RegStorageType::FReg);
+  auto VRs = FilterByStorage(RegStorageType::VReg);
+
+  // Folds are grouped by storage.
+  // The first non-empty group overrides DstReg, the rest xor into it.
+  if (!GPRs.empty()) {
+    foldGPRsIntoCheckSum(*this, IGC, AccReg, OverwriteAcc, GPRs);
+    OverwriteAcc = false;
+  }
+  if (!FPRs.empty()) {
+    foldFPRsIntoCheckSum(*this, IGC, AccReg, OverwriteAcc, FPRs);
+    OverwriteAcc = false;
+  }
+  if (!VRs.empty())
+    foldVRsIntoCheckSum(*this, IGC, AccReg, OverwriteAcc, VRs);
+}
+
+void SnippyRISCVTarget::generateCheckForCheckSumSelfcheck(
+    InstructionGenerationContext &IGC, MCRegister AccReg,
+    MCRegister RefReg) const {
+  auto &ProgCtx = IGC.ProgCtx;
+  auto &State = ProgCtx.getLLVMState();
+  auto &Tgt = State.getSnippyTarget();
+  auto &MBB = IGC.MBB;
+  auto &InsertPos = IGC.Ins;
+  auto &Ctx = State.getCtx();
+  auto &InstrInfo = State.getInstrInfo();
+
+  unsigned TrapOpcode = !IGC.getSubtarget<RISCVSubtarget>().hasStdExtC()
+                            ? RISCV::EBREAK
+                            : RISCV::C_EBREAK;
+
+  getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(RISCV::BEQ))
+      .addReg(AccReg)
+      .addReg(RefReg)
+      .addImm(kMaxSupportedInstrSize + (TrapOpcode == RISCV::EBREAK
+                                            ? kMaxSupportedInstrSize
+                                            : kCompressedInstrSize));
+
+  getSupportInstBuilder(Tgt, MBB, InsertPos, Ctx, InstrInfo.get(TrapOpcode));
+}
 
 [[noreturn]]
 static void reportInitializationFPRegError(LLVMContext &Ctx, const APInt &Value,
@@ -5666,10 +5832,10 @@ void SnippyRISCVTarget::rvvUnsafeWriteValueUsingXReg(
   auto &RP = IGC.getRegPool();
   auto &ProgCtx = IGC.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
-  const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+  [[maybe_unused]] const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+  assert(ST.hasStdExtV());
   auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto &InstrInfo = State.getInstrInfo();
-  assert(ST.hasStdExtV());
 
   // Use non-reserved reg as scratch.
   auto &RI = State.getRegInfo();
@@ -5679,10 +5845,10 @@ void SnippyRISCVTarget::rvvUnsafeWriteValueUsingXReg(
 
   assert(RISCV::VRRegClass.contains(DstReg));
   const auto SEW = static_cast<unsigned>(RGC.getSEW(MBB));
-  [[maybe_unused]] const auto ELEN = ST.getELen();
   const auto VL = RGC.getVL(MBB);
   [[maybe_unused]] const auto VLEN = RGC.getVLEN();
-  assert(SEW == ELEN && VL * SEW == VLEN);
+  // An element is transferred through an X register, so it has to fit in one
+  assert(SEW <= ST.getXLen() && VL * SEW == VLEN);
   // FIXME: We must set undef flag only when we do initialization. In all
   // other cases it's not quite right to use it. However, I expect the whole
   // this function to be a temporary solution, so it shouldn't be a big

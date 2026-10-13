@@ -724,9 +724,7 @@ public:
     reportUnimplementedError();
   }
 
-  MCRegister generateInitRegisterValueForCheckSumSelfcheck(
-      InstructionGenerationContext &IGC, MachineBasicBlock::iterator Ins,
-      const RegPoolWrapper &RP, MCRegister Reg) const override {
+  bool canHoldCheckSum(MCRegister Reg) const override {
     reportUnimplementedError();
   }
 
@@ -735,9 +733,10 @@ public:
                        MCRegister SrcReg, MCRegister DstReg) const override {
     reportUnimplementedError();
   }
-  void generateCheckSumForSelfcheck(
-      InstructionGenerationContext &IGC, MCRegister DstReg, MCRegister SrcReg,
-      std::optional<MCRegister> TmpReg) const override {
+  void
+  generateCheckSumForSelfcheck(InstructionGenerationContext &IGC,
+                               MCRegister AccReg, bool OverwriteAcc,
+                               ArrayRef<MCRegister> SrcRegs) const override {
     reportUnimplementedError();
   }
 

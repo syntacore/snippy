@@ -1,9 +1,18 @@
 # REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+m \
-# RUN:    -num-instrs=2 -init-regs-in-elf \
-# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +m
+  num-instrs: 2
+  init-regs-in-elf: true
+  dump-mf: true
+# COM: X0, should not be a register that we check
+# COM: (simulator can silently process these as no-op instructions)
+  reserved-regs-list: ["X0"]
+
 sections:
     - name:      1
       VMA:       0x100000
@@ -33,4 +42,3 @@ selfcheck:
 # CHECK-NEXT: [[XREG1:x[0-9]+]] {{(<- )*}}0x[[VALUE1:[0-9a-fA-F]+]]
 
 # CHECK: beq
-

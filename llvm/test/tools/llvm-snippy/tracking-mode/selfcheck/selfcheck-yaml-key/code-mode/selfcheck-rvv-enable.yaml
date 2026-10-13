@@ -1,12 +1,13 @@
+# REQUIRES: riscv-snippy-model-any
 # REQUIRES: riscv-rvv
-# RUN: not llvm-snippy %s \
+# RUN: llvm-snippy %s \
 # RUN:    -mtriple=riscv64 -mattr=+v \
 # RUN:     -num-instrs=2 -init-regs-in-elf -dump-mf \
 # RUN:     -selfcheck-mem \
 # RUN: |& FileCheck %s
 
 include:
-- ../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-non-zero-vl.yaml
+- "../../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-non-zero-vl.yaml"
 
 sections:
     - name:      0
@@ -24,13 +25,28 @@ sections:
       SIZE:      0x100000
       LMA:       0x210000
       ACCESS:    rw
+    - name:      selfcheck
+      VMA:       0x310000
+      SIZE:      0x100000
+      LMA:       0x310000
+      ACCESS:    rw
+    - name:      stack
+      VMA:       0x410000
+      SIZE:      0x100000
+      LMA:       0x410000
+      ACCESS:    rw
 
-histogram:
+histogram: 
     - [VADD_VV, 1.0]
 
 selfcheck:
-  mode: checksum
+  mode: code 
   selfcheck-td-options:
     enable-selfcheck-rvv: true
 
-# CHECK: error: selfcheck checksum mode is unsupported with RVV selfcheck enabled
+# CHECK: [[REG:\$v[0-9]+]] = VADD_VV
+# CHECK: VS1R_V [[REG]]
+# CHECK: VS1R_V {{\$v[0-9]+}}
+# CHECK: EBREAK
+
+

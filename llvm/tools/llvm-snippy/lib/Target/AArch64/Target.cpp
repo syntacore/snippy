@@ -1203,9 +1203,7 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
-  MCRegister generateInitRegisterValueForCheckSumSelfcheck(
-      InstructionGenerationContext &IGC, MachineBasicBlock::iterator Ins,
-      const RegPoolWrapper &RP, MCRegister Reg) const override {
+  bool canHoldCheckSum(MCRegister Reg) const override {
     SNIPPY_UNIMPLEMENTED();
   }
 
@@ -1215,9 +1213,10 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
-  void generateCheckSumForSelfcheck(
-      InstructionGenerationContext &IGC, MCRegister DstReg, MCRegister SrcReg,
-      std::optional<MCRegister> TmpReg) const override {
+  void
+  generateCheckSumForSelfcheck(InstructionGenerationContext &IGC,
+                               MCRegister AccReg, bool OverwriteAcc,
+                               ArrayRef<MCRegister> SrcRegs) const override {
     SNIPPY_UNIMPLEMENTED();
   }
 

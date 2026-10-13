@@ -57,20 +57,25 @@ getSupportedSysRegs(const RISCVSubtarget &ST);
 
 static inline unsigned getRegBitWidth(const RISCVSubtarget &ST, MCRegister Reg,
                                       unsigned VLEN = 0) {
-  if (RISCV::GPRRegClass.contains(Reg))
+  using namespace llvm::RISCV;
+
+  if (GPRRegClass.contains(Reg))
     return ST.getXLen();
-  if (RISCV::FPR16RegClass.contains(Reg))
+  if (FPR16RegClass.contains(Reg))
     return Reg2Bytes * RISCV_CHAR_BIT;
-  if (RISCV::FPR32RegClass.contains(Reg))
+  if (FPR32RegClass.contains(Reg))
     return Reg4Bytes * RISCV_CHAR_BIT;
-  if (RISCV::FPR64RegClass.contains(Reg))
+  if (FPR64RegClass.contains(Reg))
     return Reg8Bytes * RISCV_CHAR_BIT;
   auto RegID = Reg.id();
   if (is_contained(getSupportedSysRegs(ST), RegID))
     return RISCVSimulatorSysRegs::getBitWidth(
-        ST, static_cast<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>(Reg.id()));
-  assert(RISCV::VRRegClass.contains(Reg) && "unknown register class");
-  return VLEN;
+        ST, static_cast<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>(RegID));
+  if (VRRegClass.contains(Reg))
+    return VLEN;
+  // There are many more classes of VRegs (like VRM2, VRN2M1, etc),
+  // but we don't use them.
+  llvm_unreachable("unknown register class");
 }
 
 static inline unsigned regToIndex(Register Reg) {

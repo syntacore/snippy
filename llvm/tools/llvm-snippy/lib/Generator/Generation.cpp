@@ -223,16 +223,6 @@ storeRefAndActualValueForSelfcheck(
   return {std::next(FirstInserted), FirstStoreInfo};
 }
 
-static void
-generateCheckSumForDefReg(Register SelfcheckReg,
-                          planning::InstructionGenerationContext &InstrGenCtx,
-                          MCRegister AccReg, std::optional<MCRegister> TmpReg) {
-  auto &ProgCtx = InstrGenCtx.ProgCtx;
-  const auto &ST = ProgCtx.getLLVMState().getSnippyTarget();
-
-  ST.generateCheckSumForSelfcheck(InstrGenCtx, AccReg, SelfcheckReg, TmpReg);
-}
-
 template <typename CheckRegsRangeT>
 static void generateRegisterBasedSelfcheckRoutine(
     CheckRegsRangeT SelfcheckRegsRange,
@@ -242,64 +232,71 @@ static void generateRegisterBasedSelfcheckRoutine(
 
   auto &ProgCtx = InstrGenCtx.ProgCtx;
   auto &State = ProgCtx.getLLVMState();
-  auto ItEnd = InstrGenCtx.Ins;
   const auto &ST = State.getSnippyTarget();
-  auto InsPoint = InstrGenCtx.Ins;
   auto RP = InstrGenCtx.pushRegPool();
-  auto &SimCtx = InstrGenCtx.SimCtx;
 
-  std::vector SelfcheckRegs(SelfcheckRegsRange.begin(),
-                            SelfcheckRegsRange.end());
-  // make a partition with GPR and FPR registers
-  auto PartIt = std::stable_partition(
-      SelfcheckRegs.begin(), SelfcheckRegs.end(),
-      [&ST](auto &&Def) { return !ST.isFloatingPoint(Def.DestReg); });
+  // Ins never moves and marks the end of the routine
+  const auto InsPoint = InstrGenCtx.Ins;
+  assert(InstrGenCtx.MBB.begin() != InsPoint &&
+         "Selfcheck is expected to follow the instructions it checks");
+
+  const auto RoutineStart = std::prev(InsPoint);
+
+  SmallVector<MCRegister> RegsToCheck;
+  RegsToCheck.reserve(SelfcheckRegsRange.size());
+  transform(SelfcheckRegsRange, std::back_inserter(RegsToCheck),
+            [](const auto &Def) { return Def.DestReg; });
+
+  // Reg that holds the computed check-sum. Checked registers are not needed
+  // afterwards, so one of them can seed the check-sum.
+  const auto *InitialAccIt = find_if(
+      RegsToCheck, [&ST](MCRegister Reg) { return ST.canHoldCheckSum(Reg); });
+  const bool HasInitAcc = (InitialAccIt != RegsToCheck.end());
 
   MCRegister AccReg;
-  auto FirstInserted = std::prev(InsPoint);
-  if (SelfcheckRegs.begin() != PartIt) {
-    AccReg = ST.generateInitRegisterValueForCheckSumSelfcheck(
-        InstrGenCtx, InsPoint, *RP, SelfcheckRegs.front().DestReg);
+  if (HasInitAcc) {
+    AccReg = *InitialAccIt;
+    // Remove seed register from the list
+    RegsToCheck.erase(InitialAccIt);
   } else {
-    AccReg = ST.getTmpRegisterForCheckSumSelfcheck(InstrGenCtx, *RP);
-    ST.generateRegMove(InstrGenCtx.MBB, InsPoint, State.getCtx(),
-                       State.getInstrInfo(), SelfcheckRegs.front().DestReg,
-                       AccReg);
+    // Checked registers are reserved so that the scratch does not overlap them
+    auto TmpRP = InstrGenCtx.pushRegPool();
+    for (auto Reg : RegsToCheck)
+      TmpRP->addReserved(Reg);
+    AccReg = ST.getTmpRegisterForCheckSumSelfcheck(InstrGenCtx, *TmpRP);
   }
   RP->addReserved(AccReg);
 
-  if (PartIt != SelfcheckRegs.begin())
-    for (auto DefIt = std::next(SelfcheckRegs.begin()); DefIt != PartIt;
-         ++DefIt)
-      generateCheckSumForDefReg(DefIt->DestReg, InstrGenCtx, AccReg,
-                                std::nullopt);
+  assert(none_of(RegsToCheck,
+                 [&](MCRegister Reg) {
+                   return State.getRegInfo().regsOverlap(AccReg, Reg);
+                 }) &&
+         "AccReg must not intersect RegsToCheck");
 
+  if (!RegsToCheck.empty())
+    ST.generateCheckSumForSelfcheck(InstrGenCtx, AccReg,
+                                    /*OverrideDst=*/!HasInitAcc, RegsToCheck);
+
+  // Reg that will hold the reference check-sum
   auto TmpReg = ST.getTmpRegisterForCheckSumSelfcheck(InstrGenCtx, *RP);
+  RP->addReserved(TmpReg);
 
-  if (PartIt != SelfcheckRegs.end())
-    for (auto DefIt = std::next(PartIt); DefIt != SelfcheckRegs.end(); ++DefIt)
-      generateCheckSumForDefReg(DefIt->DestReg, InstrGenCtx, AccReg, TmpReg);
+  auto &I = InstrGenCtx.SimCtx.getInterpreter();
+  auto InterpretEmittedSince = [&](MachineBasicBlock::iterator Mark,
+                                   MachineBasicBlock::iterator End) {
+    if (!I.executeChainOfInstrs(State, std::next(Mark), End))
+      I.reportSimulationFatalError(
+          "Failed to execute chain of instructions in tracking mode");
+  };
 
-  // Execute self-check instructions
-  auto &I = SimCtx.getInterpreter();
-  if (!I.executeChainOfInstrs(State, std::next(FirstInserted), ItEnd))
-    I.reportSimulationFatalError(
-        "Failed to execute chain of instructions in tracking mode");
+  InterpretEmittedSince(RoutineStart, InsPoint);
+  auto RefValue =
+      SNIPPY_UNWRAP_EXPECTED(I.readReg(AccReg), "failed to read Acc Reg");
 
-  auto MaybeImm = I.readReg(AccReg);
-
-  FirstInserted = std::prev(InsPoint);
-
-  ST.writeValueToReg(InstrGenCtx,
-                     SNIPPY_UNWRAP_EXPECTED(MaybeImm, "failed to read Acc Reg"),
-                     TmpReg);
-
+  const auto CheckStart = std::prev(InsPoint);
+  ST.writeValueToReg(InstrGenCtx, RefValue, TmpReg);
   ST.generateCheckForCheckSumSelfcheck(InstrGenCtx, TmpReg, AccReg);
-
-  if (!I.executeChainOfInstrs(State, std::next(FirstInserted),
-                              std::prev(ItEnd)))
-    I.reportSimulationFatalError(
-        "Failed to execute chain of instructions in tracking mode");
+  InterpretEmittedSince(CheckStart, std::prev(InsPoint));
 }
 
 template <typename CheckRegsRangeT>
@@ -339,35 +336,40 @@ static void generateMemoryBasedSelfcheckRoutine(
   //     r2 selfcheck  <---- inserted second, support instructions cannot use
   //                         r3, but can use r1.
   //     r3 selfcheck  <---- inserted first, support instruction can use r1, r2.
+
+  using DefT = std::decay_t<decltype(*SelfcheckRegsRange.begin())>;
   auto InsPoint = ItEnd;
   auto RP = InstrGenCtx.pushRegPool();
-  std::vector<SelfcheckFirstStoreInfo<decltype(ItEnd)>> StoresInfo;
+  std::vector<
+      std::pair<decltype(DefT::Inst), SelfcheckFirstStoreInfo<decltype(ItEnd)>>>
+      StoresInfo;
 
   for (const auto &Def : SelfcheckRegsRange) {
-    SmallVector<Register> PhRegs;
-    ST.getPhysRegsFromUnit(Def.DestReg, State.getRegInfo(), PhRegs);
-    llvm::for_each(PhRegs,
-                   [&RP](auto SimpleReg) { RP->addReserved(SimpleReg); });
-    // This is done for backward compatibility.
-    auto TmpRP = InstrGenCtx.pushRegPool();
-    auto SelfcheckInterInfo =
-        storeRefAndActualValueForSelfcheck(Def.DestReg, InstrGenCtx);
-    InsPoint = InstrGenCtx.Ins = SelfcheckInterInfo.NextInsertPos;
-    // Collect information about first generated selfcheck store for a primary
-    // instr
-    StoresInfo.push_back(SelfcheckInterInfo.FirstStoreInfo);
+    SmallVector<Register> DefRegs;
+    ST.getPhysRegsWithoutOverlaps(Def.DestReg, State.getRegInfo(), DefRegs);
+    for (auto Reg : DefRegs) {
+      RP->addReserved(Reg);
+
+      // This is done for backward compatibility.
+      auto TmpRP = InstrGenCtx.pushRegPool();
+      auto SelfcheckInterInfo =
+          storeRefAndActualValueForSelfcheck(Reg, InstrGenCtx);
+      InsPoint = InstrGenCtx.Ins = SelfcheckInterInfo.NextInsertPos;
+      // Collect information about first generated selfcheck store for a primary
+      // instr
+      StoresInfo.emplace_back(Def.Inst, SelfcheckInterInfo.FirstStoreInfo);
+    }
   }
   InstrGenCtx.Ins = ItEnd;
 
-  assert(SelfcheckRegsRange.size() == StoresInfo.size());
   // Add collected information about generated selfcheck stores for selfcheck
-  // annotation
-  for (const auto &[Def, StoreInfo] : zip(SelfcheckRegsRange, StoresInfo))
+  // annotation. Distances are only final once every insertion is done.
+  for (const auto &[Inst, StoreInfo] : StoresInfo)
     InstrGenCtx.getSnippyModule()
         .getOrAddResult<SelfcheckMap>()
         .addToSelfcheckMap(
             StoreInfo.Address,
-            std::distance(Def.Inst, std::next(StoreInfo.FirstStoreInstrPos)));
+            std::distance(Inst, std::next(StoreInfo.FirstStoreInstrPos)));
 
   auto &I = SimCtx.getInterpreter();
   if (!I.executeChainOfInstrs(State, InsPoint, ItEnd))
@@ -615,6 +617,14 @@ controlNaNPropagation(InstrIt Begin, InstrIt End,
   if (interpretInstrs(++Beg, End, State, SimCtx) != GenerationStatus::Ok)
     snippy::fatal("Internal error",
                   "Failed to execute float overwrite on model");
+}
+
+static bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
+                                const GenerationStatistics &CommitedStats,
+                                size_t NewGeneratedCodeSize) {
+  if (!Lim.isSizeLimit())
+    return false;
+  return NewGeneratedCodeSize > Lim.getSizeLeft(CommitedStats);
 }
 
 template <typename InstrIt>
@@ -954,14 +964,6 @@ generateNopsToSizeLimit(const planning::RequestLimit &Limit,
     ItBegin++;
   }
   return handleGeneratedInstructions(ItBegin, InstrGenCtx, Limit);
-}
-
-static bool sizeLimitIsExceeded(const planning::RequestLimit &Lim,
-                                const GenerationStatistics &CommitedStats,
-                                size_t NewGeneratedCodeSize) {
-  if (!Lim.isSizeLimit())
-    return false;
-  return NewGeneratedCodeSize > Lim.getSizeLeft(CommitedStats);
 }
 
 static AddressInfoForInstr chooseAddrInfoForInstr(
@@ -1895,7 +1897,6 @@ void generate(const planning::InstructionGroupRequest &IG,
   InstrGenCtx.Stats.merge(OldStats);
 }
 
-namespace {
 void interpretMBBInstrs(LLVMState &State, const SimulatorContext &SimCtx,
                         MachineBasicBlock::const_iterator BeginInterpretIter,
                         MachineBasicBlock::const_iterator EndInterpretIter) {
@@ -1906,8 +1907,6 @@ void interpretMBBInstrs(LLVMState &State, const SimulatorContext &SimCtx,
                   "Interpretation failed on instructions inserted before "
                   "main instructions generation routine.");
 }
-
-} // namespace
 
 GenerationStatistics
 generate(planning::BasicBlockRequest &BB,

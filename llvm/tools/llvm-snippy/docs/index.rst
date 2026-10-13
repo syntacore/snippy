@@ -4864,9 +4864,6 @@ The legacy way of doing the same via CLI:
 
    Limitations of the ``checksum`` mode:
 
-   -  It does not support RVV self-check (``enable-selfcheck-rvv``) yet.
-      Specifying both at once is an error.
-
    -  ``selfcheck-gv`` doesn’t make sense with this mode (there is no
       ``selfcheck`` section to describe), and specifying both is an
       error.

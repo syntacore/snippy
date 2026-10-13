@@ -1,0 +1,4 @@
+selfcheck:
+  mode: checksum
+  selfcheck-td-options:
+    enable-selfcheck-rvv: true

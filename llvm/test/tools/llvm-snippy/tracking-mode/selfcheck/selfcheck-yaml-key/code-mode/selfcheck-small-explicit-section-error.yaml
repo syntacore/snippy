@@ -5,7 +5,7 @@
 # RUN: |& FileCheck %s
 
 include:
-- ../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml
+- ../../../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml
 
 sections:
     - name:      0

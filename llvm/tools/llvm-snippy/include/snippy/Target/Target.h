@@ -309,6 +309,8 @@ public:
                                   InstructionGenerationContext &IGC,
                                   MDNode *MetadataMark) const = 0;
 
+  // Get all registers that need to be self-checked.
+  // Returned registers are always physical.
   virtual std::vector<Register>
   getRegsForSelfcheck(const MachineInstr &MI,
                       InstructionGenerationContext &IGC) const = 0;
@@ -360,9 +362,7 @@ public:
   getTmpRegisterForCheckSumSelfcheck(InstructionGenerationContext &IGC,
                                      const RegPoolWrapper &RP) const = 0;
 
-  virtual MCRegister generateInitRegisterValueForCheckSumSelfcheck(
-      InstructionGenerationContext &IGC, MachineBasicBlock::iterator Ins,
-      const RegPoolWrapper &RP, MCRegister Reg) const = 0;
+  virtual bool canHoldCheckSum(MCRegister Reg) const = 0;
 
   virtual void generateRegMove(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator Ins,
@@ -370,11 +370,16 @@ public:
                                const MCInstrInfo &InstrInfo, MCRegister SrcReg,
                                MCRegister DstReg) const = 0;
 
+  // Generate sequence of XORs to compute checksum of SrcRegs.
+  // Note that AccReg must not be one (or a sub-register) of SrcRegs.
+  // When OverwriteAcc=false, Acc becomes the first value (seed) for
+  // the checksum.
   virtual void
   generateCheckSumForSelfcheck(InstructionGenerationContext &IGC,
-                               MCRegister DstReg, MCRegister SrcReg,
-                               std::optional<MCRegister> TmpReg) const = 0;
+                               MCRegister AccReg, bool OverwriteAcc,
+                               ArrayRef<MCRegister> SrcRegs) const = 0;
 
+  // Compare AccReg with RefReg and trap if they differ.
   virtual void
   generateCheckForCheckSumSelfcheck(InstructionGenerationContext &IGC,
                                     MCRegister AccReg,
