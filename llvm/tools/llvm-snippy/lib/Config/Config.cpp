@@ -1132,13 +1132,6 @@ static void normalizeProgramLevelOptions(Config &Cfg, LLVMState &State,
   auto RegsSpilledToStack = parseSpilledRegistersOption(RP, Tgt, RI, Ctx, Opts);
   auto RegsSpilledToMem = getRegsToSpillToMem(Tgt, Cfg);
   bool HasSPRelativeInstrs = Cfg.Histogram.hasSPRelativeInstrs(Tgt);
-  if (auto CG = std::get_if<CallGraphLayout>(&Cfg.PassCfg.CGLayout)) {
-    if (Opts.RedefineRA.isSpecified() && CG->RandomizeRA) {
-      snippy::fatal("Incompatible options",
-                    "When --redefine-ra is specified, return address "
-                    "randomization is not supported");
-    }
-  }
   if (ProgCfg.FollowTargetABI) {
     if (HasSPRelativeInstrs && !Opts.RedefineSP.isSpecified())
       snippy::fatal(

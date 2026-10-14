@@ -1,0 +1,49 @@
+# REQUIRES: riscv-snippy-model-None
+# COM: This test checks that -redefine-ra and -randomize-ra can be used
+# COM: together.
+
+# COM: Here we check that the redefined return address register is used
+# COM: (it is spilled and restored when -preserve-ra is specified).
+
+# RUN: llvm-snippy %s -preserve-ra \
+# RUN: |& FileCheck %s
+
+# COM: Here we check that the return addresses are randomized.
+# COM: There are at least three different return addresses.
+
+# RUN: llvm-snippy %s -preserve-ra &> %t.mf
+# RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.mf \
+# COM: Leave only names of the registers of the return address
+# RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
+# COM: Leave only unique names
+# RUN: | awk '!seen[$0]++' \
+# RUN: | wc -l \
+# COM: Check that the number of unique names is at least three
+# RUN: | awk '{ exit ($1 < 3) }'
+
+options:
+  mtriple: riscv64
+  randomize-ra: on
+  redefine-ra: reg::X13
+  function-number: 20
+  function-layers: 5
+  num-instrs: 1000
+  num-instr-ancil: 50
+  verify-mi: on
+  dump-mf: on
+
+include:
+  - Inputs/sections-with-stack.yaml
+
+histogram:
+    - [ADD, 1.0]
+    - [ADDI, 1.0]
+    - [SUB, 1.0]
+    - [JAL, 0.1]
+
+# COM: -redefine-ra is honored: the redefined register is saved to the stack
+# CHECK: SD $x13, $x{{[0-9]+}}, 0
+# COM: Calls are generated with the per-function return address register
+# CHECK: ${{[a-z0-9]+}} = PseudoJALCall
+# CHECK: ${{[a-z0-9]+}} = PseudoJALCall
+# CHECK: ${{[a-z0-9]+}} = PseudoJALCall
