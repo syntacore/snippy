@@ -16,7 +16,7 @@ jobs:
       - name: Install Nix
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          curl --proto '=https' --tlsv1.2 -L https://releases.nixos.org/nix/nix-2.35.2/install | sh -s -- --no-daemon
+          curl --proto '=https' --tlsv1.2 -L https://releases.nixos.org/nix/nix-2.35.3/install | sh -s -- --no-daemon
           export USER=$(whoami)
           . "$HOME/.nix-profile/etc/profile.d/nix.sh"
           echo "$HOME/.nix-profile/bin" >> $GITHUB_PATH
