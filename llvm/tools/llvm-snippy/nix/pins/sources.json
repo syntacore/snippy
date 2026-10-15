@@ -16,9 +16,9 @@
       },
       "branch": "main",
       "submodules": false,
-      "revision": "fdfb1c3791b0724f0cb6e506b6bb3eb07649bc63",
-      "url": "https://github.com/LLVM-Snippy/riscv-isa-sim/archive/fdfb1c3791b0724f0cb6e506b6bb3eb07649bc63.tar.gz",
-      "hash": "sha256-SreVI/JAqzOQNWJ+Ewxplzwcoa5MoP2E+mE1O1VYNR4="
+      "revision": "de8855e2a941870759f011feb6603cf85dfbaeb2",
+      "url": "https://github.com/LLVM-Snippy/riscv-isa-sim/archive/de8855e2a941870759f011feb6603cf85dfbaeb2.tar.gz",
+      "hash": "sha256-e6e0bWBVQkoH+H75WqiOFxnavlqI90foej/sZA/Ib48="
     },
     "rvmi": {
       "type": "Git",
@@ -29,9 +29,9 @@
       },
       "branch": "main",
       "submodules": false,
-      "revision": "45f5dd94651214baae560bab7c41d680948a0d7f",
-      "url": "https://github.com/LLVM-Snippy/rvmi/archive/45f5dd94651214baae560bab7c41d680948a0d7f.tar.gz",
-      "hash": "sha256-s44v5JIKKIDFeGI85B+ANvp8GjNGmMW60TJAAzH04Gg="
+      "revision": "ba15c46afd6814692db04aafb7e35951de40f95c",
+      "url": "https://github.com/LLVM-Snippy/rvmi/archive/ba15c46afd6814692db04aafb7e35951de40f95c.tar.gz",
+      "hash": "sha256-ipZJ6kIyMKoMki9EjkIEpOBvd+Rrci5oO1kcAf+BQAw="
     },
     "whisper": {
       "type": "Git",
@@ -42,9 +42,9 @@
       },
       "branch": "master",
       "submodules": false,
-      "revision": "a1297abe0a30438984cacd6633de51e30dcd41e7",
-      "url": "https://github.com/LLVM-Snippy/whisper/archive/a1297abe0a30438984cacd6633de51e30dcd41e7.tar.gz",
-      "hash": "sha256-ZR7K1i0AkLK4itXghm3ENrt7FvlG3i9LPptSWjW51Tc="
+      "revision": "178e270f349d8f772314bf2bcad67886f57a3f3c",
+      "url": "https://github.com/LLVM-Snippy/whisper/archive/178e270f349d8f772314bf2bcad67886f57a3f3c.tar.gz",
+      "hash": "sha256-HMkwYGDm5o7YlgvGDOGZeCN4Fip0uXgrfAWTu0SU76w="
     }
   },
   "version": 8
