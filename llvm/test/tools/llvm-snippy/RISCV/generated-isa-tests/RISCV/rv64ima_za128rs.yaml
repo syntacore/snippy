@@ -1,0 +1,47 @@
+# generated with isa-tests-gen.sh, to regenerate run:
+# isa-tests-gen.sh --march rv64ima_za128rs --mtriple riscv64 --extensions zalrsc
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s | FileCheck %s -dump-input fail
+include:
+  - "Inputs/sections.yaml"
+options:
+  march: rv64ima_za128rs
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+histogram:
+  - [LR_D, 1.0]
+  - [LR_D_AQ, 1.0]
+  - [LR_D_AQ_RL, 1.0]
+  - [LR_D_RL, 1.0]
+  - [LR_W, 1.0]
+  - [LR_W_AQ, 1.0]
+  - [LR_W_AQ_RL, 1.0]
+  - [LR_W_RL, 1.0]
+  - [SC_D, 1.0]
+  - [SC_D_AQ, 1.0]
+  - [SC_D_AQ_RL, 1.0]
+  - [SC_D_RL, 1.0]
+  - [SC_W, 1.0]
+  - [SC_W_AQ, 1.0]
+  - [SC_W_AQ_RL, 1.0]
+  - [SC_W_RL, 1.0]
+
+# CHECK-DAG: LR_D
+# CHECK-DAG: LR_D_AQ
+# CHECK-DAG: LR_D_AQ_RL
+# CHECK-DAG: LR_D_RL
+# CHECK-DAG: LR_W
+# CHECK-DAG: LR_W_AQ
+# CHECK-DAG: LR_W_AQ_RL
+# CHECK-DAG: LR_W_RL
+# CHECK-DAG: SC_D
+# CHECK-DAG: SC_D_AQ
+# CHECK-DAG: SC_D_AQ_RL
+# CHECK-DAG: SC_D_RL
+# CHECK-DAG: SC_W
+# CHECK-DAG: SC_W_AQ
+# CHECK-DAG: SC_W_AQ_RL
+# CHECK-DAG: SC_W_RL

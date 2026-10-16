@@ -198,6 +198,16 @@ tests:
   march: rv64i_zba_zbb_zmmul_zcb
   mtriple: riscv64
   extensions: zcb - zca
+- filename: rv64ima_za64rs.yaml
+  description: tests for za64rs
+  march: rv64ima_za64rs
+  mtriple: riscv64
+  extensions: zalrsc
+- filename: rv64ima_za128rs.yaml
+  description: tests for za128rs
+  march: rv64ima_za128rs
+  mtriple: riscv64
+  extensions: zalrsc
 - filename: rv64i_zcmp.yaml
   description: tests for zcmp extension (not call-related)
   march: rv64i_zca_zcmp
