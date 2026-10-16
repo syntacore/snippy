@@ -531,8 +531,8 @@ static void addMisaBits(RVMExtDescriptor &Ext,
 }
 
 // TODO: auto-generate this?
-static void addZextBits(RVMExtDescriptor &Ext,
-                        const RISCVSubtarget &Subtarget) {
+static void addZextBits(RVMExtDescriptor &Ext, const RISCVSubtarget &Subtarget,
+                        bool EnableMisalignedAccess = false) {
   auto &ZextBits = Ext.ZExt;
   if (Subtarget.hasStdExtZicsr())
     ZextBits[RVM_ZEXT_ICSR] = true;
@@ -650,18 +650,34 @@ static void addZextBits(RVMExtDescriptor &Ext,
     ZextBits[RVM_ZEXT_VFH] = true;
   if (Subtarget.hasStdExtZvfhmin())
     ZextBits[RVM_ZEXT_VFHMIN] = true;
+  if (Subtarget.hasStdExtZiccamoa())
+    ZextBits[RVM_ZEXT_ICCAMOA] = true;
+  if (Subtarget.hasStdExtZiccamoc())
+    ZextBits[RVM_ZEXT_ICCAMOC] = true;
+  if (Subtarget.hasStdExtZiccif())
+    ZextBits[RVM_ZEXT_ICCIF] = true;
+  if (Subtarget.hasStdExtZicclsm() || EnableMisalignedAccess)
+    ZextBits[RVM_ZEXT_ICCLSM] = true;
+  if (Subtarget.hasStdExtZiccrse())
+    ZextBits[RVM_ZEXT_ICCRSE] = true;
+  if (Subtarget.hasStdExtZa64rs())
+    ZextBits[RVM_ZEXT_A64RS] = true;
+  if (Subtarget.hasStdExtZa128rs())
+    ZextBits[RVM_ZEXT_A128RS] = true;
 }
 
 static void addXextBits(RVMExtDescriptor &Ext, const RISCVSubtarget &ST) {
   [[maybe_unused]] auto &XExt = Ext.XExt;
 }
 
-static SimulatorIsaInfo deriveSimulatorIsaInfo(const RISCVSubtarget &ST) {
+static SimulatorIsaInfo
+deriveSimulatorIsaInfo(const RISCVSubtarget &ST,
+                       bool EnableMisalignedAccess = false) {
   SimulatorIsaInfo IsaInfo = {};
   IsaInfo.Ext.ZExtSize = sizeof(IsaInfo.Ext.ZExt);
   IsaInfo.Ext.XExtSize = sizeof(IsaInfo.Ext.XExt);
   addMisaBits(IsaInfo.Ext, ST);
-  addZextBits(IsaInfo.Ext, ST);
+  addZextBits(IsaInfo.Ext, ST, EnableMisalignedAccess);
   addXextBits(IsaInfo.Ext, ST);
   IsaInfo.Is64Bit = ST.is64Bit();
   return IsaInfo;
@@ -785,7 +801,7 @@ std::unique_ptr<SimulatorInterface> createRISCVSimulator(
     unsigned VLENB, bool EnableMisalignedAccess) {
   const auto &VTable = getSimulatorEntryPoint(ModelLib);
 
-  auto SimInfo = deriveSimulatorIsaInfo(Subtarget);
+  auto SimInfo = deriveSimulatorIsaInfo(Subtarget, EnableMisalignedAccess);
   LLVM_DEBUG(dbgs() << "Model::isa_string: "
                     << rvm::create_isa_string(SimInfo.Ext, SimInfo.Is64Bit)
                     << "\n");
