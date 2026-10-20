@@ -776,17 +776,6 @@ public:
   validateSchemes(LLVMContext &Ctx, const SectionsDescriptions &Sections) const;
 };
 
-template <typename AccessesRange>
-std::optional<MemAddr> getFirstNeededMemoryAccessBound(AccessesRange &&Accesses,
-                                                       MemoryAccessMode Mode) {
-  auto *Pos =
-      llvm::find_if(Accesses, [Mode](const std::unique_ptr<MemoryAccess> &MA) {
-        return MA->getMode() == Mode;
-      });
-  if (Pos == Accesses.end())
-    return {};
-  return (*Pos)->getLowerBound();
-}
 } // namespace snippy
 
 LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS_WITH_VALIDATE(

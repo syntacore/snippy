@@ -41,6 +41,7 @@ set(snippy_sources
   ProbabilityUtils.cpp
   YAMLTuple.cpp
   YAMLProbableItems.cpp
+  MemoryBank.cpp
   )
 
 set(snippy_link_libraries
