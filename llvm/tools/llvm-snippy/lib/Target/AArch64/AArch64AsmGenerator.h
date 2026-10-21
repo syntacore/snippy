@@ -769,9 +769,71 @@ public:
     Operands.push_back(MachineOperand::CreateImm(Imm));
   }
 
+  static std::pair<AArch64_AM::ShiftExtendType, unsigned>
+  getShiftUniformly(unsigned ShiftWidth, ArrayRef<unsigned> Shifts) {
+    auto ShiftType = static_cast<AArch64_AM::ShiftExtendType>(
+        RandEngine::selectFromContainer(Shifts));
+    assert(ShiftType != AArch64_AM::ShiftExtendType::InvalidShiftExtend &&
+           ShiftType <= AArch64_AM::ShiftExtendType::ROR &&
+           "Unsupported instruction");
+    return {ShiftType, RandEngine::genInRangeInclusive(ShiftWidth - 1u)};
+  }
+
+  static unsigned getShifterImm(unsigned Opcode) {
+    switch (Opcode) {
+    // W: arith
+    case AArch64::ADDWrs:
+    case AArch64::SUBWrs:
+    case AArch64::ADDSWrs:
+    case AArch64::SUBSWrs:
+      return std::apply(AArch64_AM::getShifterImm,
+                        getShiftUniformly(/* ShiftWidth */ 32,
+                                          /* ShiftTypes */ {0b00, 0b01, 0b10}));
+    // X: arith
+    case AArch64::ADDXrs:
+    case AArch64::SUBXrs:
+    case AArch64::ADDSXrs:
+    case AArch64::SUBSXrs:
+      return std::apply(AArch64_AM::getShifterImm,
+                        getShiftUniformly(/* ShiftWidth */ 64,
+                                          /* ShiftTypes */ {0b00, 0b01, 0b10}));
+    // W: logic
+    case AArch64::ANDWrs:
+    case AArch64::BICWrs:
+    case AArch64::EONWrs:
+    case AArch64::EORWrs:
+    case AArch64::ORNWrs:
+    case AArch64::ORRWrs:
+    case AArch64::ANDSWrs:
+    case AArch64::BICSWrs:
+      return std::apply(
+          AArch64_AM::getShifterImm,
+          getShiftUniformly(/* ShiftWidth */ 32,
+                            /* ShiftTypes */ {0b00, 0b01, 0b10, 0b11}));
+    // X: logic
+    case AArch64::ANDXrs:
+    case AArch64::BICXrs:
+    case AArch64::EONXrs:
+    case AArch64::EORXrs:
+    case AArch64::ORNXrs:
+    case AArch64::ORRXrs:
+    case AArch64::ANDSXrs:
+    case AArch64::BICSXrs:
+      return std::apply(
+          AArch64_AM::getShifterImm,
+          getShiftUniformly(/* ShiftWidth */ 64,
+                            /* ShiftTypes */ {0b00, 0b01, 0b10, 0b11}));
+    default:
+      snippy::fatal("Unsupported instruction for Shifted Register operands");
+    }
+  }
+
   void addShiftedRegOperands(
       llvm::ArrayRef<planning::PreselectedOpInfo> Preselected) {
-    SNIPPY_UNIMPLEMENTED();
+    Operands.push_back(
+        MachineOperand::CreateReg(getReg(Preselected[0]), false));
+    Operands.push_back(
+        MachineOperand::CreateImm(getShifterImm(InstrDesc.getOpcode())));
   }
 
   void addExtendedRegOperands(
