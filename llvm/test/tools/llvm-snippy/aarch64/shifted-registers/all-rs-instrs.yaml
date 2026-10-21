@@ -1,0 +1,37 @@
+# RUN: llvm-snippy %s -model-plugin=None -dump-mi -o %t.elf \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: aarch64
+  mattr: +cssc
+  num-instrs: 1000
+
+include:
+  - ../Inputs/simple_sections.yaml
+
+histogram:
+  - [ADDWrs, 1.0]
+  - [SUBWrs, 1.0]
+  - [ADDSWrs, 1.0]
+  - [ADDXrs, 1.0]
+  - [SUBXrs, 1.0]
+  - [ADDSXrs, 1.0]
+  - [ANDWrs, 1.0]
+  - [BICWrs, 1.0]
+  - [EONWrs, 1.0]
+  - [EORWrs, 1.0]
+  - [ORNWrs, 1.0]
+  - [ORRWrs, 1.0]
+  - [ANDSWrs, 1.0]
+  - [BICSWrs, 1.0]
+  - [ANDXrs, 1.0]
+  - [BICXrs, 1.0]
+  - [EONXrs, 1.0]
+  - [EORXrs, 1.0]
+  - [ORNXrs, 1.0]
+  - [ORRXrs, 1.0]
+  - [ANDSXrs, 1.0]
+  - [BICSXrs, 1.0]
+
+# CHECK-COUNT-1000: Generated MI_
+# RUN: llvm-objdump -d %t.elf | not grep "<unknown>"
