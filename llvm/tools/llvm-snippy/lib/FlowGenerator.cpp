@@ -525,8 +525,15 @@ GeneratorResult FlowGenerator::generate(LLVMState &State,
 
   } else {
 
-    ProgContext.dumpInitialRegisterState(
-        PassCfg.RegistersConfig.InitialStateOutputYaml);
+    if (auto &YamlPath = PassCfg.RegistersConfig.InitialStateOutputYaml;
+        !YamlPath.empty()) {
+      auto *EntryFunc =
+          MainModule.getModule().getFunction(ProgramCfg.EntryPointName);
+      assert(EntryFunc);
+      auto &ST = State.getSubtargetImpl(*EntryFunc);
+      auto &RegState = ProgContext.getInitialRegisterState(ST);
+      RegState.saveAsYAMLFile(YamlPath);
+    }
 
     snippy::warn(WarningName::NoModelExec, State.getCtx(),
                  "Skipping snippet execution on the model",
