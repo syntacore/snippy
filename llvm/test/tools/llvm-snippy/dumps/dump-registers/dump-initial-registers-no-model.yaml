@@ -1,0 +1,25 @@
+# REQUIRES: skip-snippy-model-mixin
+# RUN: llvm-snippy %s -mtriple=riscv64 --model-plugin=None -num-instrs=10 \
+# RUN:   --init-regs-in-elf \
+# RUN:   --dump-initial-registers-yaml=%t.initial-regs.yaml
+# RUN: FileCheck %s --input-file=%t.initial-regs.yaml
+
+# RUN: llvm-snippy %s -mtriple=riscv64 --model-plugin=None -num-instrs=10 \
+# RUN:   --initial-regs-yaml=%t.initial-regs.yaml \
+# RUN:   --dump-initial-registers-yaml=%t.reloaded-regs.yaml
+# RUN: diff %t.initial-regs.yaml %t.reloaded-regs.yaml
+
+# RUN: not llvm-snippy %s -mtriple=riscv64 --model-plugin=None -num-instrs=10 \
+# RUN:   --dump-initial-registers-yaml=%t.initial-regs.yaml/invalid 2>&1 \
+# RUN:   | FileCheck %s --check-prefix=ERROR
+
+# CHECK: registers:
+# CHECK-NEXT: - [ X0, 0x0000000000000000 ]
+# CHECK: - [ X31, 0x{{([[:xdigit:]]{16})}} ]
+# ERROR: error: Register dump error:
+
+include:
+  - "../../Inputs/sections.yaml"
+
+histogram:
+  - [ADD, 1]
