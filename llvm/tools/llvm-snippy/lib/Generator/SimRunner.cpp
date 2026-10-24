@@ -67,7 +67,7 @@ void SimRunner::run(ProgramCounterType StartPC, ProgramCounterType EndPC) {
   checkStates(CheckWholeMemory);
 
   auto &PrimI = getPrimaryInterpreter();
-  PrimI.logMessage("#===Simulation Start===\n");
+  PrimI.logMessage("#====================Simulation Start====================\n");
 
   for (size_t StepIdx = 0; PrimI.getPC() != EndPC; ++StepIdx) {
     auto PC = PrimI.getPC();
