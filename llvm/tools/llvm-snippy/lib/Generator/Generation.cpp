@@ -350,8 +350,6 @@ static void generateMemoryBasedSelfcheckRoutine(
     for (auto Reg : DefRegs) {
       RP->addReserved(Reg);
 
-      // This is done for backward compatibility.
-      auto TmpRP = InstrGenCtx.pushRegPool();
       auto SelfcheckInterInfo =
           storeRefAndActualValueForSelfcheck(Reg, InstrGenCtx);
       InsPoint = InstrGenCtx.Ins = SelfcheckInterInfo.NextInsertPos;
@@ -885,7 +883,6 @@ pregenerateOperands(InstructionGenerationContext &InstrGenCtx,
   const auto &Tgt = State.getSnippyTarget();
   const auto &RI = State.getRegInfo();
 
-  RP.reset();
   // Initialized registers must not be overwritten during other instruction
   // preparation.
   llvm::for_each(Preselected, [&](const auto &Op) {
@@ -1460,6 +1457,7 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
     std::optional<SectionDesc> SelfcheckSec = std::nullopt;
     if (ProgCtx.hasSelfcheckSections())
       SelfcheckSec = ProgCtx.getSelfcheckSection();
+    auto RP = IGC.pushRegPool();
     for (auto [Addr, Data] : MemSnapshot) {
       assert(StackSec.Size > 0 && "Stack section cannot have zero size");
       // Skip stack and selfcheck memory. None of them can be rolled back.
@@ -1469,7 +1467,6 @@ GenerationStatistics generateCompensationCode(MachineBasicBlock &MBB,
            std::clamp<size_t>(Addr, SelfcheckSec->VMA,
                               SelfcheckSec->VMA + SelfcheckSec->Size) == Addr))
         continue;
-      auto RP = IGC.pushRegPool();
       SnippyTgt.storeValueToAddr(
           IGC, Addr,
           {sizeof(Data) * CHAR_BIT, static_cast<unsigned char>(Data)});

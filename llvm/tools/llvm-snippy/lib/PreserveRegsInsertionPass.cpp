@@ -171,11 +171,12 @@ private:
 
       // We must reserve ALL registers first, so as not to overwrite any of them
       // in the process of forming an address for spilling another register.
+      auto CallRPW = RPW.push();
       for (auto SpillReg : RegsToSpill)
-        RPW.addReserved(SpillReg);
+        CallRPW.addReserved(SpillReg);
       auto RealStackPointer = ProgCtx.getStackPointer();
       InstructionGenerationContext InstrGenCtxToSpill{MBB, *InsertTo, SGCtx,
-                                                      RPW};
+                                                      CallRPW};
       // Spill caller saved registers to stack.
       for (auto &&Reg : RegsToSpill)
         SnippyTgt.generateSpillToStack(InstrGenCtxToSpill, Reg,
@@ -185,7 +186,8 @@ private:
       // Go through call instruction.
       assert(CallIt->isCall());
       ++CallIt;
-      InstructionGenerationContext InstrGenCtxToReload{MBB, CallIt, SGCtx, RPW};
+      InstructionGenerationContext InstrGenCtxToReload(MBB, CallIt, SGCtx,
+                                                       CallRPW);
       // Reload caller saved registers from stack.
       for (auto &&Reg : llvm::reverse(RegsToSpill))
         SnippyTgt.generateReloadFromStack(InstrGenCtxToReload, Reg,

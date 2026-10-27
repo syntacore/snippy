@@ -1915,6 +1915,8 @@ public:
   void generateRegsInit(InstructionGenerationContext &IGC,
                         const IRegisterState &R) const override {
     const auto &Regs = static_cast<const RISCVRegisterState &>(R);
+    // A common register pool to be used during initialization
+    auto RP = IGC.pushRegPool();
 
     // Done before GPR initialization since scratch registers are used
     if (!Regs.FRegs.empty())
@@ -1949,12 +1951,12 @@ public:
   void generateGPRInit(InstructionGenerationContext &IGC,
                        const RISCVRegisterState &Regs) const {
     auto &MBB = IGC.MBB;
-    auto RP = IGC.pushRegPool();
+    auto &RP = IGC.getRegPool();
     // Initialize registers (except X0) before taking a branch
     assert(Regs.XRegs[0] == 0);
     for (auto [RegIdx, Value] : drop_begin(enumerate(Regs.XRegs))) {
       auto Reg = regIndexToMCReg(IGC, RegIdx, RegStorageType::XReg);
-      if (!RP->isReserved(Reg, MBB))
+      if (!RP.isReserved(Reg, MBB))
         writeValueToReg(IGC, APInt(getRegBitWidth(Reg, IGC), Value), Reg);
     }
   }
@@ -1962,11 +1964,11 @@ public:
   void generateFPRInit(InstructionGenerationContext &IGC,
                        const RISCVRegisterState &Regs) const {
     auto &MBB = IGC.MBB;
-    auto RP = IGC.pushRegPool();
+    auto &RP = IGC.getRegPool();
     // Initialize registers before taking a branch
     for (auto [RegIdx, Value] : enumerate(Regs.FRegs)) {
       auto FPReg = regIndexToMCReg(IGC, RegIdx, RegStorageType::FReg);
-      if (!RP->isReserved(FPReg, MBB))
+      if (!RP.isReserved(FPReg, MBB))
         writeValueToReg(IGC, APInt(getRegBitWidth(FPReg, IGC), Value), FPReg);
     }
   }
@@ -1975,8 +1977,6 @@ public:
                          const RISCVRegisterState &Regs) const {
     [[maybe_unused]] const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
     assert(ST.hasStdExtV());
-    // FIXME: Why we need this IGC.pushRegPool() ??
-    auto RP = IGC.pushRegPool();
     generateFilteredVRegsInit(IGC, Regs);
   }
 
@@ -2004,7 +2004,7 @@ public:
     auto &State = ProgCtx.getLLVMState();
     const auto &InstrInfo = State.getInstrInfo();
     [[maybe_unused]] const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
-    auto RP = IGC.pushRegPool();
+    auto &RP = IGC.getRegPool();
 
     assert(ST.hasStdExtV());
     const auto &NewRVVMode = getSEWXlenVLMaxSupportRVVMode(IGC, MBB);
@@ -2016,7 +2016,7 @@ public:
     for (unsigned RegNo = 0; RegNo < Regs.XRegs.size(); ++RegNo) {
       auto XReg = regIndexToMCReg(IGC, RegNo, RegStorageType::XReg);
       auto VReg = regIndexToMCReg(IGC, RegNo, RegStorageType::VReg);
-      if (!RP->isReserved(VReg, MBB))
+      if (!RP.isReserved(VReg, MBB))
         getSupportInstBuilder(*this, MBB, InsertPos,
                               MBB.getParent()->getFunction().getContext(),
                               InstrInfo.get(RISCV::VMV_V_X), VReg)

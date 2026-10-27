@@ -260,10 +260,6 @@ void selectNonMemoryOperands(
   auto &II = State.getInstrInfo();
   auto &RegGen = ProgCtx.getRegGen();
   Preselected.resize(InstrDesc.getNumOperands());
-  // Temporary reg pool to take implicit register restrictions into account.
-  // E.g. vluxei instructions cannot have overlapping registers with different
-  // element sizes
-  auto TmpRP = InstrGenCtx.pushRegPool();
   const auto &Operands = InstrDesc.operands();
   SmallVector<unsigned> Indices;
   Tgt.getSelectionOperandsOrder(InstrGenCtx, InstrDesc, Indices);
@@ -294,9 +290,9 @@ void selectNonMemoryOperands(
     if (!IsDst)
       copy(Destinations, std::back_inserter(ExcludedForOperand));
     Tgt.includeRegs(Opcode, RegClass, Include);
-    auto ExpectedReg = RegGen.generate(RegClass, OperandRegClassID, RI, *TmpRP,
-                                       InstrGenCtx.MBB, Tgt, ExcludedForOperand,
-                                       Include, Mask);
+    auto ExpectedReg =
+        RegGen.generate(RegClass, OperandRegClassID, RI, RP, InstrGenCtx.MBB,
+                        Tgt, ExcludedForOperand, Include, Mask);
     auto ReportCouldNotSelectReg = [&]() {
       snippy::fatal(
           formatv("Could not select register for \"{0}\" in burst group",

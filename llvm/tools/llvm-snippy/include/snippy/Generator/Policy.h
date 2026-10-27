@@ -269,7 +269,6 @@ public:
 
 private:
   LLVMState &getLLVMStateImpl() const;
-  std::unique_ptr<RegPoolWrapper> TopRP;
   RegPoolStack RPS;
   std::unique_ptr<FloatSemanticsSamplerHolder> FloatOverwriteSamplers;
 };
