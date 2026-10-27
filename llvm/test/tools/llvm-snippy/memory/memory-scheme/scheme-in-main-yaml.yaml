@@ -8,7 +8,8 @@
 # RUN: llvm-snippy %s -mtriple=riscv64 \
 # RUN:   -num-instrs=100 \
 # RUN:   -dump-layout=true \
-# RUN: |& FileCheck %s --dump-input fail
+# RUN:   -trace-log=%t
+# RUN: FileCheck -input-file=%t %s --dump-input fail
 sections:
     - name:      1
       VMA:       0x2000
