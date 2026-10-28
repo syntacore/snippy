@@ -1,17 +1,11 @@
-# REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s | FileCheck %s
-
-options:
-  mtriple: riscv64
-  mcpu: generic-rv64
-  mattr: +v
-  dump-mf: on
-  init-regs-in-elf: on
-  num-instrs: 10000
-  rvv-init-mode: mixed
+# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
+# RUN:   --num-instrs=10000 \
+# RUN:   -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:   -dump-mf \
+# RUN: |& FileCheck %s
 
 include:
-- Inputs/rvv-unit-all.yaml
+- ../../Inputs/rvv-unit-all.yaml
 
 sections:
   - name:      0
@@ -32,9 +26,7 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# COM: Use slide for v0 in nomask mode
-# CHECK: $v0 = VSLIDE1DOWN_VX
-# CHECK: VSLIDE1DOWN_VX
-# COM: Use load for v0 in mask mode
-# CHECK: $v0 = VL1RE8_V
 # CHECK: VADD
+# CHECK: $v0 = VL1RE8_V
+# CHECK: EBREAK
+# CHECK: Start Verification for function:

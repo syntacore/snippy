@@ -1,0 +1,41 @@
+# REQUIRES: riscv-snippy-model-spike
+
+# COM: This test checks that when rvv-init-mode=splats v0 can be generated as a
+#      mask and destination.
+
+# RUN: llvm-snippy %s \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 1000
+  init-regs-in-elf: on
+  rvv-init-mode: splats
+  dump-mf: on
+
+include:
+  - ../../../../../Inputs/sections.yaml
+  - ../../../rvv-config-histogram/Inputs/rvv-unit-all.yaml
+
+burst:
+    mode: mixed
+    min-size: 2
+    max-size: 4
+
+histogram:
+    - [SB, 1.0]
+    - [LBU, 1.0]
+    - [VL1RE16_V, 1.0]
+    - [VL2RE32_V, 1.0]
+    - [VL4RE64_V, 1.0]
+    - [VL8RE8_V, 1.0]
+    - [VLE16FF_V, 1.0]
+    - [VLE32_V, 1.0]
+    - [VSE8_V, 1.0]
+    - [VS4R_V, 1.0]
+    - [VADD_VV, 1.0]
+    - [VSETIVLI, 1.0]
+
+# CHECK-COUNT-10: v0{{(m.)?}} = {{(VL|VADD)}}
+# CHECK-COUNT-10: v0.t

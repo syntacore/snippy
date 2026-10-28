@@ -1,13 +1,12 @@
-# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10000 -o %t \
-# RUN:  -rvv-init-mode=splats -init-regs-in-elf \
-# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
-# RUN:  -dump-mf \
-# RUN:  |& FileCheck %s
+# RUN:   --num-instrs=10000 -o %t \
+# RUN:   -rvv-init-mode=splats -init-regs-in-elf \
+# RUN:   -verify-gen-histogram  -histogram-must-succeed=true \
+# RUN:   -dump-mf \
+# RUN: |& FileCheck %s
 
 include:
-- Inputs/rvv-unit-all.yaml
+- ../../Inputs/rvv-unit-all.yaml
 
 sections:
   - name:      0

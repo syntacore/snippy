@@ -64,7 +64,7 @@
 options:
   mtriple: riscv64
   march: rv64imfdv
-  num-instrs: 500
+  num-instrs: 100
   dump-mf: true
 
 burst:

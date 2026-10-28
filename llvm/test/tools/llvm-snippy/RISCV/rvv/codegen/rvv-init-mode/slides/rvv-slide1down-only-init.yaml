@@ -1,19 +1,17 @@
-# REQUIRES: riscv-snippy-model-None
-# COM: this test checks that option --rvv-init-mode=splats does not require r section
+# COM: This test checks that r-section is not required with --rvv-init-mode=slides
 
 # RUN: llvm-snippy %s | FileCheck %s
 
+include:
+- ../../Inputs/rvv-unit-all.yaml
+
 options:
   mtriple: riscv64
-  mcpu: generic-rv64
-  mattr: +v
-  dump-mf: on
-  init-regs-in-elf: on
+  mattr: "+v"
   num-instrs: 10000
-  rvv-init-mode: splats
-
-include:
-- Inputs/rvv-unit-all.yaml
+  dump-mf: true
+  init-regs-in-elf: true
+  rvv-init-mode: slides
 
 sections:
   - name:      1
@@ -29,8 +27,6 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: $v{{[0-9]+}} = VMV_V_X
-# CHECK: VSLIDE1DOWN_VX
 # CHECK: $v0 = VSLIDE1DOWN_VX
-# CHECK: VADD
-# CHECK: EBREAK
+# CHECK-NOT: VL1RE8_V $x
+

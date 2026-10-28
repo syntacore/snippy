@@ -5914,16 +5914,14 @@ void SnippyRISCVTarget::rvvWriteValueUsingXReg(
       rvvWriteValueUsingXRegAndGetOldMode(IGC, Value, DstReg);
 
   if (RVVModeToRestore.has_value()) {
-    // Restore only config, not the mask (v0)
-    if (DstReg == RISCV::V0) {
-      generateVTypeChange(
-          IGC, InstrInfo, *RVVModeToRestore,
-          getMetadataMark(State.getCtx(), SnippyMetadata::Support));
-      return;
-    }
-    generateRVVModeUpdate(
+    const auto &MBB = IGC.MBB;
+    auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
+    assert(!RGC.getActiveRVVMode(MBB).VM &&
+           "Support RVV Mode must not change the mask");
+    generateVTypeChange(
         IGC, InstrInfo, *RVVModeToRestore,
         getMetadataMark(State.getCtx(), SnippyMetadata::Support));
+    RGC.updateActiveRVVModeVM(&MBB, RVVModeToRestore->VM);
   }
 }
 
