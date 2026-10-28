@@ -1,0 +1,57 @@
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  mattr: "+m"
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - ../Inputs/sections.yaml
+
+scheduling:
+  enabled: on
+
+branches:
+  number-of-loop-iterations:
+    min: 2
+    max: 8
+  loop-ratio: 0.8
+  max-depth:
+    if: 2
+    loop: 1
+  distance:
+    pc:
+      min: 128
+      max: 128
+
+histogram-patterns:
+    - LoadSeq: "LD * LD * XOR"
+    - StoreSeq: "SD * SD * AND"
+
+histogram:
+    - [pattern: LoadSeq, 1.0]
+    - [pattern: StoreSeq, 1.0]
+    - [BEQ, 1.0]
+    - [BNE, 1.0]
+    - [BGE, 1.0]
+    - [BGEU, 1.0]
+    - [BLT, 1.0]
+    - [BLTU, 1.0]
+
+# CHECK: LD
+# CHECK-NEXT: LD
+# CHECK-NEXT: XOR
+
+# CHECK: SD
+# CHECK-NEXT: SD
+# CHECK-NEXT: AND
+
+# CHECK-DAG: BLTU
+# CHECK-DAG: BLT
+# CHECK-DAG: BGEU
+# CHECK-DAG: BGE
+# CHECK-DAG: BNE
+# CHECK-DAG: BEQ
