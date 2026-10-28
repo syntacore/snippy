@@ -137,21 +137,29 @@ void RISCVRegisterState::saveAsYAMLFile(raw_ostream &OS) const {
 bool RISCVRegisterState::operator==(const IRegisterState &Another) const {
   auto &Casted = static_cast<const RISCVRegisterState &>(Another);
 
-  return XRegs == Casted.XRegs && FRegs == Casted.FRegs &&
+  // Bits above XRegSize/FRegSize should be ignored,
+  // as the models can report different values.
+  auto XMask = getMaxRegValueForSize(XRegSize);
+  auto FMask = getMaxRegValueForSize(FRegSize);
+  return applyMask(XRegs, XMask) == applyMask(Casted.XRegs, XMask) &&
+         applyMask(FRegs, FMask) == applyMask(Casted.FRegs, FMask) &&
          VRegs == Casted.VRegs;
 }
 
 RegSizeInBytes RISCVRegisterState::getRegSizeInBytes(Register Reg,
                                                      unsigned VLEN) const {
-  return static_cast<RegSizeInBytes>(getRegBitWidth(*ST, Reg, VLEN) /
-                                     RISCV_CHAR_BIT);
+  return getRegSizeInBytes(*ST, Reg, VLEN);
 }
 
 RegSizeInBytes RISCVRegisterState::getRegSizeInBytes(const RISCVSubtarget &ST,
                                                      Register Reg,
                                                      unsigned VLEN) {
-  return static_cast<RegSizeInBytes>(getRegBitWidth(ST, Reg, VLEN) /
-                                     RISCV_CHAR_BIT);
+  auto BitWidth = getRegBitWidth(ST, Reg, VLEN);
+  assert((BitWidth == Reg2Bytes * RISCV_CHAR_BIT ||
+          BitWidth == Reg4Bytes * RISCV_CHAR_BIT ||
+          BitWidth == Reg8Bytes * RISCV_CHAR_BIT) &&
+         "register width is not representable as RegSizeInBytes");
+  return static_cast<RegSizeInBytes>(BitWidth / RISCV_CHAR_BIT);
 }
 
 uint64_t RISCVRegisterState::getMaxRegValueForSize(RegSizeInBytes Size) {
@@ -163,6 +171,7 @@ uint64_t RISCVRegisterState::getMaxRegValueForSize(RegSizeInBytes Size) {
   case RegSizeInBytes::Reg8Bytes:
     return std::numeric_limits<uint64_t>::max();
   }
+  llvm_unreachable("Unknown RegSizeInBytes");
 }
 
 uint64_t RISCVRegisterState::getMaxRegValueForSize(Register Reg,
@@ -314,6 +323,10 @@ public:
     auto Err = ModelState.readFReg(static_cast<RVMFReg>(RegID), Val);
     if (Err != RVM_ERRC_SUCCESS)
       return convertToError(Err);
+    // HACK: Bits above FLEN are dropped because spike nan-boxes values
+    // internally and RVM bindings don't fix that.
+    if (!ST->hasStdExtD())
+      return Val & std::numeric_limits<uint32_t>::max();
     return Val;
   }
 

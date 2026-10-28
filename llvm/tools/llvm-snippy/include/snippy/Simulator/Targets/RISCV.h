@@ -67,10 +67,6 @@ static inline unsigned getRegBitWidth(const RISCVSubtarget &ST, MCRegister Reg,
     return Reg4Bytes * RISCV_CHAR_BIT;
   if (FPR64RegClass.contains(Reg))
     return Reg8Bytes * RISCV_CHAR_BIT;
-  auto RegID = Reg.id();
-  if (is_contained(getSupportedSysRegs(ST), RegID))
-    return RISCVSimulatorSysRegs::getBitWidth(
-        ST, static_cast<RISCVSimulatorSysRegs::RISCVSimulatorSysReg>(RegID));
   if (VRRegClass.contains(Reg))
     return VLEN;
   // There are many more classes of VRegs (like VRM2, VRN2M1, etc),

@@ -3423,6 +3423,14 @@ public:
     return getRegBitWidth(Reg, IGC.ProgCtx, IGC.getSubtarget<RISCVSubtarget>());
   }
 
+  unsigned getCSRBitWidth(unsigned CSR,
+                          InstructionGenerationContext &IGC) const override {
+    const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
+    assert(is_contained(getSupportedSysRegs(ST), CSR) && "unsupported CSR");
+    return RISCVSimulatorSysRegs::getBitWidth(
+        ST, static_cast<RISCVSimulatorSysReg>(CSR));
+  }
+
   MCRegister regIndexToMCReg(InstructionGenerationContext &IGC, unsigned RegIdx,
                              RegStorageType Storage) const override {
     const auto &ST = IGC.getSubtarget<RISCVSubtarget>();
@@ -4572,7 +4580,7 @@ public:
       auto TmpReg = getNonZeroReg("tmp register to store value for csr", RI,
                                   *RP, IGC.MBB);
 
-      writeValueToReg(IGC, Value, TmpReg);
+      writeValueToReg(IGC, Value.zext(getRegBitWidth(TmpReg, IGC)), TmpReg);
       getSupportInstBuilder(*this, MBB, Ins, Ctx, InstrInfo.get(RISCV::CSRRW),
                             RISCV::X0)
           .addImm(

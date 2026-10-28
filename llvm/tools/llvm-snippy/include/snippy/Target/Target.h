@@ -217,6 +217,9 @@ public:
   virtual unsigned getRegBitWidth(MCRegister Reg,
                                   InstructionGenerationContext &IGC) const = 0;
 
+  virtual unsigned getCSRBitWidth(unsigned CSR,
+                                  InstructionGenerationContext &IGC) const = 0;
+
   virtual MCRegister regIndexToMCReg(InstructionGenerationContext &IGC,
                                      unsigned RegIdx,
                                      RegStorageType Storage) const = 0;
