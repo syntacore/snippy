@@ -1,4 +1,3 @@
-# REQUIRES: riscv-snippy-model-None
 # RUN: llvm-snippy %s | FileCheck %s
 
 options:
@@ -8,10 +7,10 @@ options:
   dump-mf: on
   init-regs-in-elf: on
   num-instrs: 10000
-  rvv-init-mode: loads
+  rvv-init-mode: mixed
 
 include:
-- Inputs/rvv-unit-all.yaml
+- ../../Inputs/rvv-unit-all.yaml
 
 sections:
   - name:      0
@@ -32,6 +31,9 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
+# COM: Use slide for v0 in nomask mode
+# CHECK: $v0 = VSLIDE1DOWN_VX
+# CHECK: VSLIDE1DOWN_VX
+# COM: Use load for v0 in mask mode
 # CHECK: $v0 = VL1RE8_V
-# CHECK-NOT: VSLIDE1DOWN_VX
 # CHECK: VADD

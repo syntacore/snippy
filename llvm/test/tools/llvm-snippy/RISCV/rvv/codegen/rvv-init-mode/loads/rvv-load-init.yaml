@@ -1,13 +1,16 @@
-# REQUIRES: riscv-snippy-model-any
-# REQUIRES: riscv-rvv
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=100000 -o %t \
-# RUN:  -rvv-init-mode=splats \
-# RUN:  -verify-gen-histogram  -histogram-must-succeed=true \
-# RUN:  |& FileCheck %s
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64
+  mcpu: generic-rv64
+  mattr: +v
+  dump-mf: on
+  init-regs-in-elf: on
+  num-instrs: 10000
+  rvv-init-mode: loads
 
 include:
-- ../Inputs/rvv-unit-all.yaml
+- ../../Inputs/rvv-unit-all.yaml
 
 sections:
   - name:      0
@@ -28,4 +31,6 @@ sections:
 histogram:
     - [VADD_VV, 1.0]
 
-# CHECK: #===Simulation Start===
+# CHECK: $v0 = VL1RE8_V
+# CHECK-NOT: VSLIDE1DOWN_VX
+# CHECK: VADD
