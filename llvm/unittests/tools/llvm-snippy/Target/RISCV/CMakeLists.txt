@@ -2,6 +2,7 @@ set(snippy_sources
   ${snippy_init_gtest_env}
   Target.cpp
   LLVMState.cpp
+  Simulator.cpp
   )
 
 set(snippy_link_libraries

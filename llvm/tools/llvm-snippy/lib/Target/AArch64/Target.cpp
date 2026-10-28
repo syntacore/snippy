@@ -669,6 +669,11 @@ public:
     return 64;
   }
 
+  unsigned getCSRBitWidth(unsigned CSR,
+                          InstructionGenerationContext &IGC) const override {
+    SNIPPY_UNIMPLEMENTED();
+  }
+
   MCRegister regIndexToMCReg(InstructionGenerationContext &IGC, unsigned RegIdx,
                              RegStorageType Storage) const override {
     SNIPPY_UNIMPLEMENTED();

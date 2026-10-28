@@ -312,6 +312,11 @@ public:
     reportUnimplementedError();
   }
 
+  unsigned getCSRBitWidth(unsigned CSR,
+                          InstructionGenerationContext &IGC) const override {
+    reportUnimplementedError();
+  }
+
   MCRegister regIndexToMCReg(InstructionGenerationContext &IGC, unsigned RegIdx,
                              RegStorageType Storage) const override {
     reportUnimplementedError();

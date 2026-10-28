@@ -1423,11 +1423,11 @@ writeCSRsSnapshot(const TransactionStack::RegIdToValueType &RegsSnapshot,
   const auto &SnippyTgt = ProgCtx.getLLVMState().getSnippyTarget();
   InstructionGenerationContext IGC(MBB, MBB.getFirstTerminator(), GC);
   auto RP = IGC.pushRegPool();
-  for (auto &&[Reg, Value] : RegsSnapshot) {
+  for (auto &&[CSR, Value] : RegsSnapshot) {
     SnippyTgt.writeValueToCSR(IGC,
-                              toAPInt(Value, SnippyTgt.getRegBitWidth(Reg, IGC),
+                              toAPInt(Value, SnippyTgt.getCSRBitWidth(CSR, IGC),
                                       /* ImplicitTrunc */ true),
-                              Reg);
+                              CSR);
   }
 }
 
