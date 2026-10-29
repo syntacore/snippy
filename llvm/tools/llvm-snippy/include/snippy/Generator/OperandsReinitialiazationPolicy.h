@@ -34,8 +34,11 @@ class ValuegramGenPolicy final : public detail::EmptyFinalizeMixin {
 
 public:
   ValuegramGenPolicy(const ValuegramGenPolicy &Other)
-      : OpcGen(Other.OpcGen ? Other.OpcGen->copy() : nullptr), Cfg(Other.Cfg),
-        OperandsValueSource(Other.OperandsValueSource->clone()) {}
+      : Cfg(Other.Cfg),
+        OperandsValueSource(Other.OperandsValueSource->clone()) {
+    assert(Other.OpcGen);
+    OpcGen = Other.OpcGen->copy();
+  }
 
   ValuegramGenPolicy(ValuegramGenPolicy &&) = default;
 
@@ -50,7 +53,7 @@ public:
   ValuegramGenPolicy(
       SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
       std::unique_ptr<IOperandsReinitializationValueSource> OperandsValueSource,
-      std::optional<OpcodeFilterType> Filter = std::nullopt);
+      OpcodeFilterType Filter = {});
 
   std::optional<InstructionRequest> next() {
     assert(Idx <= Instructions.size());

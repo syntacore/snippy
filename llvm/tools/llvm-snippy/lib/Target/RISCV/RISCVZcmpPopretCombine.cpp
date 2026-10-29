@@ -13,7 +13,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "../../InitializePasses.h"
-#include "RISCVGenerated.h"
+#include "RISCVUtils.h"
 #include "snippy/CreatePasses.h"
 #include "snippy/Generator/FunctionGeneratorPass.h"
 #include "snippy/Generator/GenerationUtils.h"

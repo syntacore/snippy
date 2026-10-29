@@ -318,17 +318,35 @@ class ModeChangingInstPolicy final : public detail::EmptyFinalizeMixin {
   // -- another ModeChangingInstPolicy --
   // | ...
   //
+  std::shared_ptr<const ModeChangingContext> MCC;
   OpcodeFilterType OpcodeFilter;
   MDNode *MetadataMark = nullptr;
-  std::shared_ptr<const ModeChangingContext> MCC;
+
+  ModeChangingInstPolicy(std::pair<std::shared_ptr<const ModeChangingContext>,
+                                   OpcodeFilterType> &&Ctx,
+                         MDNode *MetadataMark)
+      : MCC(std::move(Ctx.first)), OpcodeFilter(std::move(Ctx.second)),
+        MetadataMark(MetadataMark) {}
 
 public:
-  ModeChangingInstPolicy(const SnippyProgramContext &ProgCtx,
-                         const MachineBasicBlock &MBB, MDNode *MetadataMark)
-      : MetadataMark(MetadataMark) {
+  static ModeChangingInstPolicy create(const SnippyProgramContext &ProgCtx,
+                                       const MachineBasicBlock &MBB,
+                                       MDNode *MetadataMark) {
     const auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
-    std::tie(MCC, OpcodeFilter) =
-        Tgt.selectModeChangeAndGetFilter(ProgCtx, MBB, MetadataMark);
+    return ModeChangingInstPolicy(
+        Tgt.selectModeChangeAndGetFilter(ProgCtx, MBB, MetadataMark),
+        MetadataMark);
+  }
+
+  static ModeChangingInstPolicy
+  createWithAvailableOpcodes(const SnippyProgramContext &ProgCtx,
+                             const MachineBasicBlock &MBB,
+                             MDNode *MetadataMark) {
+    const auto &Tgt = ProgCtx.getLLVMState().getSnippyTarget();
+    return ModeChangingInstPolicy(
+        Tgt.selectModeChangeWithAvailableOpcodesAndGetFilter(ProgCtx, MBB,
+                                                             MetadataMark),
+        MetadataMark);
   }
 
   bool isSupport() const {
@@ -343,9 +361,13 @@ public:
   bool isInseparableBundle() const { return false; }
 
   const OpcodeFilterType &getOpcodeFilter() const {
-    assert(OpcodeFilter && "Opcode filter is not yet created. Usually it is "
-                           "set up during initialize().");
+    assert(OpcodeFilter && "Opcode filter is not created.");
     return OpcodeFilter;
+  }
+
+  bool hasAvailableOpcodes() const {
+    assert(MCC);
+    return MCC->hasAvailableOpcodes();
   }
 
   void print(raw_ostream &OS) const {
@@ -362,14 +384,16 @@ class DefaultGenPolicy final : public detail::EmptyFinalizeMixin {
 
 public:
   DefaultGenPolicy(const DefaultGenPolicy &Other)
-      : OpcGen(Other.OpcGen ? Other.OpcGen->copy() : nullptr), Cfg(Other.Cfg),
-        Instructions(Other.Instructions), Idx(Other.Idx) {}
+      : Cfg(Other.Cfg), Instructions(Other.Instructions), Idx(Other.Idx) {
+    assert(Other.OpcGen);
+    OpcGen = Other.OpcGen->copy();
+  }
 
   DefaultGenPolicy(DefaultGenPolicy &&) = default;
 
   DefaultGenPolicy(SnippyProgramContext &ProgCtx,
                    const DefaultPolicyConfig &Cfg,
-                   std::optional<OpcodeFilterType> Filter = std::nullopt);
+                   OpcodeFilterType Filter = {});
 
   DefaultGenPolicy &operator=(const DefaultGenPolicy &Other) {
     DefaultGenPolicy Tmp = Other;
@@ -403,8 +427,7 @@ public:
   }
 
   BurstGenPolicy(SnippyProgramContext &ProgCtx, const BurstPolicyConfig &Cfg,
-                 unsigned BurstGroupID,
-                 std::optional<OpcodeFilterType> Filter = std::nullopt);
+                 unsigned BurstGroupID, OpcodeFilterType Filter = {});
 
   void initialize(InstructionGenerationContext &InstrGenCtx,
                   const RequestLimit &Limit);
@@ -615,9 +638,9 @@ inline void print(const GenPolicy &Pol, raw_ostream &OS) {
   Pol.Impl->print(OS);
 }
 
-GenPolicy
-createGenPolicy(SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
-                std::optional<OpcodeFilterType> Filter = std::nullopt);
+GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
+                          const DefaultPolicyConfig &Cfg,
+                          OpcodeFilterType Filter = {});
 
 template <typename OperandsTy>
 Error getPreselectedForInstr(const OperandsTy &Operands,

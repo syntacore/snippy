@@ -359,7 +359,7 @@ void SnippyProgramContext::createTargetContext(const Config &Cfg,
 
 SnippyProgramContext::~SnippyProgramContext() = default;
 
-Expected<OpcGenHolder> DefaultPolicyConfig::createOpcodeGenerator(
+OpcGenHolder DefaultPolicyConfig::createOpcodeGenerator(
     const OpcodeFilterType &OpcMask, SnippyProgramContext &ProgCtx) const {
   if (DataFlowHistogram.empty())
     snippy::fatal(
@@ -371,14 +371,7 @@ Expected<OpcGenHolder> DefaultPolicyConfig::createOpcodeGenerator(
                 [&](auto &&Entry) { return OpcMask(Entry.first); });
   OpcodeHistogram DFHCopy(DFHTopOpcodes);
   DFHCopy.copyPatterns(DataFlowHistogram);
-  if (DFHCopy.empty())
-    return makeFailure(
-        Errc::InvalidConfiguration,
-        "We can not create any primary instruction in this "
-        "context.\nUsually this may happen when in some context "
-        "snippy can not find any instruction that could be created "
-        "in current context.\nTry to increase instruction number by "
-        "one or add more instructions to histogram.");
+  assert(!DFHCopy.empty());
   auto &PluginManager = *Common->ProgramCfg.PluginManagerImpl;
   if (PluginManager.pluginHasBeenLoaded())
     return PluginManager.createPlugin(DFHCopy);

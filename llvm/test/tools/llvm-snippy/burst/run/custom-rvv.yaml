@@ -49,6 +49,7 @@
 # Indexed Loads/Stores
 # RUN: sed -e s/OPCODE/VLUXEI8_V/g %s > %t.VLUXEI8_V.yaml
 # RUN: llvm-snippy %t.VLUXEI8_V.yaml %S/../Inputs/sections.yaml \
+# RUN:   %S/../rvv/Inputs/rvv-unit-little-lmul-histogram.yaml \
 # RUN: |& FileCheck %t.VLUXEI8_V.yaml --check-prefix=VLUXEI8_V
 
 # Indexed Segment Loads/Stores
@@ -64,7 +65,7 @@
 options:
   mtriple: riscv64
   march: rv64imfdv
-  num-instrs: 500
+  num-instrs: 100
   dump-mf: true
 
 burst:

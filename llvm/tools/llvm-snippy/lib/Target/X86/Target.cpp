@@ -102,13 +102,19 @@ public:
     reportUnimplementedError();
   }
 
-  std::pair<std::shared_ptr<const ModeChangingContext>,
-            std::function<bool(unsigned)>>
+  std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
   selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
                                const MachineBasicBlock &MBB,
                                MDNode *MetadataMark) const override {
     reportUnimplementedError();
   }
+
+  std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
+  selectModeChangeWithAvailableOpcodesAndGetFilter(
+      const SnippyProgramContext &ProgCtx, const MachineBasicBlock &MBB,
+      MDNode *MetadataMark) const override {
+    reportUnimplementedError();
+  };
 
   void generateModeChange(const ModeChangingContext &MCC,
                           InstructionGenerationContext &IGC,

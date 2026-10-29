@@ -94,7 +94,7 @@ static void selectInitializableOperandsRegisters(
 ValuegramGenPolicy::ValuegramGenPolicy(
     SnippyProgramContext &ProgCtx, const DefaultPolicyConfig &Cfg,
     std::unique_ptr<IOperandsReinitializationValueSource> ValueSource,
-    std::optional<OpcodeFilterType> Filter)
+    OpcodeFilterType Filter)
     : Cfg(&Cfg), OperandsValueSource(std::move(ValueSource)) {
   assert(Cfg.isApplyValuegramEachInstr() &&
          "This policy can only be used when the "
@@ -103,11 +103,7 @@ ValuegramGenPolicy::ValuegramGenPolicy(
 
   if (!Filter)
     Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
-  auto Err = Cfg.createOpcodeGenerator(*Filter, ProgCtx).moveInto(OpcGen);
-  if (Err)
-    snippy::fatal(
-        Twine("Failed to create OpcodeGenerator in ValuegramGenPolicy: ") +
-        toString(std::move(Err)));
+  OpcGen = Cfg.createOpcodeGenerator(Filter, ProgCtx);
 }
 
 std::vector<InstructionRequest>

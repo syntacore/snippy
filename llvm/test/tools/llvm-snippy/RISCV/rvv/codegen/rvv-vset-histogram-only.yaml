@@ -1,0 +1,15 @@
+# COM: This test checks that histogram can consist of only VSETs.
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +v,+d
+  num-instrs: 100
+
+include:
+  - ../Inputs/rvv-sections.yaml
+  - ../rvv-config-histogram/Inputs/rvv-unit-all.yaml
+
+histogram:
+  - [VSETVLI, 1.0]
+  - [VSETIVLI, 1.0]

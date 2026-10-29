@@ -66,8 +66,8 @@ public:
   const std::vector<const MachineBasicBlock *> &unfilledBlocks() const {
     return UnfilledBlocks;
   };
-  SmallVector<size_t> getNumCtxGroupsPerMBBs() const {
-    return FunReq.getNumCtxGroupsPerMBBs(UnfilledBlocks);
+  SmallVector<size_t> getNumLegalCtxGroupsPerMBBs() const {
+    return FunReq.getNumLegalCtxGroupsPerMBBs(UnfilledBlocks);
   }
   void fillEmptyBlocks();
   void dump() const;
@@ -450,9 +450,8 @@ auto BlockGenPlanningImpl::findSuitableBBAndContextGroup(
     auto Indices = getRandomIndices(BBReq.size());
     for (auto Idx : Indices) {
       const auto &SingleGroup = BBReq[Idx];
-      assert(SingleGroup.getOpcodeFilter().has_value());
       auto SuitableOpcodes =
-          count_if(BurstGroup, *SingleGroup.getOpcodeFilter());
+          count_if(BurstGroup, SingleGroup.getOpcodeFilter());
       if (SuitableOpcodes <= MaxSuitableOpcodes)
         continue;
       MaxSuitableOpcodes = SuitableOpcodes;
@@ -536,9 +535,7 @@ size_t BlockGenPlanningImpl::fillReqWithBurstGroups(size_t NumInstrsLeft,
     }
     auto [MBB, SGIt] = findSuitableBBAndContextGroup(Group);
     auto Filter = SGIt->getOpcodeFilter();
-    assert(Filter.has_value());
-
-    for_each(Group, [&InstrInfo, Filter = *Filter](auto Opcode) {
+    for_each(Group, [&InstrInfo, &Filter](auto Opcode) {
       // TODO: We need add info about selected configuration here, using
       // SGIt->createModeChangeIG().policy().print()
       if (!Filter(Opcode))
@@ -635,28 +632,39 @@ size_t BlockGenPlanningImpl::fillReqWithContextModeChanges(size_t NumLimit) {
       /*Value=*/SnippyTgt.modeSwitchIsSupport(ProgCtx));
 
   for (auto &&[SupportMarker, ModeChanges] :
-       zip_equal(ModeChangeIsSupport, ModeChangesPerMBB))
+       zip_equal(ModeChangeIsSupport, ModeChangesPerMBB)) {
     // If we have no mode changes in a block, add a support one
     if (ModeChanges == 0) {
       SupportMarker = true;
       ModeChanges = 1;
     }
+  }
 
   auto GetSupportMetadataIfNeed = [&State](bool IsSupport) {
     return IsSupport ? getMetadataMark(State.getCtx(), SnippyMetadata::Support)
                      : nullptr;
   };
+
+  auto AddModeChangeToBlock = [this](const MachineBasicBlock *MBB,
+                                     ModeChangingInstPolicy &&MC) {
+    FunBlocks.callWithUpdate(&FunctionRequest::addToBlock<SingleContextGroup>,
+                             MBB, planning::SingleContextGroup(std::move(MC)));
+  };
+
   for (const auto &[MBB, ModeChanges, IsSupport] :
        zip_equal(Blocks, ModeChangesPerMBB, ModeChangeIsSupport)) {
     assert(ModeChanges > 0);
-    for (size_t I = 0; I < ModeChanges; ++I) {
-      FunBlocks.callWithUpdate(
-          &FunctionRequest::addToBlock<SingleContextGroup>, MBB,
-          planning::SingleContextGroup(planning::ModeChangingInstPolicy(
-              ProgCtx, *MBB, GetSupportMetadataIfNeed(IsSupport))));
-    }
+    // Generate one group with available opcodes (this is necessary to fill the
+    // instruction limit)
+    AddModeChangeToBlock(
+        MBB, planning::ModeChangingInstPolicy::createWithAvailableOpcodes(
+                 ProgCtx, *MBB, GetSupportMetadataIfNeed(IsSupport)));
+    // Generate remaining ModeChanges - 1 groups randomly.
+    for (size_t I = 1; I < ModeChanges; ++I)
+      AddModeChangeToBlock(
+          MBB, planning::ModeChangingInstPolicy::create(
+                   ProgCtx, *MBB, GetSupportMetadataIfNeed(IsSupport)));
   }
-
   return SnippyTgt.modeSwitchIsSupport(ProgCtx) ? 0 : ContextModeChangesAmount;
 }
 
@@ -677,12 +685,17 @@ void BlockGenPlanningImpl::fillReqWithPlainInsts(size_t PlainLimit,
     FunBlocks.fillEmptyBlocks();
     return;
   }
+
+  if (all_of(FunBlocks.getNumLegalCtxGroupsPerMBBs(),
+             [](auto Size) { return Size == 0; }))
+    return;
+
   const auto &Cfg = GenCtx->getConfig();
   auto &ProgCtx = GenCtx->getProgramContext();
 
   // The more instruction groups are in a block, the more plain instructions
   // we want to be in that block.
-  const auto &IGsPerMBB = FunBlocks.getNumCtxGroupsPerMBBs();
+  const auto &IGsPerMBB = FunBlocks.getNumLegalCtxGroupsPerMBBs();
   assert(IGsPerMBB.size());
   SmallVector<size_t> PlainPerMBB;
   PlainPerMBB.reserve(IGsPerMBB.size());
@@ -759,12 +772,13 @@ void BlockGenPlanningImpl::splitDefaultGroup(planning::BasicBlockRequest &BBReq,
   // We need to split the default group into several parts and insert each one
   // of them between two non-default groups
   SmallVector<size_t> PlainGroupsSizes;
-  RandEngine::splitNIntoMParts(PlainGroupsSizes, /* N */ NumericalLimit,
-                               /* M (without default one)*/ BBReq.numIGs() - 1,
-                               /*Baseline=*/size_t{0},
-                               /*Uniformity=*/0.0, Alignment);
+  RandEngine::splitNIntoMParts(
+      PlainGroupsSizes, /* N */ NumericalLimit,
+      /* M (without default one)*/ BBReq.numLegalIGs() - 1,
+      /*Baseline=*/size_t{0},
+      /*Uniformity=*/0.0, Alignment);
 
-  assert(PlainGroupsSizes.size() == BBReq.numIGs() - 1);
+  assert(PlainGroupsSizes.size() == BBReq.numLegalIGs() - 1);
   planning::BasicBlockRequest NewBBReq(BBReq.getMBB());
 
   auto AddPlainGroup =
@@ -788,6 +802,10 @@ void BlockGenPlanningImpl::splitDefaultGroup(planning::BasicBlockRequest &BBReq,
   // parts and inserting them between other groups.
   auto GroupsWithoutDefault = drop_end(BBReq);
   for (auto &&Group : GroupsWithoutDefault) {
+    if (!Group.hasAvailableOpcodes()) {
+      NewBBReq.add(std::move(Group));
+      continue;
+    }
     auto Filter = Group.getOpcodeFilter();
     auto NumIGs = Group.numIGs();
     NewBBReq.add(std::move(Group));
@@ -859,7 +877,6 @@ void BlockGenPlanningImpl::processFunctionWithNumInstr(
 
   fillReqWithPlainInsts<RequestLimit::NumInstrs>(NumInstrsLeft,
                                                  /* Alignment */ 1);
-
   for (auto *MBB : LatchBlocks)
     FunBlocks.callWithUpdate(&FunctionRequest::add, MBB,
                              planning::BasicBlockRequest(MBB));
@@ -884,9 +901,10 @@ void BlockGenPlanningImpl::processFunctionWithSize(const MachineFunction &MF) {
          "Rounding down to the nearest multiple");
   }
 
-  assert(!SnippyTgt.needToGenerateModeSwitches(ProgCtx));
   assert(SizeLeft % MinInstrSize == 0);
   FunBlocks.setAverageBlockLimit(SizeLeft);
+  assert(!SnippyTgt.needToGenerateModeSwitches(ProgCtx));
+  std::ignore = fillReqWithContextModeChanges(SizeLeft);
   fillReqWithPlainInsts<RequestLimit::Size>(SizeLeft, MinInstrSize);
 }
 

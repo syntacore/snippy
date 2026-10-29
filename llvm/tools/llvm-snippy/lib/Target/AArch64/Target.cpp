@@ -247,13 +247,19 @@ public:
     SNIPPY_UNIMPLEMENTED();
   }
 
-  std::pair<std::shared_ptr<const ModeChangingContext>,
-            std::function<bool(unsigned)>>
+  std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
   selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
                                const MachineBasicBlock &MBB,
                                MDNode *MetadataMark) const override {
     SNIPPY_UNIMPLEMENTED();
   }
+
+  std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
+  selectModeChangeWithAvailableOpcodesAndGetFilter(
+      const SnippyProgramContext &ProgCtx, const MachineBasicBlock &MBB,
+      MDNode *MetadataMark) const override {
+    SNIPPY_UNIMPLEMENTED();
+  };
 
   void generateModeChange(const ModeChangingContext &MCC,
                           InstructionGenerationContext &IGC,

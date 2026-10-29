@@ -2062,30 +2062,6 @@ inline bool canProduceNaN(const MCInstrDesc &InstrDesc) {
   return GeneratingNaNs.count(InstrDesc.getOpcode());
 }
 
-template <typename SimulatorT>
-MaxInstrBitsType readInstrCode(const SimulatorT &Sim, ProgramCounterType PC) {
-  // We first read the first 2 bytes of the instruction (7 bits is enough for
-  // determine the instruction size, but since there are no instructions smaller
-  // than 2 bytes in RISCV, we can read them), recognize the size of the
-  // instruction, and then, if it is not a compressed instruction, read 4 bytes.
-  uint16_t BeginOfInstr;
-  auto Err = Sim.readMem(
-      PC, MutableArrayRef<char>(reinterpret_cast<char *>(&BeginOfInstr),
-                                sizeof(BeginOfInstr)));
-  SNIPPY_CHECK_ERROR(Err, "failed to readMem");
-  auto InstructionSize = getInstructionSize(BeginOfInstr);
-  if (InstructionSize == kCompressedInstrSize * RISCV_CHAR_BIT)
-    return BeginOfInstr;
-  if (InstructionSize != kMaxSupportedInstrSize * RISCV_CHAR_BIT)
-    snippy::fatal("Currently only instructions up to 32 bits are supported.");
-  uint32_t Instr;
-  // Read the full 32-bit instruction.
-  Err = Sim.readMem(PC, MutableArrayRef<char>(reinterpret_cast<char *>(&Instr),
-                                              sizeof(Instr)));
-  SNIPPY_CHECK_ERROR(Err, "failed to readMem");
-  return Instr;
-}
-
 inline std::optional<unsigned>
 getRISCVFloatRegLen(const TargetSubtargetInfo &STI) {
   const auto &ST = static_cast<const RISCVSubtarget &>(STI);

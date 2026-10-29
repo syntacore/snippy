@@ -26,5 +26,4 @@ sections:
 histogram:
     - [VSEXT_VF8, 1.0]
 
-# CHECK: error: Incorrect RVV setup: there are none opcodes available for all RVV modes
-
+# CHECK: error: Incorrect RVV setup: there are none opcodes available for any RVV configuration

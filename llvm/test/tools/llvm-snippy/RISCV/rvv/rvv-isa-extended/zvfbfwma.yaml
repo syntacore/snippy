@@ -13,7 +13,6 @@ include:
 histogram:
   - [VFWMACCBF16_VF, 1.0]
   - [VFWMACCBF16_VV, 1.0]
-  - [VADD_VV, 1.0]
 
 # CHECK-DAG: VFWMACCBF16_VV
 # CHECK-DAG: VFWMACCBF16_VF

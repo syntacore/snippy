@@ -1,0 +1,24 @@
+# COM: This test checks that if there is no VSET* in the histogram, then all rvv
+# configurations will not be generated, only those for which there are available
+# opcodes.
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v,+d
+  num-instrs: 100
+  riscv-dump-rvv-config: ""
+
+include:
+  - ../Inputs/rvv-sections.yaml
+  - ../rvv-config-biased/Inputs/rvv-unit-all.yaml
+
+histogram:
+  - [VFADD_VF, 1.0]
+
+# CHECK: Conf: { e32
+# CHECK: Conf: { e64
+
+# CHECK-NOT: Conf: { e8
+# CHECK-NOT: Conf: { e16
