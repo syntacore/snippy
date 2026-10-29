@@ -167,9 +167,8 @@ public:
 
   DefaultPolicyConfig(const CommonPolicyConfig &Common) : Common(&Common) {}
 
-  Expected<OpcGenHolder>
-  createOpcodeGenerator(const OpcodeFilterType &OpcMask,
-                        SnippyProgramContext &ProgCtx) const;
+  OpcGenHolder createOpcodeGenerator(const OpcodeFilterType &OpcMask,
+                                     SnippyProgramContext &ProgCtx) const;
 
   bool isApplyValuegramEachInstr() const {
     return Valuegram.has_value() || OperandsReinitialization.has_value();

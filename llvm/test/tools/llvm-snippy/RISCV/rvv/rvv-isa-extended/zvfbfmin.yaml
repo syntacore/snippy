@@ -13,7 +13,6 @@ include:
 histogram:
   - [VFNCVTBF16_F_F_W, 1.0]
   - [VFWCVTBF16_F_F_V, 1.0]
-  - [VADD_VV, 1.0]
 
 # CHECK-DAG: VFNCVTBF16_F_F_W
 # CHECK-DAG: VFWCVTBF16_F_F_V

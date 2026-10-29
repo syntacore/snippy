@@ -14,6 +14,8 @@
 #include "snippy/Support/ProbabilityUtils.h"
 #include "snippy/Support/RandUtil.h"
 
+#include "llvm/ADT/BitVector.h"
+
 #include <iterator>
 #include <optional>
 #include <string>
@@ -155,6 +157,10 @@ struct RVVPrimaryConfig {
       return false;
     return VL <= VLMax;
   }
+
+  RVVPrimaryConfig() = default;
+  RVVPrimaryConfig(VSEW SEW, VLMUL LMUL, unsigned VL)
+      : SEW(SEW), LMUL(LMUL), VL(VL) {}
 
   bool operator==(const RVVPrimaryConfig &Other) const {
     return SEW == Other.SEW && LMUL == Other.LMUL && VL == Other.VL;
@@ -461,9 +467,20 @@ struct PrimaryDistBuilderPolicy final {
 using PrimaryDistBuilderSequence =
     ProbableItems<GeneratorName<PrimaryDistBuilderPolicy>>;
 
+namespace detail {
+using VLSquasher = std::set<unsigned>;
+using RVVConfigSquasher = std::map<SewLmulPair, VLSquasher>;
+} // namespace detail
+
+// This class is a pair of a configuration object and a flag that indicates
+// whether there are available opcodes for this configuration or not.
+template <typename T> using WithAvailability = std::pair<T, bool>;
+
 struct RVVPrimaryConfigGenerator final {
   static constexpr size_t LMULSize = LMULEnumList::Arr.size();
   static constexpr size_t SEWSize = SEWEnumList::Arr.size();
+  using RVVConfigsDistribution = std::discrete_distribution<unsigned>;
+  using RVVConfigsDistributionParam = RVVConfigsDistribution::param_type;
 
   // VL can have values [0, GlobalVLMax]
   const size_t VLSize;
@@ -478,14 +495,33 @@ struct RVVPrimaryConfigGenerator final {
   // Note that we often have quite sparse distributions where >80% of
   // weights are 0.0. The std::discrete_distribution is not optimized for
   // such cases.
-  mutable std::discrete_distribution<unsigned> Dist;
+  mutable RVVConfigsDistribution Dist;
+  BitVector HasRVVConfigAvailableOpcodes;
 
-  RVVPrimaryConfigGenerator(
-      unsigned ELEN, unsigned VLEN, const SewLmulDistribution &SewLmulDist,
-      const ProbableItems<VLGeneratorHolder> &VLGenerators,
-      unsigned MinVMBitWidth, bool IsForVSETIVLI,
-      const ProbableItems<PrimaryDistBuilderHolder> &PrimaryDistBuilders);
+private:
+  mutable std::optional<RVVConfigsDistributionParam>
+      RVVConfigsWithAvailableOpcodes;
 
+  RVVPrimaryConfigGenerator(unsigned ELEN, unsigned VLEN, bool IsForVSETIVLI);
+
+public:
+  static WithAvailability<RVVPrimaryConfigGenerator>
+  create(unsigned ELEN, unsigned VLEN, const SewLmulDistribution &SewLmulDist,
+         const ProbableItems<VLGeneratorHolder> &VLGenerators,
+         unsigned MinVMBitWidth, bool IsForVSETIVLI,
+         const ProbableItems<PrimaryDistBuilderHolder> &PrimaryDistBuilders,
+         const OpcodeHistogram::TopOpcodesType &Hist, const RISCVSubtarget &ST,
+         detail::RVVConfigSquasher &ConfigSquasher);
+
+private:
+  bool fillConfigsDistributions(ArrayRef<double> Weights,
+                                const OpcodeHistogram::TopOpcodesType &Hist,
+                                const RISCVSubtarget &ST, unsigned VLEN,
+                                detail::RVVConfigSquasher &CfgSquasher);
+
+  unsigned generateIdx(const RVVConfigsDistributionParam &Param) const;
+
+public:
   RVVPrimaryConfig idxToConfig(size_t Idx) const {
     return Mapping.idxToConfig(Idx);
   }
@@ -493,7 +529,9 @@ struct RVVPrimaryConfigGenerator final {
     return Mapping.toIdx(SEW, LMUL, VL);
   }
 
-  RVVPrimaryConfig generate() const;
+  WithAvailability<RVVPrimaryConfig> generate() const;
+  WithAvailability<RVVPrimaryConfig>
+  generateRVVModeWithAvailableOpcodes() const;
 
   [[nodiscard]] PrimaryWeightsAndMapping getWeightsAndMapping() const {
     return {Dist.probabilities(), Mapping};
@@ -526,7 +564,12 @@ struct RVVConfigGenerator final {
         PrimaryGenReduced(std::move(PrimaryGenReduced)), VmaGen(VMA),
         VtaGen(VTA), VxrmGen(VXRM) {}
 
-  RVVConfiguration generate(bool MustUseReducedVL) const;
+  RVVConfiguration makeRVVConfig(RVVPrimaryConfig &&Cfg) const;
+
+  WithAvailability<RVVConfiguration> generate(bool MustUseReducedVL) const;
+
+  WithAvailability<RVVConfiguration>
+  generateWithAvailableOpcodes(bool MustUseReducedVL) const;
 
   // Makes a weighted sum of the distributions of PrimaryGen and
   // PrimaryGenReduced according to the probabilities of VSET opcodes.
@@ -579,7 +622,8 @@ public:
 
 class RVVConfigurationInfo final {
 public:
-  static RVVConfigurationInfo buildConfiguration(const Config &Cfg,
+  static RVVConfigurationInfo buildConfiguration(const RISCVSubtarget &ST,
+                                                 const Config &Cfg,
                                                  unsigned ELEN, unsigned VLEN);
 
   unsigned getELEN() const { return ELEN; }
@@ -593,7 +637,10 @@ public:
   }
 
   std::optional<APInt> selectVM(unsigned VL, double NoMaskModeForRVV) const;
-  RVVConfiguration selectConfiguration(bool MustUseReducedVL) const;
+  WithAvailability<RVVConfiguration>
+  selectConfiguration(bool MustUseReducedVL) const;
+  WithAvailability<RVVConfiguration>
+  selectConfigurationWithAvailableOpcodes(bool MustUseReducedVL) const;
 
   bool isModeChangeArtificial() const { return ArtificialModeChange; }
   bool isVXRMUpdateNeeded() const { return NeedsVXRMUpdate; }
@@ -653,8 +700,9 @@ class RISCVConfigurationInfo final {
   deriveArchitecturalInformation(LLVMContext &Ctx, const TargetMachine &TM);
 
 public:
-  static RISCVConfigurationInfo constructConfiguration(LLVMState &State,
-                                                       const Config &Cfg);
+  static RISCVConfigurationInfo
+  constructConfiguration(LLVMState &State, const Config &Cfg,
+                         const RISCVSubtarget &ST);
   const RVVConfigurationInfo &getVUConfig() const { return RVVCfgInfo; }
   const BaseConfigurationInfo &getBaseConfig() const { return BaseCfgInfo; }
 };

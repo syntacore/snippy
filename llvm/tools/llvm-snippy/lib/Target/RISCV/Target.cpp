@@ -41,10 +41,10 @@
 #include "MCTargetDesc/RISCVMatInt.h"
 #include "RISCV.h"
 #include "RISCVAsmPrinter.h"
-#include "RISCVGenerated.h"
 #include "RISCVInstrInfo.h"
 #include "RISCVRegisterInfo.h"
 #include "RISCVSubtarget.h"
+#include "RISCVUtils.h"
 #include "TargetGenContext.h"
 
 #include "llvm/ADT/APInt.h"
@@ -348,125 +348,6 @@ static RegStorageType regToStorage(Register Reg) {
     return RegStorageType::VReg;
 
   llvm_unreachable("Unknown register");
-}
-
-static bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
-                            unsigned VLEN, const RISCVSubtarget *ST) {
-  if (!isRVV(Opcode))
-    return false;
-
-  auto [SEWVal, LMUL, VL] = Cfg;
-  auto SEW = static_cast<unsigned>(SEWVal);
-  auto ELEN = ST->getELen();
-
-  if (!Cfg.isLegal(ELEN, VLEN)) {
-    // From RISCV-V spec 1.0:
-    //    vset{i}vl{i} and whole-register loads, stores, and moves do not depend
-    //    upon vtype.
-    // This means that they are legal even with an illegal configurations
-    if (isRVVModeSwitch(Opcode) || isRVVWholeRegLoadStore(Opcode) ||
-        isRVVWholeRegisterMove(Opcode))
-      return true;
-    return false;
-  }
-  // RVV loads and stores have an element width encoded in the opcode:
-  // unit-stride and strided instructions encode element width, whereas indexed
-  // encode index element width. It means that element width (EEW) may differ
-  // from the SEW from VType. In this cases actual LMUL (called EMUL) does not
-  // match the LMUL from VTYPE but it still must be bounds that are 1/8 <= EMUL
-  // <= 8, EMUL = EEW / SEW * LMUL.
-  if (isRVVUnitStrideLoadStore(Opcode) || isRVVUnitStrideFFLoad(Opcode) ||
-      isRVVStridedLoadStore(Opcode)) {
-    // EEW is a data element width.
-    auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-    return isValidEMUL(ELEN, SEW, EEW, LMUL);
-  }
-  if (isRVVIndexedLoadStore(Opcode)) {
-    // EEW is an index element width.
-    auto EEW = getIndexElementWidth(Opcode);
-    return isValidEMUL(ELEN, SEW, EEW, LMUL);
-  }
-  // RVV segment loads/stores encodes not only EEW in the opcode, but number of
-  // fields (NFIELDS) as well. This introduces one more restriction in addition
-  // to the previous one on EMUL: EMUL * NFIELDS <= 8. Note: EMUL from the
-  // previous inequality is a EMUL of data elements. So, for segment unit-stride
-  // and strided instructions we should check:
-  //   1/8 <= EMUL <= 8 and EMUL * NFIELDS <= 8.
-  // But for segment indexed instructions we must check:
-  //   1/8 <= EMUL <= 8 and LMUL * NFIELDS <= 8, because data multiplier is LMUL
-  //   from the current VType.
-  if (isRVVUnitStrideSegLoadStore(Opcode) || isRVVStridedSegLoadStore(Opcode)) {
-    // EEW is a data element width.
-    auto EEW = getDataElementWidth(Opcode) * CHAR_BIT;
-    if (!isValidEMUL(ELEN, SEW, EEW, LMUL))
-      return false;
-    auto EMUL = computeEMUL(ELEN, SEW, EEW, LMUL);
-    auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(EMUL);
-    if (IsFractional)
-      return true;
-    return Multiplier * getNumFields(Opcode) <= 8u;
-  }
-  if (isRVVIndexedSegLoadStore(Opcode)) {
-    auto EEW = getIndexElementWidth(Opcode);
-    if (!isValidEMUL(ELEN, SEW, EEW, LMUL))
-      return false;
-    // The EMUL * NFIELDS ≤ 8 constraint applies to the data vector register
-    // group. The data vector register group has EEW=SEW, EMUL=LMUL
-    auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
-    if (IsFractional)
-      return true;
-    return Multiplier * getNumFields(Opcode) <= 8u;
-  }
-  if (isRVVFloatingPoint(Opcode)) {
-    assert(ST);
-    if (SEW < 16u &&
-        !(mayBeZvfh8BitIntConversion(Opcode) && ST->hasStdExtZvfh()))
-      return false;
-    if (SEW < 32u && !((isZvfh(Opcode) && ST->hasStdExtZvfh()) ||
-                       (isZvfhmin(Opcode) && ST->hasStdExtZvfhmin()))) {
-      // If the EEW of a vector floating-point operand does not correspond to a
-      // supported IEEE floating-point type, the instruction encoding is
-      // reserved.
-      return false;
-    }
-  }
-  if (isRVVExt(Opcode)) {
-    // If the source EEW is not a supported width, or source EMUL would be below
-    // the minimum legal LMUL, the instruction encoding is reserved.
-    auto Factor = getRVVExtFactor(Opcode);
-    assert(Factor <= SEW);
-    assert(SEW % Factor == 0);
-    auto EEW = SEW / Factor;
-    if (!isLegalSEW(EEW))
-      return false;
-    return isValidEMUL(ELEN, SEW, EEW, LMUL);
-  }
-  // Zvfbfmin / Zvfbfwma are defined only for SEW = 16. A later widening check
-  // would otherwise accept SEW = 8/32/64, because EEW = SEW * 2 is still a
-  // legal element width.
-  if (isZvfbf(Opcode) && SEW != 16u)
-    return false;
-  if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
-      isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) {
-    // Both widening and narrowing instructions use operands with EEW = SEW * 2.
-    auto EEW = SEW * 2u;
-    if (!isLegalSEW(EEW))
-      return false;
-    // Check that LMUL * 2 is also legal.
-    return isValidEMUL(ELEN, SEW, EEW, LMUL);
-  }
-  if (isRVVGather16(Opcode)) {
-    // The vrgatherei16.vv form uses SEW/LMUL for the data in vs2 but EEW=16 and
-    // EMUL = (16/SEW)*LMUL for the indices in vs1.
-    auto EEW = 16u;
-    return isValidEMUL(ELEN, SEW, EEW, LMUL);
-  }
-
-  // Instructions from zvbc (carryless multiplication) extension
-  // are defined only for SEW = 64.
-  if (isZvbc(Opcode) && SEW != 64u)
-    return false;
-  return true;
 }
 
 void takeVSETPrefIntoAccount(VSETWeightOverrides &Overrides) {
@@ -1812,30 +1693,42 @@ public:
   }
 
   std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
-  selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
-                               const MachineBasicBlock &MBB,
-                               MDNode *MetadataMark) const override {
+  selectModeChangeAndGetFilter(
+      const SnippyProgramContext &ProgCtx, const MachineBasicBlock &MBB,
+      MDNode *MetadataMark,
+      const WithAvailability<RVVModeInfo> &&NewRVVMode) const {
     const auto &RGC =
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     const auto *STI = &MBB.getParent()->getSubtarget();
     const auto *Subtarget = static_cast<const RISCVSubtarget *>(STI);
 
-    const auto &NewRVVMode = createRVVMode(MBB, ProgCtx);
-    const auto VLEN = RGC.getVLEN();
-    const auto &PrimaryCfg = NewRVVMode.Config.PrimaryCfg;
+    auto [RVVMode, HasAvailableOpcodes] = NewRVVMode;
+    const auto &PrimaryCfg = RVVMode.Config.PrimaryCfg;
+    auto Filter = createOpcodeFilter(PrimaryCfg, RGC.getVLEN(), *Subtarget);
+    return std::make_pair(std::make_shared<RISCVModeChangingContext>(
+                              RVVMode, HasAvailableOpcodes),
+                          std::move(Filter));
+  }
 
-    auto Filter = [=](unsigned Opcode) {
-      if (!isRVV(Opcode))
-        return true;
-      // Mode switches are always generated using the ModeChangingPolicy and we
-      // are making a filter for all other policies to use
-      if (isRVVModeSwitch(Opcode))
-        return false;
-      return isLegalRVVInstr(Opcode, PrimaryCfg, VLEN, Subtarget);
-    };
+  std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
+  selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
+                               const MachineBasicBlock &MBB,
+                               MDNode *MetadataMark) const override {
+    return selectModeChangeAndGetFilter(
+        ProgCtx, MBB, MetadataMark,
+        createRVVMode(MBB, ProgCtx,
+                      &RVVConfigurationInfo::selectConfiguration));
+  }
 
-    return std::make_pair(
-        std::make_shared<RISCVModeChangingContext>(NewRVVMode), Filter);
+  std::pair<std::shared_ptr<const ModeChangingContext>, OpcodeFilterType>
+  selectModeChangeWithAvailableOpcodesAndGetFilter(
+      const SnippyProgramContext &ProgCtx, const MachineBasicBlock &MBB,
+      MDNode *MetadataMark) const override {
+    return selectModeChangeAndGetFilter(
+        ProgCtx, MBB, MetadataMark,
+        createRVVMode(
+            MBB, ProgCtx,
+            &RVVConfigurationInfo::selectConfigurationWithAvailableOpcodes));
   }
 
   void generateModeChange(const ModeChangingContext &MCC,
@@ -1844,7 +1737,7 @@ public:
     const auto &ProgCtx = IGC.ProgCtx;
     const auto &InstrInfo = ProgCtx.getLLVMState().getInstrInfo();
     const auto &RVMCC = static_cast<const RISCVModeChangingContext &>(MCC);
-    generateRVVModeUpdate(IGC, InstrInfo, RVMCC.RVVMI, MetadataMark);
+    generateRVVModeUpdate(IGC, InstrInfo, RVMCC.RVVMode, MetadataMark);
   }
 
   void checkInstrTargetDependency(const OpcodeHistogram &H,
@@ -5044,8 +4937,7 @@ public:
         ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
     auto &MBB = IGC.MBB;
     auto RCID = RC.getID();
-    if (InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) >= 0)
-      return;
+    assert(InstrDesc.getOperandConstraint(OpIndex, MCOI::TIED_TO) == -1);
     if (isSPRelative(Opcode))
       return excludeForSPRelative(RCID, Result);
     if (Opcode == RISCV::CM_MVSA01)
@@ -5309,7 +5201,6 @@ public:
   void rvvWriteValueUsingXReg(InstructionGenerationContext &IGC, APInt Value,
                               unsigned DstReg) const;
 
-private:
   std::optional<RVVModeInfo>
   rvvWriteValueUsingXRegAndGetOldMode(InstructionGenerationContext &IGC,
                                       APInt Value, unsigned DstReg) const;
@@ -5329,14 +5220,12 @@ private:
                            unsigned DstReg,
                            SmallVectorImpl<MCInst> &Insts) const;
 
-  // Randomly pick VSET opcode and a new RVV mode and make a switch.
-  RVVModeInfo
-  generateRVVModeSwitchAndUpdateContext(const MCInstrInfo &InstrInfo,
-                                        InstructionGenerationContext &IGC,
-                                        MDNode *MetadataMark) const;
-
-  RVVModeInfo createRVVMode(const MachineBasicBlock &MBB,
-                            const SnippyProgramContext &ProgCtx) const;
+  using SelectConfigurationT =
+      WithAvailability<RVVConfiguration> (RVVConfigurationInfo::*)(bool) const;
+  WithAvailability<RVVModeInfo>
+  createRVVMode(const MachineBasicBlock &MBB,
+                const SnippyProgramContext &ProgCtx,
+                SelectConfigurationT SelectConfiguration) const;
 
   void generateVTypeChange(InstructionGenerationContext &IGC,
                            const MCInstrInfo &InstrInfo,
@@ -5973,9 +5862,9 @@ void SnippyRISCVTarget::rvvWriteValue(InstructionGenerationContext &IGC,
   llvm_unreachable("Unknown RVVInitMode");
 }
 
-RVVModeInfo
-SnippyRISCVTarget::createRVVMode(const MachineBasicBlock &MBB,
-                                 const SnippyProgramContext &ProgCtx) const {
+WithAvailability<RVVModeInfo> SnippyRISCVTarget::createRVVMode(
+    const MachineBasicBlock &MBB, const SnippyProgramContext &ProgCtx,
+    SelectConfigurationT SelectConfiguration) const {
   auto &RGC = ProgCtx.getTargetContext().getImpl<RISCVGeneratorContext>();
   const auto &VUInfo = RGC.getVUConfigInfo();
 
@@ -5983,7 +5872,8 @@ SnippyRISCVTarget::createRVVMode(const MachineBasicBlock &MBB,
       selectDesiredModeChangeInstruction(RVVModeChangePreferenceOpt, RGC);
   // VSETIVLI supports only reduced VL
   const bool MustUseReducedVL = (DesiredOpcode == RISCV::VSETIVLI);
-  const auto &NewRvvCFG = VUInfo.selectConfiguration(MustUseReducedVL);
+  auto [NewRvvCFG, HasAvailableOpcodes] =
+      std::invoke(SelectConfiguration, VUInfo, MustUseReducedVL);
   auto VL = NewRvvCFG.PrimaryCfg.VL;
   assert(!(MustUseReducedVL && VL > kMaxVLForVSETIVLI) &&
          "VSETIVLI supports only VLs up to specified maximum");
@@ -5992,15 +5882,8 @@ SnippyRISCVTarget::createRVVMode(const MachineBasicBlock &MBB,
   auto NewVM = isOne(ProbNoMaskMode) ? std::nullopt
                                      : VUInfo.selectVM(VL, ProbNoMaskMode);
 
-  return RVVModeInfo{DesiredOpcode, NewVM, NewRvvCFG, &MBB};
-}
-
-RVVModeInfo SnippyRISCVTarget::generateRVVModeSwitchAndUpdateContext(
-    const MCInstrInfo &InstrInfo, InstructionGenerationContext &IGC,
-    MDNode *MetadataMark) const {
-  const auto &NewRVVMode = createRVVMode(IGC.MBB, IGC.ProgCtx);
-  generateRVVModeUpdate(IGC, InstrInfo, NewRVVMode, MetadataMark);
-  return NewRVVMode;
+  return {RVVModeInfo{DesiredOpcode, NewVM, NewRvvCFG, &MBB},
+          HasAvailableOpcodes};
 }
 
 // This function might generate VSET using RVVMode.Config or such where
@@ -6238,125 +6121,6 @@ static void dumpRvvConfigurationInfo(StringRef FilePath,
     ReportFileError(OS.error());
 }
 
-// There are many configs, which differ only in VL and don't support the
-// same instruction. So, to avoid making the warning message enormous, we need
-// data structure to squash RVVConfigs by VL.
-using VLSquasher = std::set<unsigned>;
-using RVVConfigSquasher = std::map<SewLmulPair, VLSquasher>;
-
-static std::string toString(const std::pair<SewLmulPair, VLSquasher> &Cfg) {
-  std::string Str;
-  raw_string_ostream RSO{Str};
-  const auto &SewLmul = Cfg.first;
-  RSO << "[SEW: " << toString(std::get<VSEW>(SewLmul))
-      << ", LMUL: " << snippy::toString(std::get<VLMUL>(SewLmul)) << ", VL: ";
-  const auto &VLSquash = Cfg.second;
-  assert(!VLSquash.empty());
-  // squash 1,2,3,4,5 into 1-5
-  // and separate these ranges with ,
-  for (auto It = VLSquash.begin(), Ite = VLSquash.end();;) {
-    RSO << *It;
-    auto Last =
-        std::adjacent_find(It, Ite, [](unsigned First, unsigned Second) {
-          return (First + 1) != Second;
-        });
-    if (Last == Ite) {
-      if (auto LastPrev = std::prev(Last); LastPrev != It)
-        RSO << "-" << *LastPrev;
-      break;
-    }
-    if (Last != It)
-      RSO << "-" << *Last;
-    It = std::next(Last);
-    RSO << ", ";
-  }
-  RSO << "]";
-  return Str;
-}
-
-// Exclude configs without available opcodes and return true, if there is at
-// least one config with at least one available opcode, otherwise return false.
-static bool excludeConfigsWithoutAvailableOpcodes(
-    const RVVPrimaryConfigGenerator &CfgGen, RVVConfigSquasher &CfgSquasher,
-    LLVMContext &Ctx, const OpcodeHistogram::TopOpcodesType &Hist,
-    const RISCVSubtarget &ST, unsigned VLEN) {
-  auto Probabilities = CfgGen.Dist.probabilities();
-  // The Probabilieties array can be large. Avoid copying when it's not used.
-  auto ProbabilitiesChanged = false;
-  auto AvailableConfigs = false;
-  for (size_t I = 0, E = Probabilities.size(); I < E; ++I) {
-    if (isZero(Probabilities[I]))
-      continue;
-    auto PrimaryCfg = CfgGen.idxToConfig(I);
-    auto AtLeastOneAvailableOpcode =
-        llvm::any_of(Hist, [&PrimaryCfg, &ST, VLEN](const auto &Opc) {
-          auto IsOpcodeAvailable =
-              !isRVV(Opc.first) ||
-              isLegalRVVInstr(Opc.first, PrimaryCfg, VLEN, &ST);
-          return IsOpcodeAvailable;
-        });
-    if (AtLeastOneAvailableOpcode) {
-      AvailableConfigs = true;
-      continue;
-    }
-    // exclude configs from generation, because it
-    // doesn't have available opcodes
-    Probabilities[I] = 0.0;
-    ProbabilitiesChanged = true;
-    CfgSquasher[{PrimaryCfg.SEW, PrimaryCfg.LMUL}].insert(PrimaryCfg.VL);
-  }
-  if (ProbabilitiesChanged && AvailableConfigs)
-    CfgGen.Dist = std::discrete_distribution<unsigned>(Probabilities.begin(),
-                                                       Probabilities.end());
-  return AvailableConfigs;
-}
-
-static void processAndFilterRVVConfigs(LLVMContext &Ctx, const Config &Cfg,
-                                       const TargetSubtargetInfo *STI,
-                                       const RVVConfigurationInfo &VUInfo) {
-  // exclude PrimaryConfigs which haven't available opcodes
-  const auto &ST = static_cast<const RISCVSubtarget &>(*STI);
-  const auto &Hist = Cfg.getOpcodeHistogram().topOpcodes();
-  auto VLEN = VUInfo.getVLEN();
-
-  RVVConfigSquasher ConfigSquasher;
-  auto ExcludeConfigs =
-      [&ConfigSquasher, &Ctx, &Hist, &ST, VLEN](
-          const std::optional<RVVPrimaryConfigGenerator> &Generator) -> bool {
-    return (Generator.has_value()
-                ? excludeConfigsWithoutAvailableOpcodes(
-                      *Generator, ConfigSquasher, Ctx, Hist, ST, VLEN)
-                : false);
-  };
-
-  const auto &CfgGen = VUInfo.getGenInfoPtr()->CfgGen;
-  const auto &PrimaryGen = CfgGen.PrimaryGen;
-  const auto &PrimaryGenReduced = CfgGen.PrimaryGenReduced;
-  // We need these temporary variables (AvailableConfigsPrimaryGen and
-  // AvailableConfigsPrimaryGenReduced) because the || operator performs lazy
-  // evaluation. This means we cannot call ExcludeConfigs directly within the
-  // expression, as the method must exclude configurations that lack available
-  // opcodes in both generators.
-  auto AvailableConfigsInPrimaryGen = ExcludeConfigs(PrimaryGen);
-  auto AvailableConfigsInPrimaryGenReduced = ExcludeConfigs(PrimaryGenReduced);
-  auto AvailableConfigs =
-      AvailableConfigsInPrimaryGen || AvailableConfigsInPrimaryGenReduced;
-  if (!AvailableConfigs)
-    snippy::fatal(Ctx, "Incorrect RVV setup",
-                  "there are none opcodes available for all RVV modes");
-  for (const auto &ExcludedConfig : ConfigSquasher) {
-    auto ManyCfgs = (ExcludedConfig.second.size() > 1);
-    snippy::warn(
-        snippy::WarningName::NoAvailableOpcodeForContext, Ctx,
-        llvm::formatv(
-            "No opcodes are available to be generated in the following "
-            "RVV mode{}. {} mode{} will be deleted from generation",
-            (ManyCfgs ? "s" : ""), (ManyCfgs ? "These" : "This"),
-            (ManyCfgs ? "s" : "")),
-        llvm::formatv("\n{}", toString(ExcludedConfig)));
-  }
-}
-
 static void checkThatRVVInitModeSupportsReinit(const OpcodeHistogram &Hist) {
   auto IsRVVOpcode = [](auto &&Opc) -> bool { return isRVV(Opc); };
 
@@ -6404,14 +6168,14 @@ std::unique_ptr<TargetGenContextInterface>
 SnippyRISCVTarget::createTargetContext(LLVMState &State, const Config &Cfg,
                                        const TargetSubtargetInfo *STI,
                                        const RegPoolWrapper &RP) const {
-  auto RISCVCfg = RISCVConfigurationInfo::constructConfiguration(State, Cfg);
+  assert(STI);
+  const auto &ST = static_cast<const RISCVSubtarget &>(*STI);
+  auto RISCVCfg =
+      RISCVConfigurationInfo::constructConfiguration(State, Cfg, ST);
   auto RGC = std::make_unique<RISCVGeneratorContext>(
       std::move(RISCVCfg), matchRVVOpcodesWithDisallowedIntersectingAccesses(
                                Cfg.Histogram, State.getInstrInfo()));
   const auto &VUInfo = RGC->getVUConfigInfo();
-
-  if (VUInfo.isRVVEnabled())
-    processAndFilterRVVConfigs(State.getCtx(), Cfg, STI, VUInfo);
 
   if (DumpRVVConfigurationInfo.isSpecified())
     dumpRvvConfigurationInfo(/*FilePath=*/DumpRVVConfigurationInfo.getValue(),

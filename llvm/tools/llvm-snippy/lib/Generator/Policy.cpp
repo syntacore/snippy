@@ -95,24 +95,19 @@ InstructionGenerationContext::getOrCreateFloatOverwriteValueSampler(
 
 DefaultGenPolicy::DefaultGenPolicy(SnippyProgramContext &ProgCtx,
                                    const DefaultPolicyConfig &Cfg,
-                                   std::optional<OpcodeFilterType> Filter)
+                                   OpcodeFilterType Filter)
     : Cfg(&Cfg) {
   assert(!Cfg.isApplyValuegramEachInstr() &&
          "In this case you must use ValuegramGenPolicy");
 
   if (!Filter)
     Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
-  auto Err = Cfg.createOpcodeGenerator(*Filter, ProgCtx).moveInto(OpcGen);
-  if (Err)
-    snippy::fatal(
-        Twine("Failed to create OpcodeGenerator in DefaultGenPolicy: ") +
-        toString(std::move(Err)));
+  OpcGen = Cfg.createOpcodeGenerator(Filter, ProgCtx);
 }
 
 BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
                                const BurstPolicyConfig &Cfg,
-                               unsigned BurstGroupID,
-                               std::optional<OpcodeFilterType> Filter)
+                               unsigned BurstGroupID, OpcodeFilterType Filter)
     : Cfg(&Cfg) {
   const auto &BGram = Cfg.Burst;
 
@@ -140,7 +135,7 @@ BurstGenPolicy::BurstGenPolicy(SnippyProgramContext &ProgCtx,
 
   if (!Filter)
     Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
-  ModeCompatibleOpcodes.eraseTopOpcodes(std::not_fn(*Filter));
+  ModeCompatibleOpcodes.eraseTopOpcodes(std::not_fn(Filter));
 
   assert(!ModeCompatibleOpcodes.empty() &&
          "Failed to create mode compatible OpcodeGenerator in BurstGenPolicy");
@@ -396,7 +391,7 @@ void ModeChangingInstPolicy::initialize(
 
 GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
                           const DefaultPolicyConfig &Cfg,
-                          std::optional<OpcodeFilterType> Filter) {
+                          OpcodeFilterType Filter) {
   if (!Filter)
     Filter = getDefaultFilter(ProgCtx.getLLVMState().getSnippyTarget());
   if (Cfg.isApplyValuegramEachInstr()) {
@@ -404,9 +399,9 @@ GenPolicy createGenPolicy(SnippyProgramContext &ProgCtx,
            Cfg.OperandsReinitialization.has_value());
     auto ValuegramValueSource = getValuegramPolicyValueSource(Cfg);
     return planning::ValuegramGenPolicy(
-        ProgCtx, Cfg, std::move(ValuegramValueSource), *Filter);
+        ProgCtx, Cfg, std::move(ValuegramValueSource), Filter);
   }
-  return planning::DefaultGenPolicy(ProgCtx, Cfg, *Filter);
+  return planning::DefaultGenPolicy(ProgCtx, Cfg, Filter);
 }
 
 } // namespace planning

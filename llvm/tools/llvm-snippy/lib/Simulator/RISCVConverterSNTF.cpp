@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Simulator/RISCVConverterSNTF.h"
-#include "../lib/Target/RISCV/RISCVGenerated.h"
+#include "../lib/Target/RISCV/RISCVUtils.h"
 
 namespace llvm {
 namespace snippy {

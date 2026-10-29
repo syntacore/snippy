@@ -11,7 +11,7 @@ options:
   mattr: +v,+f,+zcmp
   num-instrs: 500
   honor-target-abi: on
-  function-number: 20
+  function-number: 30
   function-layers: 5
   redefine-sp: SP
 

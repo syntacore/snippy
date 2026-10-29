@@ -3,6 +3,17 @@ call-graph:
   function-list:
     - name: SnippyFunction
       callees:
+        - fun1
+        - fun2
+        - IamExternalFunc
+    - name: fun1
+      callees:
+        - fun2
+    - name: fun2
+      callees:
+        - fun3
+    - name: fun3
+      callees:
         - IamExternalFunc
     - name: IamExternalFunc
       external: true

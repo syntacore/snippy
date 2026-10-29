@@ -226,9 +226,15 @@ public:
   SingleContextGroup() = default;
 
   bool hasModeChange() const { return ModeChangingPolicy.has_value(); }
-  std::optional<OpcodeFilterType> getOpcodeFilter() const {
+  bool hasAvailableOpcodes() const {
+    // If there is no mode change policy in the single context group, then there
+    // are no restrictions on opcodes and all are available.
+    return !ModeChangingPolicy.has_value() ||
+           ModeChangingPolicy->hasAvailableOpcodes();
+  }
+  OpcodeFilterType getOpcodeFilter() const {
     if (!ModeChangingPolicy.has_value())
-      return std::nullopt;
+      return [](unsigned) { return true; };
     return ModeChangingPolicy->getOpcodeFilter();
   }
   InstructionGroupRequest createModeChangeIG() const {
@@ -260,7 +266,9 @@ public:
   }
 
   using vector::begin;
+  using vector::empty;
   using vector::end;
+  using vector::size;
 
   void print(raw_ostream &OS, size_t Indent = 0) const {
     bool HasModeChange = ModeChangingPolicy.has_value();
@@ -303,6 +311,17 @@ public:
       return Acc + Entry.numIGs();
     });
   }
+
+  size_t numLegalIGs() const {
+    return std::accumulate(begin(), end(), 0u, [](auto Acc, const auto &Entry) {
+      return Acc + (Entry.hasAvailableOpcodes() ? Entry.numIGs() : 0u);
+    });
+  };
+
+  size_t numLegalContexts() const {
+    return count_if(
+        *this, [](const auto &Entry) { return Entry.hasAvailableOpcodes(); });
+  };
 
   using vector::begin;
   using vector::end;
@@ -372,15 +391,16 @@ public:
 
   void setFinalInstr(const MCInstrDesc *Desc) { FinalInstrDesc = Desc; }
 
-  SmallVector<size_t> getNumCtxGroupsPerMBBs(
+  SmallVector<size_t> getNumLegalCtxGroupsPerMBBs(
       const std::vector<const MachineBasicBlock *> &Blocks) const {
     SmallVector<size_t> ModeChangesPerMBBs;
     ModeChangesPerMBBs.reserve(Blocks.size());
     transform(Blocks, std::back_inserter(ModeChangesPerMBBs),
               [&](const auto *MBB) {
                 auto Found = map::find(MBB);
+                assert(Found != map::end());
                 auto &BBReq = Found->second;
-                return BBReq.size();
+                return BBReq.numLegalContexts();
               });
     return ModeChangesPerMBBs;
   }

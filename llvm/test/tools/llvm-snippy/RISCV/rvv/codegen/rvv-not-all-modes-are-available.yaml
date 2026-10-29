@@ -4,6 +4,7 @@ options:
   mtriple: riscv64
   mattr: +v
   num-instrs: 1 
+  rvv-exclude-configs-without-available-opcodes: true
 
 include:
   - ../Inputs/rvv-sections.yaml

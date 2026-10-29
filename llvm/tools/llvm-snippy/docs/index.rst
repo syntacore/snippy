@@ -4017,6 +4017,36 @@ instructions that are possible in this RVV mode, that is, the
 instructions that are compatible with each other and this mode and do
 not cause an exception.
 
+The behaviour when there is no opcode available for any RVV
+configuration depends on the mode in which the generation takes place:
+
+-  In `Histogram mode <#vector-unit-configurations>`__, snippy generates
+   **all** configurations from ``riscv-vector-unit``. This is because, in
+   this mode, the ``VSET*`` instructions are treated as ordinary
+   instructions that are valid for any configuration.
+
+-  In `Biased Mode <#biased-mode>`__, you must provide a valid opcode for
+   any RVV configuration from ``riscv-vector-unit``, otherwise snippy
+   generates an error:
+
+   .. error::
+
+      Incorrect RVV setup: there are none opcodes available for any RVV mode
+
+   In this mode, the ``VSET*`` instructions cannot be used for any
+   configuration, because they are considered support instructions.
+
+.. note::
+
+   Regardless of the weight of RVV configurations for which valid opcodes are
+   available, at least one such will be generated in each basic block. This is
+   necessary in order to satisfy the opcode probabilities as much as possible.
+
+Regardless of the generation mode, you can pass the
+``--rvv-exclude-configs-without-available-opcodes`` option
+to exclude RVV configurations without available opcodes from the
+generation. The default value is ``false``.
+
 .. note::
 
    The way some of the facilities function is specific to snippy, while

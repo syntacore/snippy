@@ -1,0 +1,40 @@
+# COM: This test checks that if there is no opcodes available for any rvv mode
+# and configurations are generated in biased mode, then this is an error.
+
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v,+d
+  num-instrs: 100
+  dump-mf: on
+  riscv-dump-rvv-config: ""
+
+include:
+  - ../Inputs/rvv-sections.yaml
+
+riscv-vector-unit:
+  mode-change-bias:
+    P: 0.5
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rdn: 1.0
+    VTYPE:
+     SEW:
+       sew_8: 1.0
+       sew_16: 1.0
+     LMUL:
+       m1: 1.0
+     VMA:
+       mu: 1.0
+     VTA:
+       tu: 1.0
+
+histogram:
+  - [VFADD_VF, 1.0]
+
+# CHECK: error: Incorrect RVV setup: there are none opcodes available for any RVV configuration

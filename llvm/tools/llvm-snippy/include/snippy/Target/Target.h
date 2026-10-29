@@ -75,6 +75,7 @@ enum class LoopType;
 struct ModeChangingContext {
   virtual ~ModeChangingContext() = default;
   virtual void print(raw_ostream &OS) const = 0;
+  virtual bool hasAvailableOpcodes() const { return true; }
 };
 
 struct TargetGenContextInterface {
@@ -307,6 +308,12 @@ public:
   selectModeChangeAndGetFilter(const SnippyProgramContext &ProgCtx,
                                const MachineBasicBlock &MBB,
                                MDNode *MetadataMark) const = 0;
+
+  virtual std::pair<std::shared_ptr<const ModeChangingContext>,
+                    OpcodeFilterType>
+  selectModeChangeWithAvailableOpcodesAndGetFilter(
+      const SnippyProgramContext &ProgCtx, const MachineBasicBlock &MBB,
+      MDNode *MetadataMark) const = 0;
 
   virtual void generateModeChange(const ModeChangingContext &MCC,
                                   InstructionGenerationContext &IGC,

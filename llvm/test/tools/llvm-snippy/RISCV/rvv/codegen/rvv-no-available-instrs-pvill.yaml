@@ -37,5 +37,4 @@ histogram:
     - [VXOR_VX, 1.0]
     - [VZEXT_VF4, 1.0]
 
-# CHECK: error: Incorrect RVV setup: there are none opcodes available for all RVV modes
-
+# CHECK: error: Incorrect RVV setup: there are none opcodes available for any RVV configuration

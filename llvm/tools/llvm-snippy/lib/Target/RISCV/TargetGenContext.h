@@ -16,7 +16,7 @@
 
 #include <optional>
 
-#include "RISCVGenerated.h"
+#include "RISCVUtils.h"
 
 namespace llvm {
 namespace snippy {
@@ -78,9 +78,12 @@ struct RISCVMemInitRegs final {
 };
 
 struct RISCVModeChangingContext : public ModeChangingContext {
-  RVVModeInfo RVVMI;
-  RISCVModeChangingContext(const RVVModeInfo &RVVMI) : RVVMI(RVVMI) {}
-  void print(raw_ostream &OS) const override { RVVMI.print(OS); }
+  RVVModeInfo RVVMode;
+  bool HasAvailableOpcodes;
+  RISCVModeChangingContext(const RVVModeInfo &RVVMode, bool HasAvailableOpcodes)
+      : RVVMode(RVVMode), HasAvailableOpcodes(HasAvailableOpcodes) {}
+  void print(raw_ostream &OS) const override { RVVMode.print(OS); }
+  bool hasAvailableOpcodes() const override { return HasAvailableOpcodes; }
 };
 
 class RISCVGeneratorContext : public TargetGenContextInterface {

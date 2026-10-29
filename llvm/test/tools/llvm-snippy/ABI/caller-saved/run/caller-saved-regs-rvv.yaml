@@ -4,7 +4,7 @@
 options:
   mtriple: riscv64
   mcpu: generic-rv64
-  num-instrs: 200
+  num-instrs: 1000
   mattr: "+v"
   redefine-sp: reg::X2
   verify-mi: on
@@ -22,7 +22,7 @@ histogram:
      - [VLE64_V, 1.0]
      - [VLSE64_V, 1.0]
      - [VLOXEI64_V, 1.0]
-     - [VSETVL, 0.1]
+     - [VSETVL, 10.0]
 
 # CHECK: VS1R_V $v1, $x2
 # CHECK: VS1R_V $v2, $x2
@@ -56,8 +56,7 @@ histogram:
 # CHECK: VS1R_V $v30, $x2
 # CHECK: VS1R_V $v31, $x2
 
-# CHECK: {{(PseudoJALCall|AUIPC)}}
-# CHECK-SAME: @IamExternalFunc
+# CHECK: {{(PseudoJALCall|AUIPC).*@IamExternalFunc}}
 
 # CHECK: $v31 = VL1RE8_V $x2
 # CHECK: $v30 = VL1RE8_V $x2

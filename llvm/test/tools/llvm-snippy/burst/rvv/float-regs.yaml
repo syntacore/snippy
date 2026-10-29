@@ -22,7 +22,7 @@ histogram:
 burst:
     mode: custom
     min-size: 4
-    max-size: 16
+    max-size: 8
     groupings:
       - [LD, VFADD_VF]
       - [SD, VFSUB_VF]

@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "RVVUnitConfig.h"
-#include "RISCVGenerated.h"
+#include "RISCVUtils.h"
 #include "TargetConfig.h"
 
 #include "snippy/Config/Valuegram.h"
@@ -1315,27 +1315,126 @@ template <> struct GeneratorFactory<PrimaryDistBuilderHolder> {
 
 namespace llvm {
 namespace snippy {
-RVVPrimaryConfigGenerator::RVVPrimaryConfigGenerator(
+
+// There are many configs, which differ only in VL and don't support the
+// same instruction. So, to avoid making the warning message enormous, we need
+// data structure to squash RVVConfigs by VL.
+static std::string
+toString(const std::pair<SewLmulPair, detail::VLSquasher> &Cfg) {
+  std::string Str;
+  raw_string_ostream RSO{Str};
+  const auto &SewLmul = Cfg.first;
+  RSO << "[SEW: " << toString(std::get<VSEW>(SewLmul))
+      << ", LMUL: " << snippy::toString(std::get<VLMUL>(SewLmul)) << ", VL: ";
+  const auto &VLSquash = Cfg.second;
+  assert(!VLSquash.empty());
+  // squash 1,2,3,4,5 into 1-5
+  // and separate these ranges with ,
+  for (auto It = VLSquash.begin(), Ite = VLSquash.end();;) {
+    RSO << *It;
+    auto Last =
+        std::adjacent_find(It, Ite, [](unsigned First, unsigned Second) {
+          return (First + 1) != Second;
+        });
+    if (Last == Ite) {
+      if (auto LastPrev = std::prev(Last); LastPrev != It)
+        RSO << "-" << *LastPrev;
+      break;
+    }
+    if (Last != It)
+      RSO << "-" << *Last;
+    It = std::next(Last);
+    RSO << ", ";
+  }
+  RSO << "]";
+  return Str;
+}
+
+static snippy::opt<bool> ExcludeRVVConfigsWithoutAvailableOpcodes(
+    "rvv-exclude-configs-without-available-opcodes",
+    cl::desc("Exclude rvv configurations without available opcodes from "
+             "generation."),
+    cl::cat(SnippyRISCVOptions), cl::init(false));
+
+// Exclude configs without available opcodes (if needed) and return true, if
+// there are configs with available opcodes, otherwise return false.
+bool RVVPrimaryConfigGenerator::fillConfigsDistributions(
+    ArrayRef<double> Weights, const OpcodeHistogram::TopOpcodesType &Hist,
+    const RISCVSubtarget &ST, unsigned VLEN,
+    detail::RVVConfigSquasher &CfgSquasher) {
+  const bool ExcludeConfigsWithoutAvailableOpcodes =
+      ExcludeRVVConfigsWithoutAvailableOpcodes.getValue();
+
+  Dist = std::discrete_distribution<unsigned>(Weights.begin(), Weights.end());
+  auto Probs = Dist.probabilities();
+  HasRVVConfigAvailableOpcodes = BitVector(Probs.size());
+
+  // The probabilities array can be large. Avoid copying when it's not used.
+  auto AnyExcluded = false;
+  // The probabilities array is modified in place below: configs that have no
+  // available opcodes get their probability zeroed out (Prob is a reference to
+  // an element of Probs)
+  for (auto [Idx, Prob] : enumerate(Probs)) {
+    assert(Prob >= 0.0 && "other cases should be parsed earlier");
+    if (isZero(Prob))
+      continue;
+    auto PrimaryCfg = idxToConfig(Idx);
+    auto OpcFilter = createOpcodeFilter(PrimaryCfg, VLEN, ST);
+    if (any_of(Hist, [&](const auto &Entry) {
+          return OpcFilter(Entry.first) && !isZero(Entry.second);
+        })) {
+      HasRVVConfigAvailableOpcodes.set(Idx);
+      continue;
+    }
+    Prob = 0.0;
+    if (!ExcludeConfigsWithoutAvailableOpcodes)
+      continue;
+    AnyExcluded = true;
+    CfgSquasher[{PrimaryCfg.SEW, PrimaryCfg.LMUL}].insert(PrimaryCfg.VL);
+  }
+
+  if (HasRVVConfigAvailableOpcodes.none())
+    return false;
+
+  if (ExcludeConfigsWithoutAvailableOpcodes && AnyExcluded)
+    Dist = std::discrete_distribution<unsigned>(Probs.begin(), Probs.end());
+
+  RVVConfigsWithAvailableOpcodes =
+      RVVConfigsDistributionParam(Probs.begin(), Probs.end());
+  return true;
+}
+
+RVVPrimaryConfigGenerator::RVVPrimaryConfigGenerator(unsigned ELEN,
+                                                     unsigned VLEN,
+                                                     bool IsForVSETIVLI)
+    : VLSize(IsForVSETIVLI ? (kMaxVLForVSETIVLI + 1)
+                           : (getMaxPossibleVL(ELEN, VLEN) + 1)),
+      IsForVSETIVLI(IsForVSETIVLI), Mapping(VLSize) {}
+
+// Return primary rvv config generator and bool, which is true, if there are
+// configs with available opcodes and false otherwise.
+WithAvailability<RVVPrimaryConfigGenerator> RVVPrimaryConfigGenerator::create(
     unsigned ELEN, unsigned VLEN, const SewLmulDistribution &SewLmulDist,
     const ProbableItems<VLGeneratorHolder> &VLGenerators,
     unsigned MinVMBitWidth, bool IsForVSETIVLI,
-    const ProbableItems<PrimaryDistBuilderHolder> &PrimaryDistBuilders)
-    : VLSize(IsForVSETIVLI ? (kMaxVLForVSETIVLI + 1)
-                           : (getMaxPossibleVL(ELEN, VLEN) + 1)),
-      IsForVSETIVLI(IsForVSETIVLI), Mapping(VLSize) {
+    const ProbableItems<PrimaryDistBuilderHolder> &PrimaryDistBuilders,
+    const OpcodeHistogram::TopOpcodesType &Hist, const RISCVSubtarget &ST,
+    detail::RVVConfigSquasher &ConfigSquasher) {
   assert(VLEN != 0 && ELEN != 0);
-
   assert(SewLmulDist.hasNonZeroProbs());
   assert(VLGenerators.hasNonZeroProbs());
   assert(PrimaryDistBuilders.hasNonZeroProbs());
 
-  std::vector<double> Weights(Mapping.maxIdx(), 0.0);
+  RVVPrimaryConfigGenerator PrimaryCfgGen(ELEN, VLEN, IsForVSETIVLI);
+
+  std::vector<double> Weights(PrimaryCfgGen.Mapping.maxIdx(), 0.0);
   // Add weights from each builder
   for (const auto &[Builder, Prob] : PrimaryDistBuilders) {
     if (isZero(Prob))
       continue;
-    auto CfgWeights = Builder->buildWeights(ELEN, VLEN, Mapping, SewLmulDist,
-                                            VLGenerators, IsForVSETIVLI);
+    auto CfgWeights =
+        Builder->buildWeights(ELEN, VLEN, PrimaryCfgGen.Mapping, SewLmulDist,
+                              VLGenerators, IsForVSETIVLI);
 
     if (all_of(CfgWeights, [](double W) { return isZero(W); }))
       continue;
@@ -1349,31 +1448,46 @@ RVVPrimaryConfigGenerator::RVVPrimaryConfigGenerator(
   // Zero-out weights of VLs < minVMBitWidth.
   // For such configs there're no applicable VMgens.
   for (auto &&[Idx, Weight] : enumerate(Weights)) {
-    auto VL = idxToConfig(Idx).VL;
+    auto VL = PrimaryCfgGen.idxToConfig(Idx).VL;
     if (VL < MinVMBitWidth)
       Weight = 0.0;
   }
 
-  if (all_of(Weights, [](double W) { return isZero(W); })) {
-    if (IsForVSETIVLI)
-      snippy::fatal(
-          "There are no VL generators in riscv-vector-unit which are "
-          "compatible with VSETIVLI under any requested VTYPE configuration");
-    snippy::fatal("There are no VL generators in riscv-vector-unit which are "
-                  "compatible with any requested VTYPE configuration");
-  }
+  if (all_of(Weights, [](double W) { return isZero(W); }))
+    snippy::fatal(
+        Twine("There are no VL generators in riscv-vector-unit which are "
+              "compatible with ") +
+        (IsForVSETIVLI ? "VSETIVLI under" : "") +
+        "any requested VTYPE configuration");
 
-  Dist = std::discrete_distribution<unsigned>(Weights.begin(), Weights.end());
+  auto HasAvailableOpcodes = PrimaryCfgGen.fillConfigsDistributions(
+      Weights, Hist, ST, VLEN, ConfigSquasher);
 
   LLVM_DEBUG(dbgs() << "=== Primary RVV Config Probabilities ===\n");
-  LLVM_DEBUG(printProbabilities(dbgs()));
+  LLVM_DEBUG(PrimaryCfgGen.printProbabilities(dbgs()));
   LLVM_DEBUG(dbgs() << "=== Final {SEW, LMUL} Probabilities ===\n");
-  LLVM_DEBUG(printCombinedSewLmulProbs(dbgs(), getAllPossibleSewLmulPairs()));
+  LLVM_DEBUG(printCombinedSewLmulProbs(
+      dbgs(), PrimaryCfgGen.getAllPossibleSewLmulPairs()));
+
+  return std::make_pair(std::move(PrimaryCfgGen), HasAvailableOpcodes);
 }
 
-RVVPrimaryConfig RVVPrimaryConfigGenerator::generate() const {
-  size_t Idx = Dist(RandEngine::engine());
-  return idxToConfig(Idx);
+unsigned RVVPrimaryConfigGenerator::generateIdx(
+    const RVVConfigsDistributionParam &Param) const {
+  return Dist(RandEngine::engine(), Param);
+}
+
+WithAvailability<RVVPrimaryConfig> RVVPrimaryConfigGenerator::generate() const {
+  auto Idx = generateIdx(Dist.param());
+  return {idxToConfig(Idx), HasRVVConfigAvailableOpcodes[Idx]};
+}
+
+WithAvailability<RVVPrimaryConfig>
+RVVPrimaryConfigGenerator::generateRVVModeWithAvailableOpcodes() const {
+  if (!RVVConfigsWithAvailableOpcodes)
+    return generate();
+  auto Idx = generateIdx(*RVVConfigsWithAvailableOpcodes);
+  return {idxToConfig(Idx), /*Availability=*/true};
 }
 
 ProbableItems<RVVPrimaryConfig>
@@ -1433,33 +1547,26 @@ void PrimaryWeightsAndMapping::printProbabilities(raw_ostream &OS) const {
   OS << "\n";
 }
 
-RVVConfiguration RVVConfigGenerator::generate(bool MustUseReducedVL) const {
-  assert((!MustUseReducedVL || PrimaryGenReduced) &&
-         "Requested to sample a mode for VSETIVLI but there "
-         "is no generator for it");
-  assert((MustUseReducedVL || PrimaryGen) &&
-         "Requested to sample a mode for VSETVLI or VSETVL but "
-         "there is no generator for them");
-  // Weights of VSET opcodes can affect the sum of two primary distributions
-  // (which we get when sampling with this generator). In the future, to
-  // account for this, we can shift marginal VL distribution to smaller values
-  // for VSETIVLI and to larger for VSETVL & VSETVLI.
-  //
-  // But this problem has some mathematical limitations:
-  // For example, if we have histogram:
-  //   - [VSETVL, 0.001]
-  //   - [VSETIVLI, 0.999]
-  // It's impossible to satisfy
-  // VL:
-  //   - [100, 0.999]
-  //   - [1, 0.001]
-  auto PrimaryCfg =
-      MustUseReducedVL ? PrimaryGenReduced->generate() : PrimaryGen->generate();
-  auto MA = VmaGen.generate();
-  auto TA = VtaGen.generate();
-  auto XRM = VxrmGen.generate();
+RVVConfiguration
+RVVConfigGenerator::makeRVVConfig(RVVPrimaryConfig &&Cfg) const {
+  return {std::move(Cfg), VmaGen.generate(), VtaGen.generate(),
+          VxrmGen.generate()};
+}
 
-  return RVVConfiguration{PrimaryCfg, MA, TA, XRM};
+WithAvailability<RVVConfiguration>
+RVVConfigGenerator::generate(bool MustUseReducedVL) const {
+  auto [PrimaryCfg, HasAvailableOpcodes] =
+      MustUseReducedVL ? PrimaryGenReduced->generate() : PrimaryGen->generate();
+  return {makeRVVConfig(std::move(PrimaryCfg)), HasAvailableOpcodes};
+}
+
+WithAvailability<RVVConfiguration>
+RVVConfigGenerator::generateWithAvailableOpcodes(bool MustUseReducedVL) const {
+  auto [PrimaryCfg, HasAvailableOpcodes] =
+      MustUseReducedVL
+          ? PrimaryGenReduced->generateRVVModeWithAvailableOpcodes()
+          : PrimaryGen->generateRVVModeWithAvailableOpcodes();
+  return {makeRVVConfig(std::move(PrimaryCfg)), HasAvailableOpcodes};
 }
 
 PrimaryWeightsAndMapping RVVConfigGenerator::getCombinedDistribution(
@@ -1538,15 +1645,6 @@ unsigned computeVLMax(unsigned ELEN, unsigned VLEN, VSEW VSEW, VLMUL LMUL) {
       IsFractional ? (VLEN / SEW / Multiplier) : (VLEN / SEW * Multiplier);
   assert(Result > 0 && "At this point SEW and LMUL are known to be legal");
   return Result;
-}
-
-inline static bool isReservedValues(unsigned ELEN, unsigned SEW, VLMUL LMUL) {
-  if (LMUL == VLMUL::LMUL_RESERVED)
-    return true;
-  auto [Multiplier, IsFractional] = RISCVVType::decodeVLMUL(LMUL);
-  auto MinFracMultiplier = ELEN / SEW;
-  return !isLegalSEW(SEW) || (SEW > ELEN) ||
-         (IsFractional && (Multiplier > MinFracMultiplier));
 }
 
 std::pair<unsigned, bool> computeDecodedEMUL(unsigned ELEN, unsigned SEW,
@@ -1964,9 +2062,23 @@ buildPrimaryDistributionBuilders(const PrimaryDistBuilderSequence &Seq) {
   return Result;
 }
 
-RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
-                                                              unsigned ELEN,
-                                                              unsigned VLEN) {
+static void
+printExcludedConfigsWarn(const detail::RVVConfigSquasher &ConfigSquasher) {
+  for (const auto &ExcludedConfig : ConfigSquasher) {
+    auto ManyCfgs = ExcludedConfig.second.size() > 1;
+    snippy::warn(
+        snippy::WarningName::NoAvailableOpcodeForContext,
+        llvm::formatv(
+            "No opcodes are available to be generated in the following "
+            "RVV mode{}. {} mode{} will be deleted from generation",
+            (ManyCfgs ? "s" : ""), (ManyCfgs ? "These" : "This"),
+            (ManyCfgs ? "s" : "")),
+        llvm::formatv("\n{}", toString(ExcludedConfig)));
+  }
+}
+
+RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(
+    const RISCVSubtarget &ST, const Config &Cfg, unsigned ELEN, unsigned VLEN) {
   auto CSOpt = Cfg.ProgramCfg.TargetConfig->getImpl<RISCVConfigInterface>()
                    .RVVConfig->getImpl<RVVConfig>()
                    .getRVVConfigurationSpace();
@@ -1989,10 +2101,6 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
   const auto &SewLmulDist = buildRawSewLmulDistribution(ELEN, VLEN, CS.VUInfo,
                                                         SwitchInfo.ProbSetVill);
 
-  bool IsPresentVSETIVLI = SwitchInfo.hasVSETIVLI();
-  bool IsPresentNonVSETIVLI = SwitchInfo.hasVSETVL() || SwitchInfo.hasVSETVLI();
-  assert(IsPresentVSETIVLI || IsPresentNonVSETIVLI);
-
   // At *some* point we HAVE TO exclude all VL values that don't have any
   // compatible VMgen. Currently this is done here, by discarding all VLgens
   // that don't have any applicable VMgens. It would be better to discard
@@ -2001,33 +2109,49 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
   // Everything else that is done here, like discarding VLgens for which
   // there're no {SEW, LMUL} combinations or discarding VMgens, is UNNECESSARY
   // and is done only to get discarded names (backward compatibility).
-  auto [VLGenerators, VMGenerators, DiscardedVLNames, DiscardedVMNames] =
-      buildVLVMgenerators(ELEN, VLEN, CS, SewLmulDist,
-                          /*IsOnlyVSETIVLI*/ !IsPresentNonVSETIVLI);
+  bool IsOnlyVSETIVLI = !SwitchInfo.hasVSETVL() && !SwitchInfo.hasVSETVLI();
+  auto VLVM = buildVLVMgenerators(ELEN, VLEN, CS, SewLmulDist, IsOnlyVSETIVLI);
 
   auto PrimaryDistBuilders =
       buildPrimaryDistributionBuilders(CS.VUInfo.PrimaryBuilders);
 
   unsigned MinVMBitWidth = getMinRequestedBitWidth(CS.VUInfo.VM);
-  // One generator for (VSETVLI & VSETVL) and another for VSETIVLI
 
-  std::optional<RVVPrimaryConfigGenerator> PrimaryConfigGen;
-  if (IsPresentNonVSETIVLI)
-    PrimaryConfigGen.emplace(ELEN, VLEN, SewLmulDist, VLGenerators,
-                             MinVMBitWidth, /*BuildForVSETIVLI*/ false,
-                             PrimaryDistBuilders);
+  const auto &Hist = Cfg.DefFlowConfig.DataFlowHistogram.topOpcodes();
+  detail::RVVConfigSquasher CfgSquasher;
+  auto CreateConfigGenerator = [&](bool ForVSETIVLI)
+      -> WithAvailability<std::optional<RVVPrimaryConfigGenerator>> {
+    if (ForVSETIVLI && !SwitchInfo.hasVSETIVLI())
+      return {std::nullopt, false};
+    if (!ForVSETIVLI && IsOnlyVSETIVLI)
+      return {std::nullopt, false};
 
-  std::optional<RVVPrimaryConfigGenerator> PrimaryConfigGenReduced;
-  if (IsPresentVSETIVLI)
-    PrimaryConfigGenReduced.emplace(
-        ELEN, VLEN, SewLmulDist, VLGenerators, MinVMBitWidth,
-        /*BuildForVSETIVLI*/ true, PrimaryDistBuilders);
+    return RVVPrimaryConfigGenerator::create(
+        ELEN, VLEN, SewLmulDist, VLVM.VLGens, MinVMBitWidth, ForVSETIVLI,
+        PrimaryDistBuilders, Hist, ST, CfgSquasher);
+  };
+  // Generator for VSETVLI and VSETVL
+  auto [ConfigGen, HasAvailableOpcodes] =
+      CreateConfigGenerator(/*ForVSETIVLI=*/false);
+  // Generator for VSETIVLI
+  auto [ConfigGenReduced, HasAvailableOpcodesReduced] =
+      CreateConfigGenerator(/*ForVSETIVLI=*/true);
 
+  if (ExcludeRVVConfigsWithoutAvailableOpcodes.getValue())
+    printExcludedConfigsWarn(CfgSquasher);
+
+  // If there are VSET opcodes in the histogram, then we can select them (they
+  // are always valid).
+  bool AvailableOpcodes = SwitchInfo.VSETPresentInHistogram ||
+                          HasAvailableOpcodes || HasAvailableOpcodesReduced;
+  if (!AvailableOpcodes)
+    snippy::fatal("Incorrect RVV setup",
+                  "there are none opcodes available for any RVV configuration");
   RVVConfigGenerator RVVConfigGen(
-      std::move(PrimaryConfigGen), std::move(PrimaryConfigGenReduced),
-      CS.VUInfo.VTYPE.VMA, CS.VUInfo.VTYPE.VTA, CS.VUInfo.VXRM);
-  RVVSupportInfo SupportInfo(CS.VUInfo, std::move(DiscardedVMNames),
-                             std::move(DiscardedVLNames));
+      std::move(ConfigGen), std::move(ConfigGenReduced), CS.VUInfo.VTYPE.VMA,
+      CS.VUInfo.VTYPE.VTA, CS.VUInfo.VXRM);
+  RVVSupportInfo SupportInfo(CS.VUInfo, std::move(VLVM.DiscardedVMNames),
+                             std::move(VLVM.DiscardedVLNames));
 
   return RVVConfigurationInfo{ELEN,
                               VLEN,
@@ -2035,7 +2159,7 @@ RVVConfigurationInfo RVVConfigurationInfo::buildConfiguration(const Config &Cfg,
                               IsArtificialModeChange,
                               NeedsVXRMUpdate,
                               RVVGeneratorInfo(std::move(RVVConfigGen),
-                                               std::move(VMGenerators),
+                                               std::move(VLVM.VMGens),
                                                std::move(SupportInfo))};
 }
 
@@ -2052,13 +2176,15 @@ RVVConfigurationInfo::selectVM(unsigned VL, double NoMaskModeForRVV) const {
   return ApplicableGen->generate(VL, NoMaskModeForRVV);
 }
 
-RVVConfiguration
+WithAvailability<RVVConfiguration>
 RVVConfigurationInfo::selectConfiguration(bool MustUseReducedVL) const {
-  assert(GenInfo && "There must be a generator. Probably VLEN is 0.");
-  auto Cfg = GenInfo->CfgGen.generate(MustUseReducedVL);
+  return GenInfo->CfgGen.generate(MustUseReducedVL);
+}
 
-  assert(!MustUseReducedVL || Cfg.PrimaryCfg.VL <= kMaxVLForVSETIVLI);
-  return Cfg;
+WithAvailability<RVVConfiguration>
+RVVConfigurationInfo::selectConfigurationWithAvailableOpcodes(
+    bool MustUseReducedVL) const {
+  return GenInfo->CfgGen.generateWithAvailableOpcodes(MustUseReducedVL);
 }
 
 ProbableItems<RVVPrimaryConfig>
@@ -2187,15 +2313,13 @@ void RVVConfigurationInfo::print(raw_ostream &OS) const {
   OS << "--- RVV Configuration End  ---\n\n";
 }
 
-RISCVConfigurationInfo
-RISCVConfigurationInfo::constructConfiguration(LLVMState &State,
-                                               const Config &Cfg) {
-  auto &Ctx = State.getCtx();
+RISCVConfigurationInfo RISCVConfigurationInfo::constructConfiguration(
+    LLVMState &State, const Config &Cfg, const RISCVSubtarget &ST) {
   const auto &TM = State.getTargetMachine();
-  auto ArchInfo =
-      RISCVConfigurationInfo::deriveArchitecturalInformation(Ctx, TM);
+  auto ArchInfo = RISCVConfigurationInfo::deriveArchitecturalInformation(
+      State.getCtx(), TM);
   auto BaseCfg = BaseConfigurationInfo(ArchInfo.XLEN);
-  auto RVVCfg = RVVConfigurationInfo::buildConfiguration(Cfg, ArchInfo.ELEN,
+  auto RVVCfg = RVVConfigurationInfo::buildConfiguration(ST, Cfg, ArchInfo.ELEN,
                                                          ArchInfo.VLEN);
 
   if (DumpDiscardedRVVConfigurations.isSpecified())
