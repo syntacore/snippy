@@ -365,7 +365,7 @@ TEST(MemRange, CtorStrangeValues) {
 
   EXPECT_EQ(T1, T2);
 
-  ASSERT_DEATH(MemRange(1, 0), "Illegal Memory Range");
+  ASSERT_DEBUG_DEATH(MemRange(1, 0), "Illegal Memory Range");
 }
 
 // ================  Memory Bank =================
