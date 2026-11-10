@@ -67,7 +67,7 @@ static bool hasPCInRH(const RegistersWithHistograms &RH) {
   assert(NumFound > 0);
 
   if (NumFound > 1)
-    snippy::fatal("Too many programm registers are specified "
+    snippy::fatal("Too many program registers are specified "
                   "in the reg state YAML");
   return true;
 }
@@ -114,7 +114,7 @@ void RISCVRegisterState::loadFromYamlFile(StringRef YamlFile,
 }
 
 void RISCVRegisterState::saveAsYAMLFile(raw_ostream &OS) const {
-  // Under some circumstances rv32 models can behave little bit wierdly:
+  // Under some circumstances rv32 models can behave little bit weirdly:
   // namely, they can unexpectedly update high part of 64-bit storage for
   // 32-bit register. So we have to manually truncate the state to avoid
   // discrepancies between different models
@@ -705,7 +705,7 @@ static void auxSimInit(const RISCVSubtarget &Subtarget,
   // user mode. Some extensions (like F), require some CSRs
   // to be programmed - this can be done only from privileged mode.
   // The code below ensures that appropriate CSRs are
-  // set to a value that allows using instructions from such extenstions
+  // set to a value that allows using instructions from such extensions
   // without raising an interrupt (using "DPI" calls to simulator)
   if (Subtarget.hasStdExtV()) {
     // MSTATUS.VS = Initial
