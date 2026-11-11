@@ -5,16 +5,16 @@ Overview
 ========
 
 ``llvm-ie`` is a utility tool designed to conveniently extract instructions
-from various computer architectures supported by LLVM based on specific
+from various computer architectures supported by LLVM, based on specific
 criteria.
 
-In LLVM, a wide range of backend components—including instructions, registers,
-and scheduling models—is defined in TableGen (.td) files. The build process
+In LLVM, a wide range of backend components, including instructions, registers,
+and scheduling models, is defined in TableGen (``.td``) files. The build process
 compiles these descriptions into the C++ data structures that form the
 backend's internal representation.
 
 ``llvm-ie`` specifically queries the information derived from instruction
-definitions, which contains rich details such as whether an instruction is a
+definitions, which contains rich details, such as whether an instruction is a
 branch, a call, or accesses memory.
 
 Initially, ``llvm-ie`` was created to extract RISC-V instructions belonging to
@@ -23,7 +23,7 @@ include architecture-independent filters and a modular design for adding new
 architecture backends.
 
 While the tool was originally developed as a helper utility for
-``llvm-snippy``, which uses it to eliminate boilerplate code, we believe
+``llvm-snippy``, which uses it to eliminate boilerplate code,
 ``llvm-ie`` can be useful in other scenarios as well.
 
 Running llvm-ie

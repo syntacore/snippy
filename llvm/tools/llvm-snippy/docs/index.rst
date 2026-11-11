@@ -14,7 +14,7 @@ Overview
 ========
 
 LLVM-snippy is a random test generator (RTG) based on LLVM. It currently
-supports RISC-V and AArch64(experimental), but can potentially support any target.
+supports RISC-V and AArch64 (experimental) but can potentially support any target.
 
 LLVM-snippy generates snippets |nbsp| -- |nbsp| sequences of randomly selected
 machine instructions with randomly selected registers, immediates, and other
@@ -35,21 +35,21 @@ Disclaimers on Versioning
 LLVM-snippy versioning works as follows:
 
 -  Settings that are compatible with one minor version are always
-   compatible with any other minor version. Example: any configuration
+   compatible with any other minor version. For example, any configuration
    that works in 1.3, will work in 1.7, and any newer 1.x version.
 
 -  The same snippy version with the configuration that has the same seed
-   value for one platform works for any other platform. Example: any
+   value for one platform works for any other platform. For example, any
    configuration for snippy 1.7 and ``seed=42`` will generate the same
    snippet on Ubuntu and CentOS.
 
 -  Different snippy versions for the same seed value do not generate the
-   same snippet. Example: the same configuration with ``seed=42`` will
+   same snippet. For example, the same configuration with ``seed=42`` will
    generate different snippets for snippy 1.3 and 1.7.
 
 .. important::
 
-   No ISG is a ready-made verification solution. Implementing any
+   No ISG is a ready-to-use verification solution. Implementing any
    solution requires additional work.
 
 .. _`_input`:
@@ -57,12 +57,12 @@ LLVM-snippy versioning works as follows:
 Input
 -----
 
-You run snippy based on one or more YAML configuration files you
+You run snippy using one or more YAML configuration files you
 provide. In the configuration file(s), you specify:
 
--  Memory sections available for read, read and write, read and execute
+-  Memory sections available for read, read/write, and read/execute access
 
--  Histogram of the probabilities of instructions
+-  Histogram of instruction probabilities 
 
 -  Memory access
 
@@ -72,13 +72,14 @@ provide. In the configuration file(s), you specify:
 
 -  Initial state
 
-If you run snippy based on more than one YAML file, it will concatenate all
-of the specified and included files and parse it as a single YAML document.
-As snippy`s configuration consists of several top-level YAML keys each of
-them should appear no more than once through all of the input files.
+If you run snippy with more than one YAML file, it concatenates all
+specified and included files and parses it as a single YAML document.
+As snippy`s configuration consists of several top-level YAML keys, each of
+them must not appear more than once across all input files.
 
 .. note::
-  You can print resulting "preprocessed" configuration using **-E** option
+
+  You can print the resulting "preprocessed" configuration using the ``-E`` option.
 
 .. _`_output`:
 
@@ -87,29 +88,28 @@ Output
 
 The snippy output includes:
 
--  An .elf file with a generated snippet. File name is specified via
-   **-o** option (default is the name of your config file with ".elf"
-   suffix appended). For more information, see
-   `The type of output .elf file`_.
+-  An ``.elf`` file with a generated snippet. The file name is specified via the
+   ``-o`` option. Default is the name of your configuration file with the ".elf"
+   suffix appended. For more information, see `Type of Output .elf File`_.
 
--  An optional execution trace of generated snippet. The trace is only
-   generated if simulator model was provided. You can specify the file
-   to output trace with **-trace-log** option (Default is stdout).
+-  An optional execution trace of the generated snippet. The trace is only
+   generated if a simulator model was provided. You can specify the file
+   to output trace with the ``-trace-log`` option. Default is ``stdout``.
 
--  A `generated linker script`_ file. The name of
-   file equals to the name of generated ELF file with ".elf" suffix
+-  A `generated linker script`_ file. The file name
+   equals the name of the generated ELF file with the ".elf" suffix
    replaced with ".ld". It is required, for example, for `global constants`_.
 
 -  An optional `selfcheck annotation file`_.
    The file name matches the name of the generated ELF file,
-   but with the suffix ".elf" replaced by ".selfcheck.yaml".
+   but with the ".elf" suffix replaced by ".selfcheck.yaml".
 
 -  Dump of the registers state after execution. To produce the register
-   state use **--dump-registers-yaml** option. See
+   state, use the ``--dump-registers-yaml`` option. See
    `Final Registers State <#final-registers-state>`__.
 
--  Dump of the registers state before execution. To produce the the
-   register state use **--dump-initial-registers-yaml** option.
+-  Dump of the registers state before execution. To produce the
+   register state, use the ``--dump-initial-registers-yaml`` option.
    See `Dumping Initial
    Registers State <#dumping-initial-registers-state>`__.
 
@@ -118,9 +118,9 @@ The snippy output includes:
 Running Snippy
 ==============
 
-You run snippy using the following as an argument or arguments:
+You run snippy using one of the following as arguments:
 
--  A single YAML file. This approach is preferred. You specify all the
+-  A single YAML file. This approach is preferred. You specify all
    configuration details in one file and use it as a single argument to
    run snippy on without having to provide numerous settings via the
    command line.
@@ -129,7 +129,7 @@ You run snippy using the following as an argument or arguments:
    files together and uses the resulting configuration as the layout for
    your output snippet.
 
-You can see all available snippy parameters and options in its embedded
+You can see all available snippy parameters and options in the embedded
 help. To open it, run:
 
 ::
@@ -138,7 +138,7 @@ help. To open it, run:
 
 To run snippy:
 
-1. Create one or more configuration files with all the required data in
+1. Create one or more configuration files with all required data in
    the snippy root directory. The mandatory keys of a snippy
    configuration are `sections <#sections>`__ and
    `histogram <#histogram>`__.
@@ -166,15 +166,15 @@ To run snippy:
 Adding Options
 --------------
 
-You specify `options <#options>`__ to run snippy on in the
+Specify `options <#options>`__ to run snippy on in the
 configuration file(s) under the ``options`` key. Though the ``options``
 key is not mandatory, if you decide to add them, the preferred approach
 is to have them all in one place.
 
 Alternatively, you can specify the options via the command line when
-running snippy, though it is a less preferable approach. As with several
+running snippy, though it is a less-preferred approach. As with several
 configuration files, if you provide several command-line options, snippy
-then combines and adds them to the resulting configuration. For example:
+then combines them and adds them to the resulting configuration. For example:
 
 ::
 
@@ -183,8 +183,8 @@ then combines and adds them to the resulting configuration. For example:
 .. important::
 
    The syntax of specifying options in a YAML file and in the command
-   line is different. As the preferred approach is to provide options
-   via a configuration file, all the examples in this guide present the
+   line is different. Since the preferred approach is to provide options
+   via a configuration file, all examples in this guide present the
    respective format. However, for some options, the guide provides
    examples of both approaches.
 
@@ -206,7 +206,7 @@ Limitations
 Printing Snippy Output
 ~~~~~~~~~~~~~~~~~~~~~~
 
-If you want to verify everything is correct and the way you want it to
+If you want to verify that everything is correct and the way you want it to
 be, you can dump the resulting snippy configuration after it is
 pre-processed using the following command-line option:
 
@@ -244,7 +244,7 @@ configuration must be unique. For the details on includes, refer to
 Layout Example
 --------------
 
-Following is an example of the configuration layout that contains:
+Following is an example of a configuration layout that contains:
 
 -  Mandatory ``sections`` and ``histogram`` keys
 
@@ -292,8 +292,8 @@ Following is an example of the configuration layout that contains:
        trace-log: trace.log
        model-plugin: spike
 
-You may try layout-example.yaml from examples on github or from yml/ and
-share/examples/ folder in this release as follows and disassemble to see
+You may try ``layout-example.yaml`` from examples on GitHub or from the ``yml/`` and
+``share/examples/`` folders of this release, and disassemble to see the
 generated snippet.
 
 ::
@@ -302,19 +302,19 @@ generated snippet.
       -o layout-example-1000.elf
    objdump -d layout-example-1000.elf >& layout-example-1000.dis
 
-As set by the ``rx`` and ``rw`` access parameters ``sections``, snippy will
+As set by the ``rx`` and ``rw`` access parameters of ``sections``, snippy will
 write the code to section ``1``, and loads/stores will go to/from section
 ``2``.
 
-Better always specify seed for reproducibility. If you dont, then snippy will
-show you which was used.
+Always specify the seed for reproducibility. If you do not, snippy will
+show you which one was used.
 
 In this example, ``options`` are:
 
 **-mtriple**
 
 Target architecture specification, mandatory. Snippy is potentially
-multi-target. In further releases, snippy will support a number of arch
+multi-target. In future releases, snippy will support a number of architecture
 specifications (x86, ARM, etc).
 
 **-mcpu**
@@ -323,12 +323,12 @@ CPU model. If empty, snippy auto-detects it.
 
 **-march**
 
-The *ISA string* that specifies an architecture for which to generate code.
+The *ISA string* that specifies the architecture for which to generate code.
 The value must be in lowercase.
 See `Platform Support`_ for information about supported architectures.
 
 Alternatively, instead of ``march``, you can use the
-``mattr`` option: in the case with the example above,
+``mattr`` option: in the case of the example above,
 it is ``+f,+c,+zifencei``.
 
 **-mattr**
@@ -337,7 +337,7 @@ Indicates which attributes to include (``+``) or exclude (``-``). For example:
 
 -  If you want to exclude RISC-V atomics, use ``-mattr=-a``.
 
--  If you want to include RISC-V vector instructions (V extension), use ``-mattr=+v``.
+-  If you want to include RISC-V vector instructions (the V extension), use ``-mattr=+v``.
 
 
 **-model-plugin**
@@ -347,11 +347,11 @@ Hardware model plugin you want to use. Available values:
 -  ``None`` (default) |nbsp| -- |nbsp| Disables snippet execution on
    a model.
 -  ``spike``, ``<PATH>/riscv-spike-plugin.so``, or
-   ``riscv-spike-plugin.so`` (preferable).
+   ``riscv-spike-plugin.so`` (preferred).
 -  ``whisper``, ``<PATH>/riscv-whisper-plugin.so``, or
-   ``riscv-whisper-plugin.so`` (preferable).
+   ``riscv-whisper-plugin.so`` (preferred).
 
-Where ``<PATH>`` is the parent directory of llvm-snippy executable
+Where ``<PATH>`` is the parent directory of the llvm-snippy executable.
 
 **-num-instrs**
 
@@ -381,7 +381,7 @@ the target executable section is full.
 
 **-seed**
 
-Seed for the instruction generation. If you do not
+Seed for instruction generation. If you do not
 provide this option, snippy picks a random value.
 
 Snippy considers programs with the same options and
@@ -406,7 +406,7 @@ use them as templates for your configurations.
 Top-Level Layout Keys
 ---------------------
 
-Top-level keys provide all the configuration parameters for your snippy run.
+Top-level keys provide all configuration parameters for your snippy run.
 
 Although you can run snippy on more than one YAML file, you cannot
 divide the same top-level key into more than one YAML file or have the
@@ -431,8 +431,8 @@ configuration for snippy to be.
 Sublayouts
 ----------
 
-You can also use sublayouts using the ``include`` key in your YAML
-configuration file of via the command line. For example:
+You can also use sublayouts with the ``include`` key in your YAML
+configuration file or via the command line. For example:
 
 .. code:: yaml
 
@@ -448,21 +448,21 @@ configuration file of via the command line. For example:
    histogram:
      - [FMUL_D, 1.0]
 
-All keys of the configuration must be unique. This way, you need to
-verify your sublayouts do not duplicate the keys you provide otherwise.
+All keys of the configuration must be unique. Therefore, you need to
+verify that your sublayouts do not duplicate the keys you provide otherwise.
 For example, if you provide ``sections`` and ``histogram`` in a "main"
 configuration file, you cannot have the same keys in any sublayout files
-that you use with this configuration one.
+that you use with this configuration.
 
 Snippy adds a relative path to the "main" layout to all its includes. To
-add an extra directory where to look for include files, use the
+add an extra directory to look for include files in, use the
 ``--layout-include-dir`` option. You can specify this option more than
 once for different directories.
 
 .. important::
 
-   If you use the same opcode more than once for ``histogram``, the
-   program displays a warning but does not stop the processing. In such
+   If you use the same opcode more than once in ``histogram``, the
+   program displays a warning but does not stop processing. In such
    a case, snippy takes the required relative weight from the last
    mentioned place (i.e., from the last sublayout file that contains
    this opcode).
@@ -547,7 +547,7 @@ Running Snippy with Sublayouts
 
    1. The name of the main layout file you provide is ``main.yaml``.
 
-   2. The ``main.yaml`` file contains all the necessary options, so you
+   2. The ``main.yaml`` file contains all necessary options, so you
       do not need to provide them via the command line.
 
    3. You want to use ``memory.yaml`` that comes with the snippy package
@@ -564,7 +564,7 @@ In the snippy root directory, run:
 Basic Configuration
 ===================
 
-Mandatory keys of a basic configuration for snippy are
+The mandatory keys of a basic configuration for snippy are
 `sections <#sections>`__ and `histogram <#histogram>`__.
 Additionally, as a part of your basic configuration for snippy, you can
 provide details for `immediate histograms <#immediate-histograms>`__
@@ -578,7 +578,7 @@ Sections
 The ``sections`` key provides a list of sections for the output file
 with the following details for each entry:
 
--  ``name`` |nbsp| -- |nbsp| Section number (in previous versions ``no``, currently disabled).
+-  ``name`` |nbsp| -- |nbsp| Section number (in previous versions ``no``, currently disabled)
 
 -  ``VMA`` |nbsp| -- |nbsp| Virtual memory address
 
@@ -588,8 +588,8 @@ with the following details for each entry:
 
 -  ``ACCESS`` |nbsp| -- |nbsp| Access type indication (``r``, ``rx``, ``rw``, ``rwx``)
 
-   Each RW section uses a default memory scheme (aligned): each and
-   whole section is addressed aligned by the subtarget information.
+   Each RW section uses a default memory scheme (aligned): each
+   entire section is addressed aligned with the subtarget information.
 
    You can use different memory access schemes for different sections
    within a single layout |nbsp| -- |nbsp| in this case, you need to provide additional
@@ -614,7 +614,7 @@ with the following details for each entry:
    -  Manually for each section in the layout.
 
    -  Using the ``-enable-phdrs-definition`` setting. If you set it to
-      ``true``, snippy defines all the program headers that are used by
+      ``true``, snippy defines all program headers that are used by
       the sections in the layout in the linker script.
 
       Regardless of how you provide the ``PHDR`` values, snippy outputs
@@ -630,7 +630,7 @@ The ``histogram`` key covers a list of instructions you want snippy to
 use and their relative weights (floating point).
 
 For certain architecture configurations, you must set the names of
-instructions the same way as in the machine description. For the
+instructions in the same way as in the machine description. For the
 details, refer to `Operation Codes for Specific
 Architecture <#operation-codes-for-specific-architecture>`__ below.
 
@@ -648,7 +648,7 @@ The ``histogram`` key supports regex. For example:
 
 Patterns
 ~~~~~~~~
-In addition to just opcodes, you can specify patterns in the histogram. For example:
+In addition to opcodes, you can specify patterns in the histogram. For example:
 
 .. code:: yaml
 
@@ -659,7 +659,7 @@ In addition to just opcodes, you can specify patterns in the histogram. For exam
      - [ADDI, 1.0]
      - [LUI, 1.0]
 
-A pattern is a sequence of machine instructions (such as *ADD, MUL, LD, SD*) that
+A pattern is a sequence of machine instructions (such as *ADD*, *MUL*, *LD*, and *SD*) that
 together perform a specific, complex action defined by the user. Patterns can be
 specified in the dedicated `Histogram Patterns`_ field.
 
@@ -821,7 +821,7 @@ or
 Immediate Histograms
 --------------------
 
-In your layout, use the ``imm-hist`` key to specify what immediate
+In your layout, use the ``imm-hist`` key to specify which immediate
 values to use for instructions and their probability. For example, you
 can use it to generate load-from-load sequences.
 
@@ -850,13 +850,13 @@ You can specify:
             - [3, 1.0]
           - ".+": uniform
 
-   This example sets to generate ADDI that matches against the first
-   ``"ADDI"`` regex, even though it also matches against the next two
+   This example generates ADDI that matches the first
+   ``"ADDI"`` regex, even though it also matches the next two
    entries (``"ADDI?"`` and ``".+"``), as it is the first one in the
    configuration that matches this particular opcode. This way, ADDI’s
    immediates with this configuration can only be either 1 or 2.
 
-You can find sample layouts that include ``imm-hist`` keys for different
+You can find sample layouts that include the ``imm-hist`` key for different
 configurations in the ``./yml`` directory.
 
 ::
@@ -865,7 +865,7 @@ configurations in the ``./yml`` directory.
 
 .. important::
 
-   When using immediate histogram with memory instructions, note that constant registers
+   When using an immediate histogram with memory instructions, note that constant registers
    (such as x0 on RISC-V) will not be used as the base address register.
 
 .. _`_operation_codes_for_specific_architecture`:
@@ -873,7 +873,7 @@ configurations in the ``./yml`` directory.
 Operation Codes for Specific Architecture
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To obtain opcodes available for a certain architecture machine
+To obtain the opcodes available for a certain architecture machine
 description, run:
 
 .. code:: shell
@@ -909,10 +909,10 @@ increasing the diversity of floating-point operations results.
    does not track NaN values in vector registers and does not overwrite them,
    and thus it cannot control the results of Vector Floating-Point Instructions.
 
-The settings of this feature are specified under the
+The settings for this feature are specified under the
 ``fpu-config.overwrite`` key. These settings define:
 
--  When NaN overwriting should happen (``mode`` and ``nan-rewrite-ratio`` keys),
+-  When NaN overwriting should happen (the ``mode`` and ``nan-rewrite-ratio`` keys),
 -  What values should be used to overwrite NaNs
    (``range``, ``ieee-single.valuegram``, ``ieee-double.valuegram``)
 
@@ -990,18 +990,18 @@ where you define the ``overwrite`` settings by the following:
 
 -  ``nan-rewrite-ratio`` |nbsp| -- |nbsp| Sets the proportion of allowed
    NaN values among all values in registers
-   (proporions are tracked separately for each class registers).
+   (proportions are tracked separately for each register class).
    This key is optional, default value is 0.
 
    Value 0 means that snippy does not allow NaNs in registers;
    snippy overwrites them immediately upon detection.
    Non-zero values extend the lifetime of NaNs, which increases the probability
    of "nontrivial" results of floating-point operations. For example, if
-   ``nan-rewrite-ratio`` is 0.25, then NaN overwriting happens if snippy
+   ``nan-rewrite-ratio`` is 0.25, NaN overwriting happens if snippy
    detects that 8 or more registers (either single, double or half precision)
    contain NaNs (8 / 32 = 0.25).
 
-   Normally NaN overwriting is performed as soon as excessive NaNs are detected.
+   Normally, NaN overwriting is performed as soon as excessive NaNs are detected.
    However, there are special cases when NaN overwriting is delayed:
 
    *  When `Burst Mode`_ is used.
@@ -1043,7 +1043,7 @@ also `combine your memory scheme into
 groups <#memory-scheme-groups>`__.
 
 You can use the files in ``./yml`` as templates for your memory scheme.
-For example, the ``memory-aligned.yaml`` file for an example of an
+For example, use the ``memory-aligned.yaml`` file as an example of an
 aligned access.
 
 .. important::
@@ -1056,22 +1056,22 @@ aligned access.
 Selecting Applicable Memory Schemes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Snippy selects applicable memory schemes to use based on the following
+Snippy selects the applicable memory schemes to use based on the following
 information that you provide:
 
--  Maximum size in bytes of each memory access |nbsp| -- |nbsp| that is, how much you
+-  Maximum size in bytes of each memory access |nbsp| -- |nbsp| how much you
    need the instruction to load (``access-size``).
 
    For example, a memory scheme has the access size set to ``2``, and
    you provide the following:
 
-   -  ``LB`` (load byte) |nbsp| -- |nbsp| Access size 1 byte
+   -  ``LB`` (load, byte) |nbsp| -- |nbsp| Access size 1 byte
 
    -  ``LH`` (load, half-word) |nbsp| -- |nbsp| Access size 2 bytes
 
-   -  ``LW`` (load-word) |nbsp| -- |nbsp| Access size 4 bytes
+   -  ``LW`` (load, word) |nbsp| -- |nbsp| Access size 4 bytes
 
-   -  ``LD`` (load double word) |nbsp| -- |nbsp| Access size 8 bytes
+   -  ``LD`` (load, double word) |nbsp| -- |nbsp| Access size 8 bytes
 
       In this case, only the ``LB`` and ``LH`` instructions can use
       addresses from this memory scheme.
@@ -1080,8 +1080,8 @@ information that you provide:
    Instructions in Memory
    Schemes <#rvv-instructions-in-memory-schemes>`__.
 
--  Alignment. Though alignment is not a parameter of memory schemes, you
-   must consider it when it is required in the instruction (for example,
+-  Alignment. Although alignment is not a parameter of memory schemes, you
+   must consider it when the instruction requires (for example,
    with ``riscv-disable-misaligned-access`` set to ``true``). In this
    case, addresses that are not aligned at least on the instruction
    access size will not be used.
@@ -1092,7 +1092,7 @@ information that you provide:
 RVV Instructions in Memory Schemes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Vector instructions work on a group of elements simultaneously.
+Vector instructions operate on a group of elements simultaneously.
 
 Snippy supports the following memory-related vector instructions:
 
@@ -1136,8 +1136,9 @@ this case, snippy uses the algorithm described in `Selecting Applicable
 Memory Schemes <#selecting-applicable-memory-schemes>`__ as for any
 basic scalar instructions.
 
-Snippy does not guarantee that a stride bigger than the element size will
-be chosen, even a stride equal to zero is possible by default. See `Memory Strides <#memory-strides>`__ for more details and how to override this behavior.
+Snippy does not guarantee that a stride larger than the element size will
+be chosen, even a stride equal to zero is possible by default. See
+`Memory Strides <#memory-strides>`__ for details and to learn how to override this behavior.
 
 For more details on strided instructions, refer
 `here <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc#75-vector-strided-instructions>`__.
@@ -1150,7 +1151,7 @@ Unit-Stride Load/Store
 Vector unit-stride operations access elements stored contiguously in
 memory starting from the base effective address.
 
-This way, if VL is set to ``2`` and misaligned accesses are disabled,
+Thus, if VL is set to ``2`` and misaligned accesses are disabled,
 instruction ``vle32.v`` (element size is 4 bytes) can access memory at
 the following addresses: ``[0-3, 4-7]`` or ``[4-7, 8-11]``, etc.
 
@@ -1159,7 +1160,7 @@ instruction works on 4 elements with the size of ``4`` each, the
 resulting access size is considered ``16`` (4x4). Then, snippy selects
 the memory schemes that allow such access along with the rest of the
 algorithm described in `Selecting Applicable Memory
-Schemes <#selecting-applicable-memory-schemes>`__ with the alignment on
+Schemes <#selecting-applicable-memory-schemes>`__ with the alignment of
 one element (``4``, not ``16``).
 
 For more details on unit-stride instructions, refer
@@ -1171,10 +1172,10 @@ Indexed Load/Store
 ^^^^^^^^^^^^^^^^^^
 
 Vector indexed operations add the contents of each element of the vector
-offset operand to the base effective address to give the effective
+offset operand to the base effective address to obtain the effective
 address of each element. Any memory scheme that suits the restrictions
 of an individual element of this instruction can be selected based on
-the algorithm described in ``<>``.
+the algorithm described in `Selecting Applicable Memory Schemes <#selecting-applicable-memory-schemes>`__.
 
 For example, the base address is ``4``, and the selected scheme allows
 accesses ``0``, ``2``, ``4``, ``6``, ``8``. Snippy tries to generate
@@ -1214,7 +1215,7 @@ For more details on the segment instructions, refer
 Memory Strides
 ~~~~~~~~~~~~~~
 
-Snippy uses memory strides to amplify the test randomization.
+Snippy uses memory strides to increase the test randomization.
 
 In the basic process, snippy:
 
@@ -1223,7 +1224,7 @@ In the basic process, snippy:
    Schemes <#selecting-applicable-memory-schemes>`__.
 
 2. Generates a strided instruction |nbsp| -- |nbsp| an instruction that can navigate
-   through the selected memory scheme by the stride you specify. Such
+   through the selected memory scheme with the stride you specify. Such
    instructions simultaneously access not one address, but several.
 
 Use ``memory.yaml`` for a reference on a memory scheme with strides:
@@ -1259,13 +1260,14 @@ where:
 
 -  ``stride`` |nbsp| -- |nbsp| Stride size
 
--  ``first offset`` |nbsp| -- |nbsp| Number of the first available bit in a stride, which access can start from
+-  ``first-offset`` |nbsp| -- |nbsp| Number of the first available bit in a stride, which access can start from
 
--  ``last offset`` |nbsp| -- |nbsp| Number of the last available bit in a stride, which access can start from
+-  ``last-offset`` |nbsp| -- |nbsp| Number of the last available bit in a stride, which access can start from
 
 -  ``max-past-last-offset`` |nbsp| -- |nbsp| Maximum number of bits after ``last-offset`` that can be accessed (optional).
 
--  ``access-size`` |nbsp| -- |nbsp| Access size (optional). If it is specified than this range can only be used for accesses not exceeding ``access-size`` bytes per one memory access.
+-  ``access-size`` |nbsp| -- |nbsp| Access size (optional). If it is specified,
+   then this range can only be used for accesses not exceeding ``access-size`` bytes per memory access.
 
 
 -  ``weight`` |nbsp| -- |nbsp| Optional value, relative probability of this access range. If you omit it, snippy considers it as ``1``.
@@ -1275,17 +1277,24 @@ as:
 
  **start + stride * rand(0 .. size/stride) + rand(first-offset .. last-offset)**
 
-This formula shows which addresses can be generated as operands of memory instructions, but it does not take into account how many bytes the instruction touches. By default, the instruction can affect any number of bytes so that the ``start + size`` of ``access-ranges`` is not exceeded.
+This formula shows which addresses can be generated as operands of memory instructions,
+but it does not take into account how many bytes the instruction accesses. By default,
+the instruction can access any number of bytes as long as ``start + size`` of ``access-ranges`` is not exceeded.
 
-In order to regulate all bytes that are accessed, there are two optional fields ``access-size`` and ``max-past-last-offset``. The first ensures that this memory scheme will not be used for instructions with an access size greater than ``access-size``. The second allows you to control how far access can exceed ``last-offset``, the offset of the last byte to which access is allowed is ``last-offset`` + ``max-past-last-offset``. This way you can generate accesses of ``access-size`` bytes without accessing bytes after ``last-offset`` + ``max-past-last-offset``.
+To regulate all bytes that are accessed, there are two optional fields, ``access-size``
+and ``max-past-last-offset``. The first ensures that this memory scheme is not used for
+instructions with an access size greater than ``access-size``. The second allows you to control
+how far access can exceed ``last-offset``, the offset of the last byte to which access is allowed is
+``last-offset`` + ``max-past-last-offset``. This way you can generate accesses of ``access-size`` bytes without
+accessing bytes after ``last-offset`` + ``max-past-last-offset``.
 
 .. note::
-   In order to be able to start accessing memory from the byte with ``last-offset``,
+   To be able to start accessing memory from the byte with ``last-offset``,
    the parameter ``max-past-last-offset`` must be greater than or equal to 1.
 
 .. note::
 
-   It makes no sense to set a ``max-past-last-offset`` greater than ``access-size``,
+   Setting ``max-past-last-offset`` greater than ``access-size`` is pointless,
    because access will never exceed ``access-size`` anyway.
 
 .. important::
@@ -1293,7 +1302,8 @@ In order to regulate all bytes that are accessed, there are two optional fields 
    No matter how large the ``max-past-last-offset`` and ``access-size`` values are,
    the start of access must always be in the interval [``first-offset``, ``last-offset``].
 
-See the memory scheme examples for different offsets in the `example <mem-scheme-image>` . Here, the bytes that can be accessed are indicated in red. The yellow color indicates the bytes accessed by the memory instruction.
+See the memory scheme examples for different offsets in the example below. Here,
+the bytes that can be accessed are indicated in red. The yellow color indicates the bytes accessed by the memory instruction.
 
 .. _mem-scheme-image:
 
@@ -1355,9 +1365,9 @@ Use ``eviction.yaml`` for a reference on a memory eviction scheme:
 
 where:
 
--  ``mask`` |nbsp| -- |nbsp| Bites that can be changed
+-  ``mask`` |nbsp| -- |nbsp| Bits that can be changed
 
--  ``fixed`` |nbsp| -- |nbsp| Fixed bites
+-  ``fixed`` |nbsp| -- |nbsp| Fixed bits
 
 
 -  ``weight`` |nbsp| -- |nbsp| Optional value, relative probability of this access range. If you omit it, snippy considers it as ``1``.
@@ -1438,7 +1448,7 @@ Scheme <#addresses-enumeration-scheme>`__.
 A negative memory scheme tells snippy to not generate any memory
 accesses to the specified memory locations. Use it in combination with
 "positive" memory schemes. "Positive" schemes define possible memory
-accesses, while "negative" schemes apply some restrictions on that
+accesses, while "negative" schemes apply restrictions to those
 accesses.
 
 .. note::
@@ -1476,10 +1486,10 @@ Memory Scheme Adjustments
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use the ``--riscv-disable-misaligned-access`` option to disable
-generation of misaligned loads/stores. This option works even if memory
+generation of misaligned loads/stores. This option works even if the memory
 scheme you select allows such loads/stores.
 
-You can override this setting for a particular access range. To do it, use the
+You can override this setting for a particular access range. To do so, use the
 ``misaligned-access`` key in the definition of an access range. It takes
 priority over ``--riscv-disable-misaligned-access``.
 
@@ -1539,7 +1549,7 @@ Possible values of ``-init-memory=`` are:
           --init-regs-in-elf --trace-log=log \
           -o layout.elf
 
--  ``full`` |nbsp| -- |nbsp| Use this setting to initialize all RW sections from the
+-  ``full`` |nbsp| -- |nbsp| Use this setting to initialize all RW sections in the
    layout with random values.
 
    You can set up a special seed for memory initialization with the
@@ -1559,10 +1569,10 @@ Possible values of ``-init-memory=`` are:
           -o layout.elf
 
 -  ``full-with-addresses`` |nbsp| -- |nbsp| Use this setting to add sections
-   initialized with the addresses you specify here to the output .elf
+   initialized with the addresses you specify here to the output ``.elf``
    file.
 
--  ``runtime`` |nbsp| -- |nbsp| Use this setting to use the initialization function.
+-  ``runtime`` |nbsp| -- |nbsp| Use this setting to enable the initialization function.
    The RW sections will be marked as ``NOLOAD`` and the initialization
    function will be called in runtime to initialize the data section.
 
@@ -1581,9 +1591,9 @@ Possible values of ``-init-memory=`` are:
    .. note::
 
       This option might considerably slow down the generation process.
-      Due to RW memory regions size, execution of such initialization
+      Due to the size of the RW memory regions, execution of such initialization
       function might take a significant amount of time on an SW model.
-      Since output of such a function is deterministic (given that we
+      Since the output of such a function is deterministic (given that we
       know the seed value), llvm-snippy can deduce the values produced
       by such a function quite easily and fast.
 
@@ -1638,7 +1648,7 @@ Possible values of ``-init-memory=`` are:
 Initializing Memory from Results of Another Snippet
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can generate a snippet with memory initialized with results of a
+You can generate a snippet with memory initialized with the results of a
 previously executed snippet. To do this, you need to specify the
 following parameters:
 
@@ -1753,10 +1763,10 @@ The following is an example of a memory scheme group configuration:
 Dumping Memory Access Scheme
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can dump used addresses and reuse them in later runs as the address
+You can dump the used addresses and reuse them in later runs as the address
 scheme.
 
--  To dump the applied "positive" memory access scheme (namely, all the
+-  To dump the applied "positive" memory access scheme (namely, all
    individually used addresses), use the
    ``--dump-memory-accesses[=<filename>]`` option.
 
@@ -1768,7 +1778,7 @@ scheme.
             ./yml/memory-accgroups.yaml -seed=1 \
             --dump-memory-accesses=acc.yaml --num-instrs=1000
 
--  To dump the applied "negative" memory access scheme (namely, all the
+-  To dump the applied "negative" memory access scheme (namely, all
    individually used addresses), use the
    ``--dump-memory-accesses-restricted[=<filename>]`` option. You can
    then use it as a `negative memory
@@ -1797,7 +1807,7 @@ You can use the ``-dump-memory-section`` option to:
 
       ./llvm-snippy -mtriple=riscv64 ./yml/layout.yaml --dump-memory-section=
 
-   In this case, snippy dumps all ``rw`` sections including the
+   In this case, snippy dumps all ``rw`` sections, including the
    ancillary ones (for example, ``selfcheck`` and ``stack``).
 
 -  Dump specific sections with the ``rw`` access. For example:
@@ -1810,7 +1820,7 @@ You can use the ``-dump-memory-section`` option to:
    they are ``rw``.
 
 -  Dump a specific memory range. It creates a record in the output
-   memory section file for this range of the memory. The range records
+   memory section file for this range of memory. The range records
    from the state of the model after execution, so the content of the
    sections memory output depends on the model implementation.
 
@@ -1855,8 +1865,8 @@ Dumping Memory Access Scheme for Burst Groups
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When generating addresses for burst groups, snippy operates not on
-single addresses, but rather on ranges of legal addresses. Snippy
-collects ranges used in burst groups and generates ranges-like schemes
+single addresses, but on ranges of legal addresses. Snippy
+collects ranges used in burst groups and generates range-like schemes
 on the output.
 
 An example for collecting addresses:
@@ -1916,7 +1926,7 @@ scheme <#addresses-enumeration-scheme>`__:
 
    If ``ordered`` is set to ``true``, snippy tries to use the provided
    ranges for burst groups from the access-addresses scheme one by one,
-   and report a warning if it cannot use the current range of the
+   and report a warning if it cannot use the current range of
    addresses for the burst group under generation. When multiple memory
    schemes are passed, any appropriate scheme is selected.
 
@@ -1925,13 +1935,13 @@ scheme <#addresses-enumeration-scheme>`__:
 Burst Mode
 ----------
 
-Burst Mode allows you to combine specified instructions in several
+Burst Mode allows you to combine specified instructions into several
 groups of a specific size in the generated snippet.
 
 The sequences of primary instructions produced in Burst Mode are indivisible,
-i.e. snippy never inserts ancillary instructions into these sequences.
+i.e., snippy never inserts ancillary instructions into these sequences.
 That is why the features that emit ancillary instructions,
-like `NaN Overwriting`_ and `Address Hazard Mode`_,
+such as `NaN Overwriting`_ and `Address Hazard Mode`_,
 are inactive within burst groups.
 
 To manage the burst mode, provide burst mode attributes in your layout
@@ -1939,13 +1949,13 @@ in the ``burst`` key, which you can add:
 
 -  Directly in the configuration file.
 
--  As a sublayout of the configuration file (for example, using the
+-  As a sublayout of the configuration file, for example, using the
    ``.yml/burstdesc.yaml`` file.
 
 .. important::
 
-   Currently, RISC-V VSET instructions, calls and branches can not be
-   generated in a burst group. If an unsupported opcode is specified in the
+   Currently, RISC-V VSET instructions, calls, and branches cannot be
+   generated within a burst group. If an unsupported opcode is specified in the
    custom burst group, it will be generated outside this group.
 
 Following is an example of the ``burst`` key:
@@ -1973,10 +1983,10 @@ where:
    -  ``mixed`` |nbsp| -- |nbsp| Issues groups with mixed loads and stores in one
       group.
 
-   -  ``basic`` |nbsp| -- |nbsp| Is equal to no burst.
+   -  ``basic`` |nbsp| -- |nbsp| Equivalent to no burst.
 
-   -  ``custom`` |nbsp| -- |nbsp| Sets custom grouping configuration. This mode allows
-      to randomly combine different types of opcodes in groups (for
+   -  ``custom`` |nbsp| -- |nbsp| Sets a custom grouping configuration. This mode allows
+      you to randomly combine different types of opcodes into groups (for
       example, all loads and one store in one group, and all other
       stores and fences in another group).
 
@@ -1989,32 +1999,33 @@ where:
 
    .. note::
 
-      You can have an unlimited amount of burst groups and opcodes in
+      You can have an unlimited number of burst groups and opcodes in
       each group.
 
-The example above specifies two different burst groups:
+The example above specifies two burst groups:
 
 1. ``LW`` and ``FENCE`` instructions
 
 2. ``SW`` instructions
 
 Based on these settings, snippy will generate separate permuted groups
-(some groups of LWs and FENCEs, and some groups of SWs) divided by other
-instructions (optionally).
+(some groups of LWs and FENCEs, and some groups of SWs) optionally separated by other
+instructions.
 
 .. note::
 
    The burst config determines which opcodes are generated within burst groups.
-   However, this does not prohibit the use of these opcodes outside of burst groups.
+   However, it does not prohibit the use of these opcodes outside burst groups.
    Although llvm-snippy attempts to generate burst-config opcodes only within burst groups, there is no guarantee.
-   Depending on config complexity, llvm-snippy version, and seed, certain opcodes may bypass the burst group construction, resulting in the generation of standalone primary instructions.
+   Depending on the config complexity, the llvm-snippy version, and the seed, certain
+   opcodes may bypass the burst group construction, resulting in the generation of standalone primary instructions.
    This is normal behavior and not a bug.
 
 .. note::
 
    Burst groups are insensitive to `Random scheduling`_.
    Burst Mode uses its own randomization machinery
-   and produces bursts of primary instructions which should not be
+   and produces bursts of primary instructions that should not be
    mixed with ancillary instructions.
 
 You can then have the result of the generation dumped. For more details,
@@ -2049,7 +2060,7 @@ group can be defined as shown in the example below:
        - [SW, SD]
        - [LW, LD]
 
-In the example we define two base-register groups: stores and loads.
+In the example, we define two base-register groups: stores and loads.
 This prevents an instruction in one group from using the base registers
 assigned to the other group (and vice-versa).
 
@@ -2067,31 +2078,32 @@ Advanced Configuration
 
 Advanced configuration includes keys for:
 
+-  `Register Reservation Config`_
+
+-  `Basic block layout <#basic-block-layout>`__
+
 -  `Branchegrams <#control-flow-branchegrams>`__
 
 -  `Call graph <#call-graph>`__
-
--  `Basic block layout <#basic-block-layout>`__
 
 -  `SMC blocks <#smc-blocks>`__
 
 
 -  `Random scheduling pass <#random-scheduling>`__
 
--  `Register Reservation Config`_
-
 .. _register-reservation:
 
 Register Reservation Config
 ---------------------------
 To control which registers can be read or modified by the generated program
-you can specify ``register-reservation`` top-level YAML key.
+you can specify the ``register-reservation`` top-level YAML key.
 
 .. note::
-   The use of `-reserved-regs-list`_ option is also possible but discouraged
+
+   The use of the `-reserved-regs-list`_ option is also possible but discouraged
    because it reserves registers only for use in primary instructions.
 
-This ``register-reservation`` key contains a sequence of register-to-access map.
+This ``register-reservation`` key contains a sequence of register-to-access maps.
 Example:
 
 .. code:: yaml
@@ -2107,12 +2119,12 @@ Example:
 Each specified register maps to a sequence of access bits. Available options
 here are:
 
-- **R** -- reserves registers for all reads
-- **W** -- reserves registers for all writes
-- **RW** == **R & W** -- reserves registers for all reads and writes [#exception]_
-- **SR** -- Soft-reserves register for read (Can not be read by primary instruction but can be read by ancillary)
-- **SW** -- Soft-reserves register for write (Can not be written by primary instruction but can be modified by ancillary)
-- **SRW** == **SR & SW**-- Soft-reserves register for reads and writes. I.e. no primary instructions can access it
+- **R** -- Reserves registers for all reads
+- **W** -- Reserves registers for all writes
+- **RW** == **R & W** -- Reserves registers for all reads and writes [#exception]_
+- **SR** -- Soft-reserves register for read, cannot be read by primary instruction but can be read by ancillary)
+- **SW** -- Soft-reserves register for write, cannot be written by primary instruction but can be modified by ancillary)
+- **SRW** == **SR & SW**-- Soft-reserves register for reads and writes, that is, no primary instructions can access it
 
 You can also leave access bits sequence empty which means register is not
 reserved at all (default):
@@ -2122,9 +2134,9 @@ reserved at all (default):
    register-reservation:
      - X1: [] # has no effect (can be removed)
 
-.. [#exception] Stack Pointer register can still be used for stack access even
-   if it is reserved as RW but no other instruction will read or modify it.
-   Without this config snippy still will not modify Stack Pointer but can generate
+.. [#exception] The Stack Pointer register can still be used for stack access even
+   if it is reserved as RW, but no other instruction will read or modify it.
+   Without this config, snippy will not modify the Stack Pointer but can generate
    reads from it in primary instructions.
 
 .. note::
@@ -2133,7 +2145,7 @@ reserved at all (default):
   to support primary instructions. For example, instructions that perform
   address materialization (needed to emit loads from memory) are the
   *ancillary* ones. Ditto instructions that initialize registers emitted when
-  the **-init-regs-in-elf** option is specified.
+  the ``-init-regs-in-elf`` option is specified.
 
 Consider an example where we want to reserve registers X10 and X11 for reads
 and modification by primary instructions:
@@ -2147,18 +2159,18 @@ and modification by primary instructions:
      - X11: [SRW] # same because SRW is alias to SR and SW
 
 As mentioned above, the `-reserved-regs-list`_ option
-does not prevent register from being read and modified by ancillary instructions
+does not prevent a register from being read and modified by ancillary instructions
 (i.e. it performs "soft" reservation of registers). Therefore adding register to
-**--reserved-regs-list** is the same as adding it to **register-reservation**
+``--reserved-regs-list`` is the same as adding it to the ``register-reservation``
 config with **SRW**. So the previous :ref:`example <soft-reserve-x1011>` is
-equivalent to adding **-reserved-regs-list=X10,X11** option. And every
-**-reserved-regs-list** option in snippy is internally converted to a
-**register-reservation** config with all mention registers reserved as **SRW**.
+equivalent to adding the ``-reserved-regs-list=X10,X11`` option. And every
+``-reserved-regs-list`` option in snippy is internally converted to the
+``register-reservation`` config with all mentioned registers reserved as **SRW**.
 
 .. warning::
 
-   It is forbidden to use both **register-reservation** config and
-   **-reserved-regs-list** option at the same time
+   It is forbidden to use both the ``register-reservation`` config and
+   the ``-reserved-regs-list`` option at the same time.
 
 You can also use regex to reserve registers (snippy uses whole-word matching).
 The following soft-reserves X10-X17 registers for writes and reserves X1-X4 for
@@ -2185,8 +2197,8 @@ CAN be read by both primary and ancillary instructions.
 
 Snippy can implicitly reserve some registers by default:
 
-- **RISC-V:** Stack Pointer register **X2** is reserved as RW if both **-honor-target-abi** and
-  **external-stack** options are enabled. Otherwise snippy could generate reads
+- **RISC-V:** The Stack Pointer register **X2** is reserved as RW if both ``-honor-target-abi`` and
+  ``external-stack`` options are enabled. Otherwise snippy could generate reads
   of stack pointer in arithmetic operations from histogram making the program
   execution depend on stack location, which is non-reproducible
   if external stack is used.
@@ -2199,7 +2211,9 @@ Register Naming
 RISC-V Floating-point Registers (F, D, Zfh extensions)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-RISC-V floating-point registers should be specified using the following syntax: ``<register-name>_<precision>``.  *register-name* is the name of one of the 32 floating-point registers (``F0`` ... ``F31``), *precision* is a letter, as specified in the RISC-V Instruction Set:
+RISC-V floating-point registers should be specified using the following syntax:
+``<register-name>_<precision>``. *register-name* is the name of one of 32
+floating-point registers (``F0`` ... ``F31``), *precision* is a letter, as specified in the RISC-V Instruction Set:
 
 * ``F`` -- Single precision (32 bit registers)
 
@@ -2207,7 +2221,10 @@ RISC-V floating-point registers should be specified using the following syntax: 
 
 * ``H`` -- Half precision (16 bit registers)
 
-For example, to refer to the ``F4`` register, use one of the following names: ``F4_F``, ``F4_D``, ``F4_H``. ``F4_D`` denotes the whole 64-bit register, ``F4_F`` -- the lower half of the same register (32 bits out of 64), and ``F4_H`` -- the lower quarter of the same register (16 bits out of 64).
+For example, to refer to the ``F4`` register, use one of the following names:
+``F4_F``, ``F4_D``, ``F4_H``. ``F4_D`` denotes the whole 64-bit register, ``F4_F``
+-- the lower half of the same register (32 bits out of 64), and ``F4_H`` -- the lower
+quarter of the same register (16 bits out of 64).
 
 .. note::
    Reserving a floating-point register for one precision results in reserving the same register for all precisions.
@@ -2246,7 +2263,7 @@ memory addresses that correspond to these ranges. Configuration of the
 ``code-layout`` schemes is similar to the configuration of
 ``access-ranges`` in `memory schemes <#memory-scheme>`__.
 
-Address ranges can reference memory from different RX section. For
+Address ranges can reference memory from different RX sections. For
 example, it makes possible code distribution between different RX
 sections.
 
@@ -2275,9 +2292,9 @@ where:
 
 -  ``stride`` |nbsp| -- |nbsp| Stride size.
 
--  ``first offset`` |nbsp| -- |nbsp| Number of the first available bit in a stride.
+-  ``first-offset`` |nbsp| -- |nbsp| Number of the first available bit in a stride.
 
--  ``last offset`` |nbsp| -- |nbsp| Number of the last available bit in a stride.
+-  ``last-offset`` |nbsp| -- |nbsp| Number of the last available bit in a stride.
 
 
 Control Flow (Branchegrams)
@@ -2310,7 +2327,7 @@ How to Add Branchegrams
         - branchegram.yaml
       ...
 
--  Add a ``branches`` key along with the ``sections``, ``histogram``,
+-  Add the ``branches`` key along with the ``sections``, ``histogram``,
    and other keys in your configuration file(s).
 
 .. _`_generating_loops`:
@@ -2526,11 +2543,14 @@ RISC-V branches have limited range depending on the instruction format:
 
 -  **Uncompressed instructions**: ±4 KiB range
 
-Snippy automatically detects when a generated branch cannot reach its destination within the instruction's range limitation. When such a situation occurs, snippy extends the reach by inserting proxy indirect jumps immediately after the branch and redirecting the branch's destination to them.
+Snippy automatically detects when a generated branch cannot reach its destination
+within the instruction range limitation. When such a situation occurs, snippy extends
+the reach by inserting proxy indirect jumps immediately after the branch and redirecting the branch destination to them.
 
 .. important::
 
-   If you consider this automatic behavior unacceptable for your use case, it is your responsibility to ensure that any generated branch can reach its destination. You can do this by limiting code section size.
+   If you consider this automatic behavior unacceptable for your use case, it is your
+   responsibility to ensure that any generated branch can reach its destination. You can do this by limiting code section size.
 
 
 Dumping Control Flow Graphs
@@ -2555,8 +2575,6 @@ dumped:
                  -seed=1 -num-instrs=10 --dump-cfg
    dot -Tpng SnippyFunction-cfg-dump.dot > dump.png
 
-Now you can enjoy generated control flow picture.
-
 .. _`_call_graph`:
 
 Call Graph
@@ -2564,7 +2582,7 @@ Call Graph
 
 Snippy uses call graphs to keep the instructions in a correct order. To
 generate a call instruction, you need to specify instructions that the
-llvm target considers to be 'call' instructions. For example, for RISCV
+llvm target considers to be "call" instructions. For example, for RISC-V
 it is JAL and JALR.
 
 .. important::
@@ -2582,7 +2600,7 @@ For snippy to generate a call graph, you can either use a specific
 configuration file with all its properties (for the details, refer to
 the `External Call Graph <#external-call-graph>`__ chapter), or have it
 generated randomly. In this case, snippy executes calls among the
-generated function according to this randomly generated call graph.
+generated functions according to this randomly generated call graph.
 
 Use the following settings to configure a call graph generation:
 
@@ -2657,7 +2675,7 @@ the layout. Other side effects are allowed.
 
 To specify a call graph:
 
--  Add a ``call-graph`` key to your configuration file(s).
+-  Add the ``call-graph`` key to your configuration file(s).
 
 -  Alternatively, use a predefined YAML file in the command line. For
    example:
@@ -2679,7 +2697,7 @@ To specify a call graph:
    -  ``cg-predefined.yaml`` |nbsp| -- |nbsp| A sample layout file used as the graph
       description.
 
-   -  ``call-graph-dump-filename`` |nbsp| -- |nbsp| The direction where to save the
+   -  ``call-graph-dump-filename`` |nbsp| -- |nbsp| The destination where to save the
       graph dump.
 
    -  ``call-graph-dump-format`` |nbsp| -- |nbsp| The format of the graph dump.
@@ -2792,7 +2810,7 @@ Snippy does not allow random scheduling for some instructions.
 The reasons for this may vary.
 There are instructions whose relocation could
 cause changes in program behavior, which is prohibited.
-For some opcodes, rescheduling is just not implemented yet.
+For some opcodes, rescheduling is not implemented yet.
 
 When snippy encounters instructions for which rescheduling is disallowed,
 it splits the basic block into regions consisting of
@@ -2849,7 +2867,7 @@ Then snippy reschedules instructions within these regions,
 which is faster than rescheduling the entire basic block.
 
 The default limit (max size) is ``131072`` instructions.
-The ``scheduling.max-region-size`` key allows to set the arbitrary limit.
+The ``scheduling.max-region-size`` key allows you to set an arbitrary limit.
 Example:
 
 .. code:: yaml
@@ -2877,7 +2895,7 @@ you pass takes precedence.
 
 At the same time, the options you provide via the configuration files
 have priority over the ones in the includes. The options you provide via
-includes will be merged, and their amount and the order in which you
+includes will be merged, and their number and the order in which you
 pass them does not matter.
 
 See the chapters that follow for details.
@@ -2920,11 +2938,11 @@ enter long lists of options:
 
 .. note::
 
-   Though the preferred approach of specifying snippy options is using a
-   single YAML file with all the required parameters, you can use more
+   Although the preferred approach of specifying snippy options is to use a
+   single YAML file with all required parameters, you can use more
    than one file as an argument and specify the ``options`` key in any
    of them. If you use more than one file to base the snippy run on, it
-   merges the data from all the files and uses it for the run.
+   merges the data from all files and uses it for the run.
 
 .. _`_specifying_settings_as_options_via_command_line`:
 
@@ -2966,7 +2984,7 @@ You can control the errors and warnings you get in your snippy runs. To
 do it, you need to provide one of the following options followed by a
 comma-separated list of warning categories that you want to be affected:
 
--  ``-Wdisable`` |nbsp| -- |nbsp| To disable getting specific warnings. For example:
+-  ``-Wdisable`` |nbsp| -- |nbsp| Disables getting specific warnings. For example:
 
    ::
 
@@ -2975,16 +2993,16 @@ comma-separated list of warning categories that you want to be affected:
    If you try to disable a category that does not exist, you will get an
    error.
 
--  ``-Werror`` |nbsp| -- |nbsp| To treat specific warnings as errors.
+-  ``-Werror`` |nbsp| -- |nbsp| Treats specific warnings as errors.
 
    Some warnings are treated as errors by default:
 
    -  ``non-reproducible-execution``
 
-   You can convert these errors back to warnings by means of ``-Wno-error``,
+   You can convert these errors back to warnings by using ``-Wno-error``,
    as described below.
 
--  ``-Wno-error`` |nbsp| -- |nbsp| To not treat specific warnings as errors (that is,
+-  ``-Wno-error`` |nbsp| -- |nbsp| Does not treat specific warnings as errors (that is,
    to remove them from the list of warnings treated as errors).
 
    ``-Wno-error`` takes priority over ``-Werror``, which makes it
@@ -2998,14 +3016,14 @@ comma-separated list of warning categories that you want to be affected:
    treats all warnings as errors, except for the warnings of the
    ``no-model-exec`` and ``memory-scheme`` categories.
 
-   The opposite is impossible. If you try to disable treating all
+   The opposite is not possible. If you try to disable treating all
    warnings as errors by ``-Wno-error``, and then enable handling some
    warnings as errors via ``-Werror``, the result will be as if no
    ``-Werror`` is specified.
 
 .. note::
 
-   If you specify ``-Werror`` and ``-Wno-error`` options via the command
+   If you specify the ``-Werror`` and ``-Wno-error`` options via the command
    line, every occurrence of each appends to their value. For example,
    ``-Werror=A -Werror=B`` is equivalent to ``-Werror=A,B``.
 
@@ -3032,7 +3050,7 @@ So, if you do not want to keep getting such warnings, pass:
 ABI Option
 ----------
 
-You can set ABI to be used in the generated .elf file. For example:
+You can set ABI to be used in the generated ``.elf`` file. For example:
 
 ::
 
@@ -3059,20 +3077,20 @@ section for snippy to spill ``tp`` and ``gp`` to. For example:
        ACCESS:    rw
    ...
 
-Registers are "soft"-reserved |nbsp| -- |nbsp| reserved register mechanism is no longer
+Registers are "soft"-reserved |nbsp| -- |nbsp| the reserved register mechanism is no longer
 intended to preserve ABI, just to increase registers pressure. This
-means that even reserved register can be used in ancillary instructions.
+means that even a reserved register can be used in ancillary instructions.
 
 You can only reserve registers for main instructions. For more details,
 refer to `Reserving Registers`_.
 
-If one of registers in a spill-list happens to be reserved via the
-``--reserved-regs-list`` option, it will be spilled anyway, and no error
-or warning will be raised.
+If one of the registers in a spill-list happens to be reserved via the
+``--reserved-regs-list`` option, it is spilled anyway, and no error
+or warning is raised.
 
 .. important::
 
-   When ``--honor-target-abi`` option is used, the
+   When the ``--honor-target-abi`` option is used, the
    ``--spilled-regs-list`` option is ignored (if used) and the following
    warning is displayed:
 
@@ -3083,8 +3101,8 @@ or warning will be raised.
 
 .. important::
 
-   If you use this option, you cannot specify in the histogram opcodes that
-   require a stack pointer. (For example, for RISC-V, this is ``C_LWSP``,
+   If you use this option, you cannot specify opcodes that
+   require a stack pointer in the histogram. (For example, for RISC-V, this is ``C_LWSP``,
    ``C_LDSP``, ``C_SWSP``, ``C_SDSP``, ``C_FLWSP``, ``C_FLDSP``, ``C_FSWSP``,
    ``C_FSDSP``, ``C_ADDI16SP``, ``C_ADDI4SPN``.) You get the following error:
 
@@ -3097,10 +3115,10 @@ or warning will be raised.
 
    You must also specify the snippy `stack section <#stack-section>`__.
 
-Preserving caller saved registers
+Preserving Caller-Saved Registers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If generated code by snippy can make calls to external functions, you can request
+If the code generated by snippy can make calls to external functions, you can request
 the preservation of caller-saved registers around those calls.
 
 Setting the option in the configuration file:
@@ -3134,12 +3152,12 @@ Name of Generated Function
 
 The default name of the function produced by llvm-snippy is "SnippyFunction".
 
-This can be changed using ``--entry-point`` option. It allows you to specify
+This can be changed using the ``--entry-point`` option. It allows you to specify
 a custom name for the generated function, which is useful when you want to call
 it from a generic startup code. In case of generating several functions (like
 with `generated-call-graph`_) this option renames the main (entry) function.
 
-For example if we want entry function to be named "test_code":
+For example, if we want the entry function to be named "test_code":
 
 .. code:: yaml
 
@@ -3205,8 +3223,8 @@ where ``<string>`` is a list of registers to spill, for example,
    warning is given.
 
 In the following example, a spilled register (``X1``) is specified via
-the command line. ``X1`` will be spilled in prologue and restored in
-epilogue:
+the command line. ``X1`` will be spilled in the prologue and restored in
+the epilogue:
 
 ::
 
@@ -3228,10 +3246,11 @@ reserve and not use in the snippet code.
    ancillary instructions can still use these reserved registers.
 
 .. warning::
-   This option is deprecated and will be removed in the future major release.
-   We recommend replacing it with `register-reservation`_. Adding register to
-   **--reserved-regs-list** is the same as adding it to **register-reservation**
-   config with **SRW**
+
+   This option is deprecated and will be removed in a future major release.
+   We recommend replacing it with `register-reservation`_. Adding a register to
+   ``--reserved-regs-list`` is the same as adding it to the ``register-reservation``
+   config with **SRW**.
 
 Example for command line:
 
@@ -3270,14 +3289,14 @@ This code will reserve X10 as well as X20-X29 registers.
 
 Register names are described in the `Register Naming`_ section.
 
-Initialization of Registers
----------------------------
+Registers Initialization
+------------------------
 
-Initializing Registers in .elf
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Initializing Registers in ``.elf``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To include initialization of registers with random values into the
-output .elf file, use the ``--init-regs-in-elf`` setting in the command
+output ``.elf`` file, use the ``--init-regs-in-elf`` setting in the command
 line.
 
 If you do not explicitly specify both ``init-regs-in-elf`` and
@@ -3325,7 +3344,7 @@ Dumping Initial Registers State
 
 .. caution::
 
-   This functionality is not supported without model plugin
+   This feature is not supported without a model plugin.
 
 To get a dump with an initial registers state, run:
 
@@ -3350,7 +3369,7 @@ where:
 Loading Initial Registers State
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Snippy supports loading of initial register state from a file to a model.
+Snippy supports loading an initial register state from a file to a model.
 This feature allows you to initialize registers with specific values rather
 than random ones. The file format matches the one snippy uses to save registers
 by means of the ``dump-initial-registers-yaml`` option, which makes it easy to
@@ -3379,7 +3398,7 @@ Value Histogram (Valuegram)
 Configure a valuegram to initialize registers with values from a given
 set before execution.
 
-You can provide the data for a valuegram in a form of sequences and
+You can provide the data for a valuegram in the form of sequences and
 mappings. They are backward compatible, and you can use both or either
 of them, since they describe equal values. For example:
 
@@ -3407,7 +3426,7 @@ of them, since they describe equal values. For example:
          weight: 1.0
    ...
 
-where ``type`` options include:
+where the ``type`` options include:
 
 -  ``bitvalue`` |nbsp| -- |nbsp| Specific bit value. You can provide a value in two
    formats:
@@ -3507,7 +3526,7 @@ For example:
 
 .. _`_operands_reinitialization`:
 
-Operands reinitialization
+Operands Reinitialization
 -------------------------
 
 You can per-opcode reinitialize all initializable operand registers using
@@ -3515,7 +3534,7 @@ You can per-opcode reinitialize all initializable operand registers using
 
 .. important::
 
-   Specifying ``operands-reinitialization`` with specified ``--valuegram-operands-regs``
+   Specifying ``operands-reinitialization`` together with the ``--valuegram-operands-regs``
    option is prohibited.
 
 .. container:: formalpara-title
@@ -3544,24 +3563,24 @@ You can per-opcode reinitialize all initializable operand registers using
                     - [-nan, 1.0] # Negative qNaN
                   - -inf
 
-As you can see in the given example, operands-reinitialization is a list of
+As you can see in the example, operands-reinitialization is a list of
 weighted data sources. The weight field is optional (1.0 by default) and
 it determines the probability with which this data source will be selected
 before each primary instruction initialization.
 
-Currently, only ``valuegram`` data source type is supported. It should include:
+Currently, only the ``valuegram`` data source type is supported. It should include:
 
--  ``opcodes`` |nbsp| -- |nbsp| the list of the weighted valuegram opcode settings,
+-  ``opcodes`` |nbsp| -- |nbsp| The list of the weighted valuegram opcode settings,
    which consist of an opcode regex and a list of weighted value sources.
 
    Value sources ``type`` includes:
 
-   - ``uniform`` |nbsp| -- |nbsp| all considering operands will be reinitialized with
+   - ``uniform`` |nbsp| -- |nbsp| All considering operands will be reinitialized with
      uniformly generated values.
 
    - ``operands`` |nbsp| -- |nbsp| specific values for each operand.
 
-      - ``values`` |nbsp| -- |nbsp| the ordered list of values. Floating point syntax
+      - ``values`` |nbsp| -- |nbsp| The ordered list of values. Floating point syntax
         and uniform are supported. The number of values must be equal to the number of
         initializable operands of all instructions that this regex matches. Also you
         can specify each value via valuegram, the same way as in the **histograms** and
@@ -3591,10 +3610,11 @@ Final Registers State
 .. important::
 
    The state is obtained from the model, so this functionality is not
-   supported without model plugin.
+   supported without a model plugin.
 
 .. caution::
-   It is not recommended to use the results of comparison of the final
+
+   It is not recommended to use the results of comparing the final
    registers state obtained from the model with the state obtained from the
    device-under-the-test as a pass/fail criterion for the test. Such an
    approach may lead to false failures unless the ``initial-regs-yaml`` option
@@ -3624,7 +3644,7 @@ Execution Log
 
 .. important::
 
-   Currently, this functionality does not supported without model plugin
+   This feature is not supported without a model plugin.
 
 By default, snippy prints the model execution log from a plugin to the
 standard output. To redirect the log:
@@ -3632,7 +3652,7 @@ standard output. To redirect the log:
 -  To a specific file, use the ``--trace-log <filename>`` option.
 
 -  To a standard error (instead of the standard output), use ``-``
-   instead of ``<filename>``, For example: ``--trace-log -``.
+   instead of ``<filename>``, for example, ``--trace-log -``.
 
 The program injects a special watermark line
 
@@ -3648,14 +3668,14 @@ Address Hazard Mode
 
 .. important::
 
-   This feature is not supported without model plugin.
+   This feature is not supported without a model plugin.
 
-In this mode, snippy tries to create a data dependency when forming an
-address part of the memory instruction. To enable this mode use the
+In this mode, snippy tries to create a data dependency when forming the
+address part of the memory instruction. To enable this mode, use the
 ``--enable-address-value-hazards`` option.
 
 In the following example, an address for the second load in the register
-``s1`` is formed by transforming it by adding the ``a0`` register value.
+``s1`` is formed by transforming it, adding the ``a0`` register value.
 That way, the value of ``s1`` that was formed by the first load becomes
 important, and a data hazard is formed here:
 
@@ -3696,7 +3716,7 @@ Add a stack section in the following cases:
    `--honor-target-abi option <#generating-abi-with-respect-to-target>`__ to properly save
    the register state.
 
-To specify ``stack``, add a ``stack`` section in the layout file. This
+To specify ``stack``, add a ``stack`` section to the layout file. This
 makes the stack location and size configurable. For example:
 
 ::
@@ -3763,7 +3783,7 @@ The options are:
 
 -  ``SP`` |nbsp| -- |nbsp| Stack pointer register specified by the ABI.
 
--  ``any-not-SP`` |nbsp| -- |nbsp| Any random suitable register except for SP.
+-  ``any-not-SP`` |nbsp| -- |nbsp| Any random suitable register except SP.
 
 **Default** is:
 
@@ -3779,7 +3799,7 @@ This setting has the same value in all functions in the call graph.
 
 .. important::
 
-   If you use this option with "any", "SP" or register which is a stack pointer
+   If you use this option with "any", "SP", or a register hat is a stack pointer
    (for example, "reg::X2" for RISC-V), you cannot specify in the histogram opcodes
    that require a stack pointer. (For example, for RISC-V, this is ``C_LWSP``,
    ``C_LDSP``, ``C_SWSP``, ``C_SDSP``, ``C_FLWSP``, ``C_FLDSP``, ``C_FSWSP``,
@@ -3791,10 +3811,14 @@ This setting has the same value in all functions in the call graph.
 
 .. _`_return_address`:
 
-Return address
+Return Address
 --------------
 
-Snippy generates return instructions in the end of each secondary function and in the main function if ``--last-instr=RET`` option is specified. In these instructions and in all generated call instructions it uses same register for return address that is chosen at configuration stage. User can control choice using following option:
+Snippy generates return instructions at the end of each secondary function and
+in the main function if the ``--last-instr=RET`` option is specified. In these
+instructions and in all generated call instructions it uses the same register for
+return address, which is chosen at the configuration stage. You can control the choice
+using the following option:
 
 ::
 
@@ -3802,9 +3826,11 @@ Snippy generates return instructions in the end of each secondary function and i
 
 The options are:
 
--  ``any`` |nbsp| -- |nbsp| Any random suitable register. If ``--honor-target-abi`` option is specified then target ABI return address register is always chosen.
+-  ``any`` |nbsp| -- |nbsp| Any random suitable register. If the ``--honor-target-abi`` option
+   is specified, the target ABI return address register is always chosen.
 
--  ``reg::R`` |nbsp| -- |nbsp| Specific register ``R``. If register is not suitable to be used as return address in at least one of call instructions specified in histogram, the error is issued.
+-  ``reg::R`` |nbsp| -- |nbsp| Specific register ``R``. If the register is not suitable to be
+   used as a return address for at least one of the call instructions specified in the histogram, an error is issued.
 
 -  ``RA`` |nbsp| -- |nbsp| Return address register specified by the ABI.
 
@@ -3814,16 +3840,20 @@ The options are:
 
 -  ``any``
 
-Return address register must be distinct from stack pointer register, so be cautious when using this option in pair with ``--redefine-sp``. The configuration error may occur if:
+the return address register must be distinct from stack pointer register; be cautious when using
+this option in pair with ``--redefine-sp``. The configuration error may occur if:
 
-- Same register is specified in both options. E.g. ``--redefine-ra=reg::X2 --redefine-sp=SP``
+- The same register is specified in both options. E.g. ``--redefine-ra=reg::X2 --redefine-sp=SP``
 
-- There is not enough available registers to choose distinct ra and sp.
+- There are not enough available registers to choose distinct ra and sp.
 
 
 .. important::
 
-   If ``--honor-target-abi`` and ``--redefine-ra=any-not-RA`` are both specified then ra is chosen among ABI caller-saved(temporary) registers due to it's value being dirty at returning instruction. Using ``--honor-target-abi`` and ``--redefine-ra=reg::R`` with ``R`` that is not caller-saved is discouraged, because it's value would not be preserved. The warning is issued in both cases:
+   If ``--honor-target-abi`` and ``--redefine-ra=any-not-RA`` are both specified, ra is
+   chosen among ABI caller-saved (temporary) registers because its value is dirty at the returning
+   instruction. Using ``--honor-target-abi`` and ``--redefine-ra=reg::R`` with an ``R`` that is
+   not caller-saved is discouraged because its value would not be preserved. The warning is issued in both cases:
 
    ::
 
@@ -3833,16 +3863,18 @@ Return address register must be distinct from stack pointer register, so be caut
 
    --preserve-ra
 
-This flag enables return address value to be preserved in order to safely exit root function back to caller code. This is done by spilling it to stack like its done in ``--honor-target-abi`` mode.
+This flag enables return address value to be preserved in order to safely exit root function back to
+caller code. This is done by spilling it to stack, as is done in the ``--honor-target-abi`` mode.
 
 .. _`_static_stack`:
 
-Static stack
+Static Stack
 ------------
-Snippy has the ability to use a static stack, meaning that it do not rely on
-stack pointer value, but calculate the stack location for each function statically.
-This functionality reserves part of stack for every function and each of them saves
-values to the predefined addresses in any call.
+
+Snippy can use a static stack, which means it does not rely on
+the stack pointer value, instead, it calculates the stack location for each function statically.
+This feature reserves part of the stack for every function, and each of them saves
+its values to the predefined addresses in any call.
 
 To enable static stack:
 
@@ -3850,11 +3882,11 @@ To enable static stack:
 
    --enable-static-stack=true
 
-If no option is specified, then snippy uses static stack **automatically** whenever possible.
+If no option is specified, snippy uses static stack **automatically** whenever possible.
 
 Static stack can be explicitly disabled by ``--enable-static-stack=false``.
 
-The feature is **not supported** (and therefore Snippy does not enable it automatically) when:
+The feature is **not supported** (and therefore snippy does not enable it automatically) when:
 
 - ``--honor-target-abi`` is enabled
 - section ``stack`` is not provided
@@ -3866,32 +3898,39 @@ The feature is **not supported** (and therefore Snippy does not enable it automa
 
 **Benefits** this feature provides:
 
-- When stack area is specified it becomes possible to generate instructions with SP
+- When a stack area is specified, it becomes possible to generate instructions with SP
   register operand and stack-pointer specific instructions. (For RISC-V, these
   include compressed SP-based instructions that implicitly use X2.)
-- There are more registers available, as the SP register is no longer reserved.
+- More registers are available because the SP register is no longer reserved.
 
 **Drawbacks** of this feature:
 
-- Snippets that use static stack may occupy more stack space. The wider the function
+- Snippets that use a static stack may occupy more stack space. The wider the function
   call graph, the greater the increase of the required stack size. We are going to
   implement some optimizations that would partially mitigate this effect in the future.
 - Increasing the size of the ancillary code.
 
-  - The size of each function body is getting bigger. Additional ancillary instructions are used to load the address of the functions static stack area to the temporary register. This is done in both prologue and epilogue (for RISC-V, approximately 3 + 3 = 6 instructions).
+  - The size of each function body increases. Additional ancillary instructions
+    are used to load the address of the function static stack area into the temporary register.
+    This is done in both prologue and epilogue (for RISC-V, approximately 3 + 3 = 6 instructions).
 
-  - Additional ancillary instructions are generated whenever a function is called. These are necessary to load the address of the callees static stack area (approximately 6 instructions per a function call). This is necessary for spilling registers before a call and reloading them after a call.
+  - Additional ancillary instructions are generated whenever a function is called. These
+    are necessary to load the address of the callee static stack area (approximately 6 instructions
+    per function call). This is necessary for spilling registers before a call and reloading them after a call.
 
-  - Lets consider an example -- a snippet that contains three functions, each of which contains one call to another function, and let each function consist of 1000 instructions, i.e. total 3000 instructions. Static stack would add 6 instructions per a function plus 6 instruction per call, total 36 instructions, with represents approximately 1.2% increase.
+  - Let us consider an example -- a snippet that contains three functions, each of which
+    contains one call to another function, and let each function consist of 1000 instructions,
+    i.e. total 3000 instructions. Static stack would add 6 instructions per function plus 6
+    instructions per call, totaling 36 instructions, which represents an increase of approximately 1.2%.
 
 .. _`_section_names_prefix`:
 
-Section names prefix
+Section Names Prefix
 --------------------
 
-You can override section names prefix in the output file using ``--sections-prefix=<string>``.
+You can override the section names prefix in the output file using ``--sections-prefix=<string>``.
 
-By default, snippy uses ``.snippy`` as a section names prefix. For example:
+By default, snippy uses ``.snippy`` as the section names prefix. For example:
 
 ::
 
@@ -3901,12 +3940,12 @@ By default, snippy uses ``.snippy`` as a section names prefix. For example:
 
 etc.
 
-.. _the type of output .elf file:
+.. _type of output .elf file:
 
-The type of output .elf file
+Type of Output ``.elf`` File
 ----------------------------
 
-The type of output .elf file is controlled by the ``--object-type`` option:
+The type of the output ``.elf`` file is controlled by the ``--object-type`` option:
 
 .. code:: shell
 
@@ -3915,12 +3954,14 @@ The type of output .elf file is controlled by the ``--object-type`` option:
 Where ``<type-of-output-file>`` should be one of:
 
 * ``reloc`` - Relocatable object file plus `generated linker script`_. This is the default.
-* ``exec`` - Executable .elf. To produce it, snippy uses ld.lld from the snippy pack, and feeds it with commands identical to those written to the `generated linker script`_.
+* ``exec`` - Executable .elf. To produce it, snippy uses ld.lld from the snippy pack, and feeds
+  it with commands identical to those written to the `generated linker script`_.
 * ``shared`` - Shared object: the same layout as ``exec`` plus dynamic section.
 
 .. important::
 
-   If ``--model-plugin`` is not ``none``, and the user would like to obtain executable .elf that is identical to the one executed by the model, then the ``--object-type=exec`` option should be specified.
+   If ``--model-plugin`` is not ``none`` and you would like to obtain an executable ``.elf``,
+   identical to the one executed by the model, specify the ``--object-type=exec`` option.
 
 .. _`_target_specific_configurationrisc_v`:
 
@@ -3936,7 +3977,8 @@ accordingly once they become available.
 RVV Support
 -----------
 
-Snippy supports RVV and have some knowledge about its semantics to avoid (or produce by request) illegal instructions and modes. Just specify vector instructions in layout.
+Snippy supports RVV and has some knowledge about its semantics to avoid (or produce by request)
+illegal instructions and modes. Just specify vector instructions in the layout.
 
 .. container:: formalpara-title
 
@@ -3952,8 +3994,8 @@ where:
 -  ``./yml/layout-vector.yaml`` |nbsp| -- |nbsp| A sample layout file with vector
    instructions.
 
--  ``--init-regs-in-elf`` |nbsp| -- |nbsp| A parameter that registers initialization
-   including in the output .elf file. For the details, refer to
+-  ``--init-regs-in-elf`` |nbsp| -- |nbsp| A parameter that includes initialization of registers
+   into the output ``.elf`` file. For the details, refer to
    `Initializing Registers in .elf <#initializing-registers-in-elf>`__.
 
 -  ``./yml/memory-aligned.yaml`` |nbsp| -- |nbsp| A sample layout file used as an
@@ -3968,7 +4010,7 @@ Vector Unit Configurations
 You configure reachable vector unit configurations by describing this
 set via a dedicated configuration section.
 
-You can specify the probability for selecting a new RVV configuration in
+You can specify the probability of selecting a new RVV configuration in
 two mutually exclusive modes:
 
 -  Histogram mode |nbsp| -- |nbsp| For this, you need to have ``VSET*``-like
@@ -3982,7 +4024,7 @@ two mutually exclusive modes:
 As a result, you have a random vector unit mode change on each ``VSET*``
 in the code.
 
-.. Warning::
+.. warning::
 
    If you do not specify a configuration, the only reachable RVV configuration is:
 
@@ -4017,7 +4059,7 @@ instructions that are possible in this RVV mode, that is, the
 instructions that are compatible with each other and this mode and do
 not cause an exception.
 
-The behaviour when there is no opcode available for any RVV
+The behavior when there is no opcode available for any RVV
 configuration depends on the mode in which the generation takes place:
 
 -  In `Histogram mode <#vector-unit-configurations>`__, snippy generates
@@ -4039,7 +4081,7 @@ configuration depends on the mode in which the generation takes place:
 .. note::
 
    Regardless of the weight of RVV configurations for which valid opcodes are
-   available, at least one such will be generated in each basic block. This is
+   available, at least one such configuration will be generated in each basic block. This is
    necessary in order to satisfy the opcode probabilities as much as possible.
 
 Regardless of the generation mode, you can pass the
@@ -4049,7 +4091,7 @@ generation. The default value is ``false``.
 
 .. note::
 
-   The way some of the facilities function is specific to snippy, while
+   The way some facilities function is specific to snippy, while
    some other facilities partially or fully match the `official RVV
    specification <https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc>`__.
    We will provide the links to specific descriptions where applicable.
@@ -4084,8 +4126,8 @@ reachable RVV configurations for the snippet:
 
    -  ``vlmax`` |nbsp| -- |nbsp| Compliant with RVV specification value:
       ``vlmax`` = ``LMUL`` * ``VLEN`` / ``SEW``. It behaves the same as
-      ``max_encodable``, but it will not be selected if according to current
-      situation ``vlmax`` can not be selected (for example, to change the RVV
+      ``max_encodable``, but it will not be selected if, according to the current
+      situation, ``vlmax`` cannot be selected (for example, to change the RVV
       mode, opcode ``VSETIVLI`` is selected, where the maximum ``vl`` value that
       fits into the encoding is 31, and ``vlmax`` is greater than 31).
 
@@ -4099,7 +4141,7 @@ reachable RVV configurations for the snippet:
 
    -  Unsigned integers (for example, ``2``, ``0b10100``, ``0xFA``).
 
-   -  ``all_ones`` |nbsp| -- |nbsp| The mask is selected to be only ones.
+   -  ``all_ones`` |nbsp| -- |nbsp| The mask is selected to consist of ones only.
       The bit width of the mask is exactly ``VL``.
 
    -  ``any_legal`` |nbsp| -- |nbsp| Allows any value given the selected ``VL``.
@@ -4174,7 +4216,7 @@ reachable RVV configurations for the snippet:
    ``marginal-priorities`` is defined by a weighted combination of:
 
    -  ``3d_uniform`` |nbsp| -- |nbsp| This option does not satisfy any marginal
-      distribution exactly. It tries to balance the tradeoff across all 3 dimensions.
+      distribution exactly. It tries to balance the tradeoff across all three dimensions.
       It is the best one if you want to cover all possible ``{SEW, LMUL, VL}`` combinations.
       For example, the following configuration creates a true 3D-uniform distribution
       containing all legal configurations:
@@ -4289,7 +4331,7 @@ where:
 
    .. note::
 
-      You do not need to list all the values and set zero weights for
+      You do not need to list all values and set zero weights for
       those that you do not want to be generated.
 
 -  ``./yml/memory-stride1.yaml`` |nbsp| -- |nbsp| A sample layout file used as an
@@ -4304,9 +4346,9 @@ Biased Mode
 To specify a mode-changing bias, add the ``mode-change-bias`` key to the
 RVV-configuration YAML file. Use this mode to set:
 
--  ``P`` |nbsp| -- |nbsp| A fixed probability of the RVV mode change regardless of the
+-  ``P`` |nbsp| -- |nbsp| A fixed probability of an RVV mode change, regardless of the
    number and type of instructions in the input histogram. Can be either a number from 0.0 to 1.0
-   or ``deduced``, which will deduce probability from the ``vset{i}vl{i}`` instructions in the histogram.
+   or ``deduced``, which deduces the probability from the ``vset{i}vl{i}`` instructions in the histogram.
 
 -  ``Pvill`` (optional) |nbsp| -- |nbsp| A probability that an illegal configuration (SEW, LMUL)
    will be selected when the opcode ``vset{i}vl{i}`` is selected. It is
@@ -4372,7 +4414,7 @@ RVV-configuration YAML file. Use this mode to set:
       legitimately generated mask. In this case ``v0`` always holds mask value
       and cannot be used as the destination or temporary register.
 
-   -  Greater than ``0`` but less than ``1``: On each RVV mode change
+   -  Greater than ``0`` but less than ``1``: On each RVV mode change,
       snippy switches into the nomask mode with the given probability. The
       higher the value, the more often the nomask mode is selected.
 
@@ -4437,8 +4479,10 @@ Example snippy run:
 
 .. important::
 
-   You need to have some possibly illegal instructions (like V1SR_V) in histogram. Otherwise you will get error "can not create any primary instruction in this context", which in some cryptic manner informs you (in this case), that in illegal context there are no possibly illegal instructions found. In other context this error may mean different things (like no legal found, etc).
-
+   You need to have some possibly illegal instructions (like ``V1SR_V``) in histogram.
+   Otherwise you will get an error "cannot create any primary instruction in this context",
+   which informs you (in this case), that in an illegal context no possibly illegal instructions
+   are found. In other contexts, this error may mean different things (like no legal found, etc.).
 
 
 .. _`_rvv_configuration_dump`:
@@ -4484,18 +4528,18 @@ Avoiding Unordered Memory Accesses to the Same Addresses
 
 The memory accesses performed by a single instruction when the same memory
 location is accessed more than once are called *intersecting memory accesses*.
-Unordered intersecting memory access can lead to
-non-reproducible/unpredictable result of snippet execution,
-which is generally undesirable.
+Unordered intersecting memory accesses can lead to
+non-reproducible/unpredictable results of snippet execution,
+which are generally undesirable.
 
-RISC-V ISA has instructions that are capable to perform unordered
+RISC-V ISA has instructions that are capable of performing unordered
 intersecting memory accesses. The ``riscv-disallow-intersecting-mem-accesses``
 option is intended to avoid such accesses by providing these instructions
 with non-intersecting memory addresses.
 
 The option accepts a *regex* that should match the opcodes
 for which intersecting memory accesses must be prevented.
-Then Snippy will produce only disjoint memory addresses for these opcodes.
+Then snippy will produce only disjoint memory addresses for these opcodes.
 
 .. code:: yaml
 
@@ -4514,7 +4558,7 @@ Then Snippy will produce only disjoint memory addresses for these opcodes.
    execution on RISC-V targets.
    This may change in the future.
 
-   Other opcodes, when match the regex, are ignored.
+   Other opcodes, when they match the regex, are ignored.
 
 .. warning::
    The functionality works only with
@@ -4530,7 +4574,7 @@ Then Snippy will produce only disjoint memory addresses for these opcodes.
    schemes and ignore all others.
 
    The above means that
-   when different kinds of memory schemes are used in the snippet,
+   when different kinds of memory schemes are used in the snippet
    and ``riscv-disallow-intersecting-mem-accesses`` is engaged as well,
    the memory accesses may be distributed unevenly.
    **We do not recommend using memory schemes other than** ``access-ranges``
@@ -4548,7 +4592,7 @@ Then Snippy will produce only disjoint memory addresses for these opcodes.
 Support for Floating-Point Control and Status Registers
 -------------------------------------------------------
 
-Accessing and initialization of ``fflags`` and ``frm`` CSRs
+Accessing and Initializing ``fflags`` and ``frm`` CSRs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Snippy supports accessing ``fflags`` and ``frm`` CSRs by means of the following
@@ -4559,16 +4603,16 @@ pseudoinstructions:
 - ``SwapFFLAGSImm``, ``SwapFRMImm`` and ``SwapFCSRImm`` - Save previous CSR value into a GPR and write immediate into it.
 - ``WriteFFLAGS``, ``WriteFRM``, ``WriteFCSR`` - Write register to CSR. Best used in combination with `Operands Reinitialization <#operands-reinitialization>`__
 
-These pseudoinstructions in conjunction with
-`Immediate Histograms <#immediate-histograms>`__ provide flexible manipulation
+These pseudoinstructions, in conjunction with
+`Immediate Histograms <#immediate-histograms>`__, provide flexible manipulation
 of static and dynamic rounding modes, reading, clearing and writing exception
-flags and so on. A few examples follow below.
+flags, and so on. A few examples follow.
 
-When `register initialization code (-init-regs-in-elf) <#initializing-registers-in-elf>`__ is used,
+When `register initialization code <#initializing-registers-in-elf>`__ (``-init-regs-in-elf``) is used,
 snippy emits service code that randomizes ``frm`` and ``fflags``.
 
-Example: Specifying rounding mode for each opcode. ``FADD_S`` uses randomized
-rounding mode via DYN (thanks to the randomization of ``frm``), ``FSUB_S``
+Example: Specifying a rounding mode for each opcode. ``FADD_S`` uses randomized
+rounding mode via DYN (thanks to the randomization of ``frm``), while ``FSUB_S``
 uses RNE:
 
 .. code:: yaml
@@ -4589,9 +4633,9 @@ uses RNE:
    # COM: RMM - 0b100
    # COM: DYN - 0b111
 
-Example: Controlled randomization of dynamic rounding mode in the ``frm`` CSR.
-The emitted FP instructions that engage DYN mode randomly use 2 (RNE, RTZ)
-out of 5 available rounding modes:
+Example: Controlled randomization of the dynamic rounding mode in the ``frm`` CSR.
+The emitted FP instructions that engage DYN mode randomly use two (RNE, RTZ)
+out of five available rounding modes:
 
 .. code:: yaml
 
@@ -4634,15 +4678,15 @@ RISC-V Opcode Support Details
 
 .. note::
 
-   RISC-V specifications use dot (``.``) in the opcode mnemonics.
-   Snippy uses underscore (``_``) instead of dot.
+   RISC-V specifications use a dot (``.``) in the opcode mnemonics.
+   Snippy uses an underscore (``_``) instead of a dot.
 
 .. note::
 
    Snippy uses opcode names as defined in LLVM TableGen files.
    Therefore, the opcode names should not be assumed stable and
-   may change depending on which LLVM version snippy is based on.
-   For actual list of supported opcodes,
+   may change depending on the LLVM version snippy is based on.
+   For the actual list of supported opcodes,
    run snippy with ``-mtriple=.... -march=.... -list-opcode-names``
    or use `llvm-ie <#llvm-ie-documentation>`_.
 
@@ -4658,11 +4702,11 @@ can be used in histograms:
    ``SwapFCSRImm``, ``SwapFFLAGSImm``, ``SwapFRMImm``,
    ``WriteFCSRImm``, ``WriteFCSR``, ``WriteFFLAGSImm``,
    ``WriteFFLAGS``, ``WriteFRMImm``, ``WriteFRM`` -
-   See `Accessing and initialization of fflags and frm CSRs`_.
+   See `Accessing and initializing fflags and frm CSRs`_.
 
 .. note::
 
-   ``PseudoC_JRB`` is currently deprecated. Use ``C_JR`` instead.
+   ``PseudoC_JRB`` is deprecated. Use ``C_JR`` instead.
 
 Opcode Limitations
 ~~~~~~~~~~~~~~~~~~
@@ -4671,12 +4715,12 @@ Opcode Limitations
 
 .. _`_self_check`:
 
-Self-check
+Self-Check
 ==========
 
 .. important::
 
-   Self-check features are not supported without model plugin.
+   Self-check features are not supported without a model plugin.
 
 Self-check is a code generation mode that supports validation of the results
 of the primary instructions. The reference values are obtained from the
@@ -4698,11 +4742,11 @@ model plugin. There are three families of self-check modes:
    register) is still stored into ``selfcheck`` by ancillary code.
 
 -  Register-based ``checksum`` mode |nbsp| -- |nbsp| Snippy inserts code
-   that computes and compares a running checksum on-the-fly and traps
+   that computes and compares a running checksum on the fly and traps
    immediately if a mismatch is detected. This mode does not require a
    ``selfcheck`` section. See `Register-based Self-check (Checksum Mode)`_.
 
-The Legacy Self-check Options
+Legacy Self-Check Options
 -----------------------------
 
 The legacy method of enabling self-check and setting its mode is via options.
@@ -4715,13 +4759,13 @@ the ``options`` key in the configuration file.
 .. note::
 
    The ``--selfcheck`` option has the default value ``<N>`` of ``1``,
-   so all the primary instructions are self-checked if this option is used
+   so all primary instructions are self-checked if this option is used
    without parameters.
 
    If the ``selfcheck-ref-value-storage`` option is
    not provided, then the ``code`` mode is selected by default.
 
-The "selfcheck" Configuration Key
+"selfcheck" Configuration Key
 ------------------------------------
 
 In addition to the legacy way of enabling self-check
@@ -4751,7 +4795,7 @@ where:
       See `Register-based Self-check (Checksum Mode)`_.
 
 -  ``period`` (optional) |nbsp| -- |nbsp| Same meaning as ``<N>`` in
-   ``options: selfcheck: <N>`` |nbsp| -- |nbsp| self-check occurs every ``period`` -th
+   ``options: selfcheck: <N>`` |nbsp| -- |nbsp| self-check occurs every ``period``-th
    instruction. Defaults to ``1``.
 
 -  ``selfcheck-gv`` (optional) |nbsp| -- |nbsp| Same effect as the
@@ -4772,7 +4816,7 @@ where:
    ``enable-selfcheck-rvv``) both as a command-line option and inside the
    ``selfcheck`` configuration key at the same time.
 
-Memory-based Self-check
+Memory-Based Self-Check
 -----------------------
 
 After each ``N`` primary instructions,
@@ -4837,7 +4881,7 @@ To use this feature:
       options:
          selfcheck-gv: true # the default is false.
 
-Register-based Self-check (Checksum Mode)
+Register-Based Self-Check (Checksum Mode)
 ------------------------------------------
 
 Unlike the memory-based modes, the ``checksum`` self-check mode does not
@@ -4856,7 +4900,7 @@ inline instructions that:
    RISC-V) immediately if they differ.
 
 Because the check happens inline and traps as soon as a mismatch is
-detected, this mode does not require neither the ``selfcheck`` section, nor
+detected, this mode requires neither the ``selfcheck`` section nor
 the external tooling to detect a divergence.
 The generated snippet checks itself while it runs.
 
@@ -4894,17 +4938,17 @@ The legacy way of doing the same via CLI:
 
    Limitations of the ``checksum`` mode:
 
-   -  ``selfcheck-gv`` doesn’t make sense with this mode (there is no
+   -  ``selfcheck-gv`` does not make sense with this mode (there is no
       ``selfcheck`` section to describe), and specifying both is an
       error.
 
    -  As with any self-check mode, ``AUIPC`` is not supported in the
       histogram.
 
-Self-check for RVV
+Self-Check for RVV
 ------------------
 
-Self-check for RVV is currently in the experimental state. To enable it:
+Self-check for RVV is currently experimental. To enable it:
 
 ::
 
@@ -4951,18 +4995,18 @@ self-check global variables:
 
 .. _selfcheck annotation file:
 
-Exporting Self-check Annotations to a File
+Exporting Self-Check Annotations to a File
 ------------------------------------------
 
-This feature works in conjunction with Memory-based Self-check modes.
-It makes it easy to find PC of the primary instruction that
+This feature works in conjunction with the memory-based self-check modes.
+It makes it easy to find the PC of the primary instruction that
 produced an actual value that does not match the reference value.
 
 Self-check annotations are output to a YAML file whose name matches
 the name of the generated ELF file,
 but with the suffix ".elf" replaced with ".selfcheck.yaml".
 The file is generated automatically when
-any of the Memory-based Self-check modes is activated.
+any of the memory-based self-check modes is activated.
 
 Annotations reside under the top-level ``selfcheck-annotation`` YAML key
 and consist of ``K`` pairs of values:
@@ -4996,28 +5040,27 @@ Global Constants
 
 In some scenarios, snippy produces global constants.
 For example, this is necessary for
-`RISC-V vector register initialization`_,
-`selfcheck-related global constants`_ and so on.
+`RISC-V vector register initialization`_ and
+`selfcheck-related global constants`_.
 
-Read-only Sections
+Read-Only Sections
 ------------------
 
-When snippet uses global constants,
+When a snippet uses global constants,
 a read-only section is required to hold constant data.
 
-A description of read-only section should be provided in
+A description of the read-only section should be provided in
 the ``sections`` entry of the snippy configuration file.
-Please find an example in the next subsection
-(a copy of ``./yml/layout-vector-init.yaml``;
-you can use this file as a template for your own configuration).
+The next subsection provides an example based on ``./yml/layout-vector-init.yaml``.
+You can use this file as a template for your own configuration.
 
 .. _generated linker script:
 
 Generated Linker Script
 =======================
 
-A linker script is generated by default when you run snippy and
-`the type of output .elf file`_ is relocatable.
+A linker script is generated by default when you run snippy and the
+`type of output .elf file`_ is relocatable.
 
 The linker script is intended to properly place
 sections into the resulting executable image.
@@ -5025,12 +5068,12 @@ If you would like to use the snippet as a part of some application
 (which is often so), then you have to pass information from
 the linking script to the link stage of the application.
 Use whatever means convenient for you to do this:
-directly insert the contents of generated script
-into the application’s linking script,
-or indirectly insert it there
-(e.g. by means of the linker’s ``INCLUDE()`` command), and so on.
+directly insert the contents of the generated script
+into the application linking script,
+or insert it indirectly,
+e.g. by means of the linker ``INCLUDE()`` command, and so on.
 
-Let’s consider an example with a read-only section below:
+Consider an example with a read-only section below:
 
 .. container:: formalpara-title
 
@@ -5043,8 +5086,8 @@ Let’s consider an example with a read-only section below:
        ./yml/memory-aligned.yaml \
        -init-regs-in-elf -o layout.elf
 
-Notice the description of read-only section
-(the one with ``ACCESS: r``) in layout-vector-init.yaml:
+Notice the description of the read-only section
+(the one with ``ACCESS: r``) in ``layout-vector-init.yaml``:
 
 .. container:: formalpara-title
 
@@ -5114,21 +5157,22 @@ Notice the description of read-only section
 Generated Linker Options File
 =============================
 
-Additionally, snippy generates a text file containing the linker options users need to pass to their linker. This enables the creation of a binary file identical to the one executed on the internal model.
+Additionally, snippy generates a text file containing the linker options that users need to pass
+to their linker. This enables the creation of a binary file identical to the one executed on the internal model.
 
 .. important::
 
    **Why it matters?**
    Consider an example where you generate a snippet containing several
    functions that call each other for the rv32imc architecture. If the
-   linker flags you use do not match those Snippy passes to its internal
+   linker flags you use do not match those that snippy passes to its internal
    linker before model execution, your linker might compress some jal
    calls into c.jal instructions. Since this compression did not occur
    during the internal linking process, a trace mismatch will occur.
 
-During snippet generation, alongside the **<outname>.ld** linker
-script file snippy will generate **<outname>.ldargs** file containing
-all necessary linker options (Empty if no specific options are required).
+During snippet generation, alongside the ``<outname>.ld`` linker
+script file, snippy generates the ``<outname>.ldargs`` file containing
+all necessary linker options (empty if no specific options are required).
 
 This way, when you have a config:
 
@@ -5172,7 +5216,8 @@ And run snippy as follows:
 
   llvm-snippy layout-generated-linker-options.yaml -model-plugin=<SOME_MODEL> -o path/to/snippet
 
-Then alongside **path/to/snippet.ld** linker script you will see **path/to/snippet.ldargs** file. Then, to match the snippet executed on internal model you just need to pass this **.ldargs** file to your linker via the **@** argument:
+Then alongside the ``path/to/snippet.ld`` linker script you will see the ``path/to/snippet.ldargs`` file.
+Then, to match the snippet executed on internal model you just need to pass this ``.ldargs`` file to your linker via the ``@`` argument:
 
 .. code:: bash
 
@@ -5182,8 +5227,8 @@ Then alongside **path/to/snippet.ld** linker script you will see **path/to/snipp
 
    For more documentation on linker options file see ld manual: https://linux.die.net/man/1/ld
 
-Additionally, you can pass liner options file to your compiler driver (If
-you do not call linker directly):
+Additionally, you can pass the linker options file to your compiler driver, if
+you do not call linker directly:
 
 .. code:: bash
 
@@ -5194,22 +5239,22 @@ Converting Traces
 =================
 
 Use the ``--trace-SNTF=<sntf_file_name>`` option to convert traces from the model to the
-**SNippy Trace Format (SNTF)**. The model you convert from must support callbacks.
+**SNippy Trace Format (SNTF)**. The model that you convert from must support callbacks.
 If you set model to ``None``, you will get an error.
 
 SNTF file format
 ----------------
 
-SNTF file begins with a **header**, in which after **#** (comments), starting from a new line, are followed:
+A SNTF file begins with a **header** containing, after **#** (comments), the following, each on a new line:
 
 1. Format name (SNTF)
 2. Version
 3. List of enabled features of the current version ``+<feature-name>`` (ex: ``+time``)
 4. List of disabled features of the current version ``-<feature-name>`` (ex: ``-next-pc``)
 
-In total, paragraphs 3 and 4 should list all the features of the version from paragraph 2.
+Together, items 3 and 4 should list all features of the version from item 2.
 
-All names of **1.1** version features:
+All names of the features in **version 1.1**:
 
 * ``time``
 * ``pc``
@@ -5219,7 +5264,7 @@ All names of **1.1** version features:
 * ``csrs-changed``
 * ``memory-accesses``
 
-You can enable or disable these features using the sntf-config key in your layout:
+You can enable or disable these features using the ``sntf-config`` key in your layout:
 
 .. code:: yaml
 
@@ -5246,7 +5291,7 @@ You can enable or disable these features using the sntf-config key in your layou
   # +csrs-changed
   # +memory-accesses
 
-After the header, on each line placed entries that were selected in the
+After the header, each line contains the entries that were selected in the
 header, separated by a whitespace.
 
 **Entry format:**
@@ -5259,15 +5304,15 @@ header, separated by a whitespace.
 |520        |000086d0    |11010093       |000086d4    |f4=017f7ff0    |2ff4fe98:W:fa,2ff4fe99:R:ee    |
 +-----------+------------+---------------+------------+---------------+-------------------------------+
 
-* ``time`` is synchronized with when the instruction was fetched from memory. For now it it just a number of instruction.
-* Vector registers are printed element by element, the length of which is 64 bits:
+* ``time`` is synchronized with the moment the instruction was fetched from memory. For now, it is just a number of the instruction.
+* Vector registers are printed element by element. Each element is 64 bits long:
 
   (``vlen`` = 128) ``v4=[1]:0000000000227c3d[0]:0000000100227c3d``
 
   (``vlen`` = 256) ``v7=[3]:00000f0000000001[2]:0000000000000a00[1]:0000b00000000000[0]:00000c0000000000``
 * The format of memory accesses: ``<Addr>:<AccessType>:<Value>``.
 
-  Access size is determined by the number of characters in the Value. ``AccessType`` can be either **W** (write) or **R** (read).
+  The access size is determined by the number of characters in the Value. ``AccessType`` can be either **W** (write) or **R** (read).
 
 **Entry example:**
 
@@ -5275,7 +5320,7 @@ header, separated by a whitespace.
 
    520 000086d0 11010093 000086d4 f4=017f7ff0 2ff4fe98:W:fa,2ff4fe99:R:ee
 
-So, for example, you can use the following layout:
+For example, you can use the following layout:
 
 .. container:: formalpara-title
 
@@ -5305,7 +5350,7 @@ Then, to convert the traces, run:
 where ``<sntf_file_name>`` is the name of the output SNTF file, for
 example, ``trace.sntf``.
 
-This way, the result of this conversion is the ``trace.sntf`` file.
+The result of this conversion is the ``trace.sntf`` file.
 
 
 .. _`_trace_end_pc_option`:
@@ -5318,9 +5363,8 @@ specific value of PC, which will be set at the end of the whole trace.
 The default value is ``0``.
 
 The SNTF format contains the ``next-pc`` field.
-If you set the ``--trace-end-pc`` value, when the trace reaches the end,
-it uses this value. If not, the PC value after the last one on which the
-instruction is executed will be set to ``0``.
+If you set the ``--trace-end-pc`` value, the trace uses it as ``next-pc`` when it reaches the end.
+Otherwise, the ``next-pc`` value after the last executed instruction is set to ``0``.
 
 .. _`_comparing_traces`:
 
@@ -5331,13 +5375,13 @@ Co-simulation
 
 .. important::
 
-   This functionality is not supported without model plugin
+   This feature is not supported without a model plugin.
 
 Co-simulation allows you to run a generated snippy ``.elf`` file on
-multiple models and perform a step-by-step state comparison of them.
+multiple models and perform a step-by-step comparison of their states.
 
-The generation process only uses one "primary" model plugin |nbsp| -- |nbsp| the one
-you specify in the ``model-plugin`` string. All the other plugins are
+The generation process uses only one "primary" model plugin |nbsp| -- |nbsp| the one
+you specify in the ``model-plugin`` string. All other plugins are
 "secondary", or co-simulation, models, and you specify them in the
 ``cosim-model-plugins`` string.
 
@@ -5346,7 +5390,7 @@ you specify in the ``model-plugin`` string. All the other plugins are
    Do not use the same plugin for both ``model-plugin`` and
    ``cosim-model-plugins``: it leads to an undefined result.
 
-To specify two and more models:
+To specify two or more models:
 
 -  Via ``options``:
 
@@ -5368,7 +5412,7 @@ To specify two and more models:
 State Comparison
 ----------------
 
-At each step of the simulation, the program compares a state of each
+At each step of the simulation, the program compares the state of each
 model against a "primary" one. If the program finds a difference, it
 issues an error and terminates further execution.
 
@@ -5385,7 +5429,7 @@ the executed instruction:
 
 -  the program counter.
 
-If some model does not report its changes, the program compares the
+If a model does not report changes, the program compares the
 whole register file after each instruction and the whole memory before
 and after the run instead.
 
@@ -5423,8 +5467,8 @@ Dump Filename
 ~~~~~~~~~~~~~
 
 When you use the ``--trace-log=<filename>`` with multiple models, a log
-from all the co-simulations models is redirected to the
-``<filename>.plugin`` file. The "primary" model log is directed to as
+from all co-simulation models is redirected to the
+``<filename>.plugin`` file. The "primary" model log is directed as
 before. This way, each model gets its own log file.
 
 .. container:: formalpara-title
@@ -5438,16 +5482,16 @@ before. This way, each model gets its own log file.
        -model-plugin=<model_plugin>.so -cosim-model-plugins=<co-sim_model>.so \
        --init-regs-in-elf -trace-log=log -o layout.elf
 
-In this case you get two files: ``log`` and ``log.<co-sim_model>``.
+In this case, you get two files: ``log`` and ``log.<co-sim_model>``.
 
 .. _`_range_of_instruction_addresses`:
 
 Range of Instruction Addresses
 ------------------------------
 
-You can specify the range of instruction addresses that you need the
+You can specify the range of instruction addresses that you need
 data from. Snippy then uses this setting to generate an output file with
-metadata of all the useful addresses in a closed ``[first, last]``
+the metadata of all useful addresses in a closed ``[first, last]``
 interval in the hex format.
 
 To specify the range:
@@ -5483,7 +5527,7 @@ Platform Support
 RISC-V
 ------
 
-snippy supports the following RISC-V configurations:
+Snippy supports the following RISC-V configurations:
 
 - **RV32I** - Base Integer Instruction Set (32-bit)
 - **RV64I** - Base Integer Instruction Set (64-bit)
@@ -5495,11 +5539,11 @@ snippy supports the following RISC-V configurations:
 RISC-V Extensions
 ~~~~~~~~~~~~~~~~~
 
-RISC-V architecture is supported with the following extensions. For the details, please refer to the RISC-V specifications.
+RISC-V architecture is supported with the following extensions. For the details, refer to the RISC-V specifications.
 
 .. important::
 
-   The list of supported extensions provided in this chapter could be incomplete and is subject to change.
+   The list of supported extensions provided in this chapter may be incomplete and is subject to change.
 
 
 **Standard Extensions**
@@ -5634,9 +5678,9 @@ The most basic **Svinval** tests can be generated by the following config:
   Replace supervisor instructions with **HINVAL_FVMA** and **HINVAL_VVMA** to
   generate test for hypervisor svinval instructions
 
-However, semantics of the instructions from **Svinval** extension depend on the
-source registers used (**X0** or other). And the above config chooses source
-registers randomly. Meaning that probability of generating **X0** as at least
+However, semantics of the instructions from the **Svinval** extension depend on the
+source registers used (**X0** or others). And the above config chooses source
+registers randomly. This means that the probability of generating **X0** as at least
 one operand is ``2/32``. To increase the probability of generating **X0** as a
 source register you can explicitly reserve other registers. We will also add
 `Operands Reinitialization Config <#operands-reinitialization>`__ to specify
@@ -5701,9 +5745,7 @@ values that are written to source registers:
              - type: operands
                values: [1, 1]
 
-
-
-With this config probability of choosing **X0** as a source register is ``1/5``.
+With this config, the probability of choosing **X0** as a source register is ``1/5``.
 However limiting the number of available registers might affect generation of
 all instructions from histogram. Let us take a look at a possible solution to
 this problem that involves generating 2 snippets with custom call graph.
@@ -5711,7 +5753,7 @@ this problem that involves generating 2 snippets with custom call graph.
 The first snippet will reuse the :ref:`config above <svinval-hypervisor>` that
 produces a ``svinval_random`` function.
 
-The second snippet we will generate using the following config:
+The second snippet is generated using the following config:
 
 .. code:: yaml
 
@@ -5758,15 +5800,15 @@ The second snippet we will generate using the following config:
 
 This config generates random code that uses all available registers and
 periodically calls ``svinval_random`` that was generated previously. Now we
-just need to link ``svinval-caller.elf`` and ``svinval.elf`` together and we
-will get a random snippet with normal generation of instructions from the second
+need to link ``svinval-caller.elf`` and ``svinval.elf`` together and we
+get a random snippet with normal generation of instructions from the second
 config and constrained generation of svinval instructions that increases probability
 of using **X0** as source register.
 
 AArch64
 -------
 
-snippy currently supports only the **AArch64** (A64) base ISA
+Snippy currently supports only the **AArch64** (A64) base ISA
 and a handful of its “basic” instructions. The supported
 subset is intended mainly for demonstration and simple
 testing purposes; the list of supported and tested instructions can be found in
