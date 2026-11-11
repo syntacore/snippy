@@ -172,7 +172,7 @@ private:
   ParserReturnType parseRangeForRepeatNode(ParserReturnType LhsNode) {
     if (!LhsNode)
       return LhsNode.takeError();
-    auto LeftRange = parseDegreeArgumentForRepeatNode();
+    auto LeftRange = parseDegreeArgumentForRepeatNode(/*AllowZero*/ true);
     if (!LeftRange)
       return LeftRange;
     auto *LeftRangeNum = dyn_cast<NumberNode>(LeftRange->get());
@@ -206,7 +206,7 @@ private:
                                         std::make_pair(Min, Max));
   }
 
-  ParserReturnType parseDegreeArgumentForRepeatNode() {
+  ParserReturnType parseDegreeArgumentForRepeatNode(bool AllowZero = false) {
     auto Arg = parseFactor();
     if (!Arg)
       return Arg.takeError();
@@ -216,12 +216,14 @@ private:
           std::make_error_code(std::errc::invalid_argument),
           llvm::formatv("invalid argument for '{0}' operation",
                         Operations::Pow));
-    if (ArgNum->isNonPositive())
+    if (!ArgNum->isNonNegative() || (!AllowZero && ArgNum->isNonPositive()))
       return createStringError(
           std::make_error_code(std::errc::invalid_argument),
           llvm::formatv("invalid argument for '{0}' operation. An integer "
-                        "greater than 0 is expected",
-                        Operations::Pow));
+                        "{1} is expected",
+                        Operations::Pow,
+                        AllowZero ? "greater than or equal to 0"
+                                  : "greater than 0"));
     return Arg;
   }
 

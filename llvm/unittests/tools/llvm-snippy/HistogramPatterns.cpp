@@ -92,7 +92,7 @@ void checkOpcodeProbabilities(const ChoiceNode &OpcodesTree,
 // the weight of the CartesianNode itself.
 // - The weight for a RepeatNode argument
 // (denoted by ^) is calculated as the weight of the RepeatNode itself
-// multiplied by the repetition count of that argument.
+// multiplied by the expected repetition count of that argument.
 // - The total weight is calculated as the sum of the weights of all opcodes.
 // The probability of an individual opcode is calculated as the opcode's weight
 // divided by the total weight.
@@ -184,6 +184,25 @@ TEST(OpcodeHistogramVisitor, CheckWeightMethodHard) {
   OpcodeWeightsTy OpcodeWeights{{ADD, 7.0 / 3},  {AND, 17.0 / 3},
                                 {MUL, 16.0 / 3}, {DIV, 4.0 / 3},
                                 {SUB, 4.0 / 3},  {MOV, 12.0}};
+  checkOpcodeProbabilities(OpcodesTree, OpcodeWeights);
+}
+
+TEST(OpcodeHistogramVisitor, CheckWeightMethodRepeatRange) {
+  //            OpcodesTree
+  //     -------------------------
+  //        |              |
+  //   ADD ^ [0 : 2]      SUB[1.0]
+  //
+  // Weights:
+  // ADD -> (0 + 2) / 2 = 1.0
+  // SUB -> 1.0
+  // TotalWeight = 2.0
+  ChoiceNode OpcodesTree;
+  OpcodesTree.emplace<OpcodeNode>(SUB, 1.0);
+  OpcodesTree.emplace<RepeatNode>(BaseNode::create<OpcodeNode>(ADD),
+                                  RepeatNode::RangeType{0, 2});
+
+  OpcodeWeightsTy OpcodeWeights{{ADD, 1.0}, {SUB, 1.0}};
   checkOpcodeProbabilities(OpcodesTree, OpcodeWeights);
 }
 

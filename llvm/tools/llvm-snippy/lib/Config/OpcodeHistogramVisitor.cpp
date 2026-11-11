@@ -149,7 +149,7 @@ void OpcodeProbVisitor::visit(const RepeatNode &Pow) {
   assert(Found != NodeWeight.end() &&
          "All parent nodes must have already been processed");
   auto PathWeight = Found->second;
-  NodeWeight[Arg] = PathWeight * Pow.degree();
+  NodeWeight[Arg] = PathWeight * Pow.expectedDegree();
   Arg->accept(*this);
 }
 

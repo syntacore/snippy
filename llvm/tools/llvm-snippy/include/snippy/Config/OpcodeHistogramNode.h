@@ -455,6 +455,12 @@ public:
 
   unsigned degree() const { return Degree; }
 
+  double expectedDegree() const {
+    return (static_cast<double>(Range.first) +
+            static_cast<double>(Range.second)) /
+           2.0;
+  }
+
 private:
   unsigned generateDegree() const {
     return RandEngine::genInRangeInclusive<unsigned>(Range.first, Range.second);
