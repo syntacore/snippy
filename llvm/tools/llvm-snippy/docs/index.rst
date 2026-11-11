@@ -686,6 +686,12 @@ operations, such as:
 
     -  For instance, ``ADD ^ [3 : 4]`` would signify either three or four consecutive ``ADD`` instructions.
 
+    -  For instance, ``(NTL_P1 ^ [0 : 1]) * LB`` would signify an optional ``NTL_P1``
+       hint before ``LB``.
+
+    The minimum value of the range can be zero, in which case the repeated
+    opcode/pattern is omitted. The maximum value must be greater than zero.
+
 The Cartesian products (``*``) and Repetitions (``^``) produce
 indivisible sequences of primary instructions,
 i.e. snippy never inserts ancillary instructions into these sequences.

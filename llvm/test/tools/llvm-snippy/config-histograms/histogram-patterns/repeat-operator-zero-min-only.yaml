@@ -1,0 +1,20 @@
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: "+m"
+  num-instrs: 150
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - AddZero: "ADD ^ [0 : 3]"
+
+histogram:
+  - [pattern: AddZero, 1.0]
+
+# CHECK-COUNT-150: ADD

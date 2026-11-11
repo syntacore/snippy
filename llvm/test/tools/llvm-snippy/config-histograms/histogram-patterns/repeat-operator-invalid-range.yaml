@@ -9,6 +9,12 @@
 # RUN: not llvm-snippy %s --define-main-histogram=MissingColong \ 
 # RUN: %S/Inputs/invalid-repeat-range-min-max-conflict.yaml |& FileCheck %s --check-prefix=MIN_MAX_CONFLICT
 
+# RUN: not llvm-snippy %s --define-main-histogram=ZeroMax \
+# RUN: %S/Inputs/invalid-repeat-range-zero-max.yaml |& FileCheck %s --check-prefix=ZERO_MAX
+
+# RUN: not llvm-snippy %s --define-main-histogram=NegativeMin \
+# RUN: %S/Inputs/invalid-repeat-range-negative-min.yaml |& FileCheck %s --check-prefix=NEGATIVE_MIN
+
 include:
   - Inputs/sections.yaml
 
@@ -25,3 +31,9 @@ options:
 # MIN_MAX_CONFLICT: error: invalid range for '^' operation. Expected format:
 # MIN_MAX_CONFLICT-SAME: '[min : max]', where min <= max. Provided: '[10 : 5]'
 # MIN_MAX_CONFLICT-NEXT: - MinMaxConflict: "ADD ^ [10 : 5]"
+
+# ZERO_MAX: error: invalid argument for '^' operation. An integer greater than 0 is expected
+# ZERO_MAX-NEXT: - ZeroMax: "ADD ^ [0 : 0]"
+
+# NEGATIVE_MIN: error: invalid argument for '^' operation. An integer greater than or equal to 0 is expected
+# NEGATIVE_MIN-NEXT: - NegativeMin: "ADD ^ [-1 : 5]"

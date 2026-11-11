@@ -1,0 +1,21 @@
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: "+m,+zihintntl"
+  num-instrs: 100
+  dump-mf: on
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  - OptionalHint: "(NTL_P1 ^ [0 : 1]) * LB"
+
+histogram:
+  - [pattern: OptionalHint, 1.0]
+
+# CHECK-COUNT-3: NTL_P1{{.*[[:space:]].*}}LB
+
+# COM: check non-pair LB
+# CHECK-COUNT-3: $[[REG:[a-z0-9]+]] = ADDI $[[REG]], {{-?[[:digit:]]+}}, pcsections <0x{{[[:xdigit:]]+}}>{{[[:space:]].*}}$x{{[[:digit:]]+}} = LB $[[REG]]
