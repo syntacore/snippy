@@ -38,6 +38,7 @@ struct IRegisterState {
   virtual void loadFromYamlFile(StringRef, WarningsT &,
                                 const SnippyTarget *Tgt = nullptr) = 0;
   virtual void saveAsYAMLFile(raw_ostream &) const = 0;
+  void saveAsYAMLFile(StringRef YamlPath) const;
 
   virtual bool operator==(const IRegisterState &) const = 0;
   bool operator!=(const IRegisterState &Another) const {
