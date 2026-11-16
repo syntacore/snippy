@@ -39,8 +39,8 @@ void BurstGramData::convertToCustomMode(const OpcodeHistogram &Histogram,
   case BurstMode::LoadStoreBurst:
     CopyFirstIfSatisfies(Group,
                          [&II](auto Opc) { return II.get(Opc).mayStore(); });
-    Groupings->push_back(Group);
-    Group.clear();
+    Groupings->emplace_back(std::move(Group));
+    assert(Group.empty());
     CopyFirstIfSatisfies(Group, [&II](auto Opc) {
       return II.get(Opc).mayLoad() && !II.get(Opc).mayStore();
     });
@@ -51,7 +51,7 @@ void BurstGramData::convertToCustomMode(const OpcodeHistogram &Histogram,
     });
     break;
   }
-  Groupings->push_back(Group);
+  Groupings->emplace_back(std::move(Group));
   Mode = BurstMode::CustomBurst;
 }
 

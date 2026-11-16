@@ -42,6 +42,7 @@ struct BurstGramData final {
   using OpcodeToNumGroupsTy = std::map<unsigned, unsigned>;
   // Returns a mapping from opcode to the number of burst groups it is used in.
   OpcodeToNumGroupsTy getOpcodeToNumBurstGroups() const {
+    assert(Groupings);
     std::map<unsigned, unsigned> OpcodeToNumOfGroups;
     for (const auto &Group : *Groupings)
       for (auto Opcode : Group)

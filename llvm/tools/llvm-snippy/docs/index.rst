@@ -1996,9 +1996,8 @@ where:
       example, all loads and one store in one group, and all other
       stores and fences in another group).
 
--  ``min-size`` and ``max-size`` set the number of memory access
-   instructions in a burst group. There is no restriction on the maximum
-   size.
+-  ``min-size`` and ``max-size`` set the number of instructions in a burst group.
+   There is no restriction on the maximum size.
 
 -  | ``groupings`` |nbsp| -- |nbsp| Specifies the burst more precisely (for the
      ``custom`` mode only).

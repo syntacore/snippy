@@ -16,33 +16,37 @@
 
 #include "snippy/GeneratorUtils/LLVMState.h"
 
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Module.h"
-
 #include "gtest/gtest.h"
+
 #include <string>
+#include <utility>
 
 namespace llvm::snippy::testing {
+
+inline LLVMState getLLVMState(const SelectedTargetInfo &TargetInfo) {
+  auto State = LLVMState::create(TargetInfo);
+  if (!State)
+    snippy::fatal(State.takeError());
+  return std::move(*State);
+}
+
+inline LLVMState getLLVMState(std::string Triple, std::string MArch,
+                              std::string CPU, std::string Features) {
+  return getLLVMState(SelectedTargetInfo{std::move(Triple), std::move(MArch),
+                                         std::move(CPU), std::move(Features)});
+}
 
 struct SnippyState : public ::testing::TestWithParam<SelectedTargetInfo> {
   LLVMState State;
 
   // for TEST_P
-  SnippyState() : State(parseErrorAndGetState(GetParam())) {}
+  SnippyState() : State(getLLVMState(GetParam())) {}
 
   // for TEST_F
   SnippyState(std::string Triple, std::string MArch, std::string CPU,
               std::string Features)
-      : State(parseErrorAndGetState(
-            SelectedTargetInfo{Triple, MArch, CPU, Features})) {}
-
-private:
-  static LLVMState parseErrorAndGetState(const SelectedTargetInfo &TargetInfo) {
-    auto State = LLVMState::create(TargetInfo);
-    if (!State)
-      snippy::fatal(State.takeError());
-    return std::move(*State);
-  }
+      : State(getLLVMState(std::move(Triple), std::move(MArch), std::move(CPU),
+                           std::move(Features))) {}
 };
 } // namespace llvm::snippy::testing
 

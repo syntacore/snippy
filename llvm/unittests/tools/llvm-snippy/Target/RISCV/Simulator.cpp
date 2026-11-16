@@ -14,6 +14,7 @@
 #include "snippy/Simulator/Targets/RISCV.h"
 
 #include "snippy/unittests/SnippyState.h"
+#include "llvm/IR/Module.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

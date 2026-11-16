@@ -18,6 +18,14 @@ if(LLVM_TARGETS_TO_BUILD MATCHES "X86" OR LLVM_EXPERIMENTAL_TARGETS_TO_BUILD MAT
   list(APPEND LLVM_SNIPPY_TARGETS_LIST X86)
 endif()
 
+set(snippy_link_libraries
+  LLVMSnippy
+  )
+
+foreach(t ${LLVM_SNIPPY_TARGETS_LIST})
+  list(APPEND snippy_link_libraries "LLVMSnippy${t}")
+endforeach()
+
 # lit discovers unit test executables by the "Tests" suffix (llvm/test/Unit/lit.cfg.py).
 # A binary named otherwise is built but never run!
 function(add_snippy_unittest test_name)
@@ -33,6 +41,7 @@ add_subdirectory(RandomUtils)
 add_subdirectory(Target)
 
 set(snippy_sources
+  ${snippy_init_gtest_env}
   Support.cpp
   ImmediateHistogram.cpp
   MemoryAccessRange.cpp
@@ -42,16 +51,18 @@ set(snippy_sources
   YAMLTuple.cpp
   YAMLProbableItems.cpp
   MemoryBank.cpp
-  )
-
-set(snippy_link_libraries
-  LLVMSnippy
+  BurstGram.cpp
+  LLVMState.cpp
   )
 
 set(snippy_includes
   ${snippy_unittests_include}
   ${LLVM_MAIN_SRC_DIR}/lib/Target/RISCV/
   ${LLVM_BINARY_DIR}/lib/Target/RISCV
+  ${LLVM_MAIN_SRC_DIR}/lib/Target/X86/
+  ${LLVM_BINARY_DIR}/lib/Target/X86
+  ${LLVM_MAIN_SRC_DIR}/lib/Target/AArch64/
+  ${LLVM_BINARY_DIR}/lib/Target/AArch64
   )
 
 add_snippy_unittest(LLVMSnippyCommonTests
