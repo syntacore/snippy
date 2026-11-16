@@ -62,7 +62,7 @@ provide. In the configuration file(s), you specify:
 
 -  Memory sections available for read, read/write, and read/execute access
 
--  Histogram of instruction probabilities 
+-  Histogram of instruction probabilities
 
 -  Memory access
 
@@ -113,6 +113,14 @@ The snippy output includes:
    See `Dumping Initial
    Registers State <#dumping-initial-registers-state>`__.
 
+Processor Models
+----------------
+
+Snippy supports the following processor models:
+
++-----------------+-----------------+
+| generic-rv32    | generic-rv64    |
++-----------------+-----------------+
 
 
 Running Snippy
@@ -311,11 +319,22 @@ show you which one was used.
 
 In this example, ``options`` are:
 
+.. _`-mtriple`:
+
 **-mtriple**
 
 Target architecture specification, mandatory. Snippy is potentially
 multi-target. In future releases, snippy will support a number of architecture
 specifications (x86, ARM, etc).
+
+The syntax of triple matches the one used in LLVM.
+For more information, see:
+
+*  `LLVM Language Reference Manual
+   <https://llvm.org/docs/LangRef.html#target-triple>`_
+*  `LLVM User Guide for RISC-V Target - Base ISAs
+   <https://llvm.org/docs/RISCVUsage.html#base-isas>`_
+
 
 **-mcpu**
 
@@ -325,7 +344,7 @@ CPU model. If empty, snippy auto-detects it.
 
 The *ISA string* that specifies the architecture for which to generate code.
 The value must be in lowercase.
-See `Platform Support`_ for information about supported architectures.
+See the `Supported Architectures`_ section for more information.
 
 Alternatively, instead of ``march``, you can use the
 ``mattr`` option: in the case of the example above,
@@ -352,6 +371,8 @@ Hardware model plugin you want to use. Available values:
    ``riscv-whisper-plugin.so`` (preferred).
 
 Where ``<PATH>`` is the parent directory of the llvm-snippy executable.
+
+.. _`-num-instrs`:
 
 **-num-instrs**
 
@@ -621,22 +642,31 @@ with the following details for each entry:
       them into the resulting ELF file with the respective section
       information.
 
-.. _`_histogram`:
-
 Histogram
 ---------
 
-The ``histogram`` key covers a list of instructions you want snippy to
-use and their relative weights (floating point).
+The ``histogram`` key specifies a list of opcodes that snippy
+should generate and their relative weights (floating-point numbers).
+A simple example of histogram:
 
-For certain architecture configurations, you must set the names of
-instructions in the same way as in the machine description. For the
-details, refer to `Operation Codes for Specific
-Architecture <#operation-codes-for-specific-architecture>`__ below.
+.. code:: yaml
 
-The ``histogram`` key supports regex. For example:
+   histogram:
+     - [ADDI, 1.0]
+     - [LUI, 1.0]
 
-::
+Opcode mnemonics accepted by snippy may differ from the generally adopted ones.
+In addition, snippy may introduce additional mnemonics (pseudoinstructions)
+when these allow implementation of certain features or
+improve the usability.
+For details, refer to the following sections:
+
+-  `Opcodes for Specific Architecture`_
+-  `RISC-V Opcode Support Details`_
+
+The ``histogram`` key supports regexes, for example:
+
+.. code:: yaml
 
    histogram:
      - ["ADDI?", 1.0]
@@ -644,11 +674,62 @@ The ``histogram`` key supports regex. For example:
      - ["(VSSE16_V)|(VSSE32_V)", 1.0]
      - ["VSSE.*", 2.0]
 
-.. _`_patterns`:
+..
 
-Patterns
-~~~~~~~~
-In addition to opcodes, you can specify patterns in the histogram. For example:
+   .. admonition:: Regex details
+
+      When regex is used, snippy works
+      *as if* all matching opcodes are present in the histogram,
+      and their weights are the same as the regular expression weight.
+      For example, the following two histograms are equivalent:
+
+         .. code:: yaml
+
+            histogram:
+               ...
+               - ["(VSSE16_V)|(VSSE32_V)", 5.5]
+               ...
+
+         .. code:: yaml
+
+            histogram:
+               ...
+               - [VSSE16_V, 5.5]
+               - [VSSE32_V, 5.5]
+               ...
+
+      If the same opcode matches several regexes,
+      only the first match is in effect. Let’s consider the following example:
+
+         .. code:: yaml
+
+            histogram:
+               ...
+               - ["(VSSE16_V)|(VSSE32_V)", 0.1]
+               - ["VSSE[0-9]+_V", 5.0]
+               ...
+
+         For the generic 64-bit RISC-V processor with V extension,
+         the first regex textually matches two opcodes
+         (``VSSE16_V`` and ``VSSE32_V``),
+         and the second one matches four opcodes
+         (``VSSE16_V``, ``VSSE32_V``, ``VSSE64_V`` and ``VSSE8_V``).
+         However snippy works *as if* the second regex matches only
+         ``VSSE64_V`` and ``VSSE8_V``, because ``VSSE16_V`` and ``VSSE32_V``
+         already matched the first regex.
+         The equivalent histogram:
+
+         .. code:: yaml
+
+            histogram:
+               ...
+               - [VSSE16_V, 0.1]
+               - [VSSE32_V, 0.1]
+               - [VSSE64_V, 5.0]
+               - [VSSE8_V, 5.0]
+               ...
+
+In addition to opcodes, you can use *patterns* in the histogram. For example:
 
 .. code:: yaml
 
@@ -659,53 +740,353 @@ In addition to opcodes, you can specify patterns in the histogram. For example:
      - [ADDI, 1.0]
      - [LUI, 1.0]
 
-A pattern is a sequence of machine instructions (such as *ADD*, *MUL*, *LD*, and *SD*) that
-together perform a specific, complex action defined by the user. Patterns can be
-specified in the dedicated `Histogram Patterns`_ field.
+A *pattern* expands to a sequence of machine instructions.
+Patterns are explained in detail in the `Histogram Patterns`_ section.
+
+.. _`histogram-patterns`:
 
 Histogram Patterns
-^^^^^^^^^^^^^^^^^^
-The ``histogram-patterns`` allows you to define histograms from opcodes and other
-histograms (defined within the same configuration) using various algebraic
-operations, such as:
+------------------
+When used in a histogram, patterns are expanded into a sequence
+of machine instructions.
+Informally speaking, patterns provide means to generate
+code that performs a specific, complex action,
+adding a bit of randomization to taste,
+and insert that code into the resulting snippet as a single, indivisable block.
 
--   ``|`` - Probabilistic OR (selection from either the left or right expression).
-    Lets take two opcodes, DIV and MUL. The expression ``DIV | MUL`` then means
-    choosing either ``DIV`` or ``MUL`` (by default, all opcodes within the patterns have equal probability).
+Patterns are defined under the top-level ``histogram-patterns`` YAML key.
 
--   ``*`` - Cartesian product.
-    For example, consider two opcode sequences: ``[ADD | SUB] * [LD | SD]``.
-    Their Cartesian product yields all possible two-instruction sequences
-    where an opcode from the first set is followed by an opcode from the second:
-    ``ADD + LD; ADD + SD; SUB + LD; SUB + SD``.
+**Syntax of pattern definition:**
 
--   ``^`` - Repetition of an opcode/pattern N times. You can specify either a possible range
-    in the format [min : max] or a specific number of repetitions for the pattern. E.g:
+.. code:: yaml
 
-    -  For instance, ``ADD ^ 3`` would signify three consecutive ``ADD`` instructions.
+   histogram-patterns:
+      - <pattern-name>: <pattern-expression>
+      - ...
 
-    -  For instance, ``ADD ^ [3 : 4]`` would signify either three or four consecutive ``ADD`` instructions.
+**Basic definitions:**
 
-    -  For instance, ``(NTL_P1 ^ [0 : 1]) * LB`` would signify an optional ``NTL_P1``
-       hint before ``LB``.
+-  The *pattern* is a named *pattern-expression*.
 
-    The minimum value of the range can be zero, in which case the repeated
-    opcode/pattern is omitted. The maximum value must be greater than zero.
+-  The *pattern-expression* is a valid sequence of *pattern-operands*
+   and *pattern-operators* on them.
 
-The Cartesian products (``*``) and Repetitions (``^``) produce
-indivisible sequences of primary instructions,
-i.e. snippy never inserts ancillary instructions into these sequences.
-The features that emit ancillary instructions,
-like `NaN Overwriting`_ and `Address Hazard Mode`_,
-are inactive there.
+-  The available *pattern-operators* are described in the subsections below.
 
-In the ``histogram-patterns``, you can define any number of patterns as a list, using
-previously created patterns to build new ones. A pattern is initialized using
-either a string or the algebraic operations described above.
+-  The *pattern-operand* is one of:
 
-.. Important::
+   -  a mnemonic of an opcode (note the `pattern opcode restrictions`_),
+   -  a *pattern-name*, a name of some other, previously defined *pattern*,
+   -  any valid *pattern-expression*, optionally enclosed in parentheses
+      ``()``.
 
-   By default, the weight of all opcodes is set to one.
+   The *pattern-operand* may also contain an optional *weight*.
+   The weight is enclosed in square brackets ``[]`` and treated as a
+   floating-point number.
+
+   .. note::
+      The default value of weight is 1.0.
+
+The following example defines a pattern and then uses it in a histogram:
+
+.. code:: yaml
+
+   histogram-patterns:
+      - LoadStore: "LD * SD"
+
+   histogram:
+      - [ADD, 1.0]
+      - [SUB, 1.0]
+      - [pattern: LoadStore, 1.0]
+
+Pattern Operators
+~~~~~~~~~~~~~~~~~
+
+``|`` - The Probabilistic OR Pattern Operator
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Syntax:**
+   *pattern-operand* |nbsp| |nbsp| ``|`` |nbsp| |nbsp| *pattern-operand*
+
+The Probabilistic OR operator
+performs random selection of either the left or right *pattern-operand*
+according to their relative weights.
+
+   .. admonition:: Example
+
+      "``DIV | MUL``" expands to either ``DIV`` or ``MUL``,
+      with equal probability.
+
+Explicit weighting allows changing the relative probability.
+
+   .. admonition:: Example of weighted operands in ``|``
+
+      "``ADD [2.0] | SUB``" expands to either ``ADD`` or ``SUB``,
+      with the probability of getting ``ADD`` being twice as high as ``SUB``.
+
+``*`` - The Cartesian Product Pattern Operator
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Syntax:**
+   *pattern-operand* |nbsp| |nbsp| ``*`` |nbsp| |nbsp| *pattern-operand*
+
+The Cartesian Product operator
+treats the left and right *pattern-operands* as sets of elements.
+It operates *as if* a Cartesian product operator was applied to these sets,
+producing an intermediate set of pairs, and then
+one pair is randomly selected from the intermediate set.
+The selected pair is what the operator expands to.
+
+   .. admonition:: Simplest example
+
+      "``ADD * SUB``" expands to the ``(ADD, SUB)`` code sequence.
+      This is an example of generating a simple linear indivisible
+      sequence of instructions.
+
+   .. admonition:: Example
+
+      "``(ADD | SUB) * (LD | SD)``" works *as if it were producing*
+      the intermediate set of all possible two-instruction sequences,
+      in which an opcode from the left OR expression
+      is followed by an opcode from the right OR:
+
+         ``{ (ADD, LD), (ADD, SD), (SUB, LD), (SUB, SD) }``
+
+      One of these two-instruction sequences is then randomly selected
+      for code generation.
+
+When an operand is an expression or pattern that
+contains a Probabilistic OR operator,
+the weights of Probabilistic OR operands affect the result.
+
+   .. admonition:: Example of using ``|`` with weighted operands
+
+      "``(ADD [2.0] | SUB) * LD``" has the ``(ADD [2.0] | SUB)``
+      Probabilistic OR expression as a left operand of ``*``.
+      It is considered as a set of three elements ``{ADD, ADD, SUB}``,
+      where ``ADD`` occurs twice because its weight is
+      twice as big as weight of ``SUB``.
+      The right operand of ``*`` is a set of one element ``{ LD }``.
+
+      So the intermediate set of two-instruction sequences looks as follows:
+
+         ``{ (ADD, LD), (ADD, LD), (SUB, LD) }``
+
+      One of these sequences is then randomly selected for code generation.
+      If pattern is expanded multiple times, then
+      ``(ADD, LD)`` will be emitted twice as often as ``(SUB, LD)``.
+
+The operand weights, if present, do not affect the result itself
+(i.e. they do not affect how snippy selects a result from the
+intermediate set), but they do determine the *result’s weight*.
+The *result’s weight* is set to the product of the input operand weights.
+
+The *result’s weight* only matters if the result is then used in
+Probabilistic OR. It influences the random selection performed by Probabilistic OR.
+
+   .. admonition:: Example of using weighted result of ``*`` in ``|``
+
+      .. code:: yaml
+
+         histogram-patterns:
+         - P1: "ADD [2.0] * SUB [1.5]"
+         - P2: "MUL [3.0] | P1 [4.0]"
+
+      P2 expands to "``MUL [3.0] | (ADD * SUB) [12.0]``",
+      where "12.0" is obtained as the product of weights from
+      the *definition* of pattern P1 (2.0 * 1.5 = 3.0) which is then
+      multiplied by the weight from *the use* of P1 (4.0) in P2,
+      which finally gives 12.0.
+
+      If used in a histogram, P2 would expand to
+      either a single ``MUL`` or the ``(ADD, SUB)`` sequence.
+      The former is 4 times less likely to be generated than the latter.
+
+``^`` - The Repetition Pattern Operator
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Syntax:**
+   *pattern-operand* |nbsp| |nbsp| ``^`` |nbsp| |nbsp| *integer-or-range*
+
+The right operand should be an *integer* number or a colon-separated *range*
+of two integers, enclosed in square brackets.
+The following restrictions should be met:
+
+- all numbers should be at least ``1``,
+  except the the first number in *range*, which is also allowed to be ``0``,
+
+- the second number in range should be greater or equal than the first one.
+
+When the right operand is an integer ``N``, the operator works *as if* ``(N-1)``
+repetitions of the Cartesian Product (``*``) were applied to the left operand.
+
+   .. admonition:: Example
+
+      "``ADD ^ 3``" is equivalent to an expression containing
+      two Cartesian product operators "``(ADD * ADD * ADD)``",
+      which expands to three consecutive ``ADD`` instructions.
+
+When the right operand is a range, the difference is that
+an integer ``N`` is first randomly selected from the range ``[L:M]``.
+*This happens each time when the pattern is expanded.*
+Then operator proceeds as described in the paragraph above,
+except the case when selected ``N`` is ``0``:
+if this happens, the ``^`` expression expands to nothing.
+
+   .. admonition:: Example with range
+
+      "``ADD ^ [2 : 3]``" is equivalent to either
+      "``(ADD * ADD)``" or "``(ADD * ADD * ADD)``",
+      and expands to either two or three consecutive ``ADD`` instructions.
+
+   .. admonition:: Example with randomly disappearing hint instruction
+
+      "``NTL_P1 ^ [0 : 1] * LD``" expands to either
+      hint instruction and then load "``{NTL_P1, LD}``" or single load "``LD``".
+      Approximately 50% of expansions would not have a hint.
+
+Pattern-Expression Evaluation Order
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+During the evaluation of *pattern-expressions*,
+sub-expressions are evaluated in order of their *precedence*.
+A *pattern-operator* of higher precedence is evaluated before
+a *pattern-operator* of lower precedence.
+
+Operators of equal precedence are evaluated from left to right.
+
+Parentheses can be used to change the evaluation order.
+
+.. list-table::
+   :header-rows: 1
+
+   *  - Operator
+      - Precedence
+      - Priority
+   *  - ``^``
+      - 3
+      - Highest
+   *  - ``*``
+      - 2
+      -
+   *  - ``|``
+      - 1
+      - Lowest
+
+.. admonition:: Examples
+
+   *  "``C | A * B``" |nbsp| -- |nbsp| the evaluation order is:
+      first "``*``", then "``|``", i.e. *as if* the following parentheses
+      are applied: "``C | (A * B)``".
+
+   *  "``A * B | C``" |nbsp| -- |nbsp| the evaluation order is
+      the same as in the previous example:
+      first "``*``", then "``|``", i.e. "``(A * B) | C``".
+
+   *  "``A * (B | C) * D``" |nbsp| -- |nbsp| the evaluation order is:
+      first "``|``", then left-side "``*``", then right-side "``*``",
+      i.e. "``(A * (B | C)) * D``".
+
+   *  "``A * B | C ^ D``" |nbsp| -- |nbsp| the evaluation order is:
+      first "``^``", then "``*``", then "``|``", i.e. "``(A * B) | (C ^ D)``".
+
+Special Considerations
+~~~~~~~~~~~~~~~~~~~~~~
+
+Inactive Features
+^^^^^^^^^^^^^^^^^
+
+During pattern expansion,
+an indivisible sequence of primary instructions is generated.
+Thus, snippy never inserts **ancillary** instructions into these sequences.
+Therefore:
+
+.. important::
+
+   The features that emit ancillary instructions,
+   like `NaN Overwriting`_ and `Address Hazard Mode`_,
+   are inactive in patterns.
+
+Patterns are designed to generate instruction sequences
+with as much user control as possible, including
+how those sequences are randomized. Therefore:
+
+.. note::
+
+   The code blocks generated from patterns are
+   insensitive to `Random scheduling`_.
+
+Incompatible Features and Restrictions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. important::
+
+   Patterns are currently incompatible with the
+   `-valuegram-operands-regs`_ option.
+
+.. _`pattern opcode restrictions`:
+
+.. important::
+
+   The branch instructions cannot be used in patterns.
+
+.. important::
+
+   **RISC-V:** RVV instructions cannot be used in patterns.
+   This restriction will be eliminated in future snippy versions.
+
+
+Possibility of Incomplete Pattern Expansion
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The number of primary instructions to generate
+is globally set via the `-num-instrs`_ option.
+Exceeding this limit is an error.
+
+On the other hand, an indivisible sequence of primary instructions is produced
+during pattern expansion. The number of instructions generated depends on
+the template definition and how Snippy randomizes it during generation.
+Snippy does not evaluate it in advance.
+
+Therefore, it is possible that
+the code generated during pattern expansion
+may exceed the global limit set via ``-num-instrs``,
+which would lead to an error.
+
+.. warning::
+
+   In order to prevent the error described above,
+   snippy stops code generation once the instruction limit is reached.
+   As a result, the most recent expansion of pattern in the snippet
+   may be incomplete.
+
+Redefining Main Histogram
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This feature is intended mostly for debugging and testing purposes,
+but we hope the reader will find it useful for something else.
+It allows replacing the contents of the main `Histogram`_
+with a single pattern.
+
+**CLI syntax:** ``--define-main-histogram=<pattern-name>``
+
+Example:
+
+   .. code:: yaml
+
+      histogram-patterns:
+         - LoadStore: "LD * SD"
+      histogram:
+         - [ADD, 1.0]
+         - [SUB, 1.0]
+         - [pattern: LoadStore, 1.0]
+
+   By default, the mix of "``ADD``", "``SUB``", and "``(LD, SD)``" pairs
+   is generated. If ``--define-main-histogram=LoadStore`` is provided,
+   then the snippet will contain only "``(LD, SD)``" pairs.
+
+Pattern Example with Explanation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Lets look at a simple example of defining histogram patterns:
 
@@ -718,109 +1099,52 @@ Lets look at a simple example of defining histogram patterns:
 
 In the example above:
 
--  The ``AddMul`` histogram can produce one of the following:
+-  The ``AddMul`` pattern can produce one of the following:
 
-   - The sequence [ADD MUL]:
+   - The "``ADD``, ``MUL``" sequence:
 
-      ::
+      .. code:: asm
 
          ADD r1, r2, r3
          MUL r4, r5, r6
 
-   - The single opcode ADD:
+   - Single ADD:
 
-      ::
+      .. code:: asm
 
          ADD r1, r2, r3
 
-   - The single opcode MUL:
+   - Single MUL:
 
-      ::
+      .. code:: asm
 
          MUL r1, r2, r3
 
--  Similarly, the ``LoadStore`` histogram can produce one of two sequences:
+-  Similarly, the ``LoadStore`` pattern can produce one of two sequences:
 
-   - [LD SD]:
+   - "``LD``, ``SD``":
 
-      ::
+      .. code:: asm
 
          LD r1, [r2]
          SD r3, [r4]
 
-   - [SD LD]
+   - "``SD``, ``LD``":
 
-      ::
+      .. code:: asm
 
          SD r1, [r2]
          LD r3, [r4]
 
--  The ``MultiHistogram`` is initialized using the two previous histograms and can
-   produce either:
+-  The ``MultiHistogram`` is defined using the two previous histograms
+   and results in either two expansions of ``AddMul``, or
+   the code emitted by ``LoadStore`` with an appended ``LUI`` instruction.
+   Now it can be used in the main histogram like this:
 
-   - The ``AddMul`` histogram repeated twice
-   - The ``LoadStore`` histogram with an appended LUI instruction
+   .. code:: yaml
 
-
-.. note::
-
-    If the size of the generated pattern exceeds the remaining number of
-    instructions, it will be generated only partially, until the instruction
-    limit is reached
-
-Now they can be used in the main histogram.
-
-.. code:: yaml
-
-   histogram:
-     - [pattern: AddMul, 1.0]
-     - [pattern: LoadStore, 1.0]
-     - [pattern: MultiHistogram, 1.0]
-
-You can specify weights for opcodes and patterns using the square bracket syntax:
-
-.. code:: yaml
-
-   histogram-patterns:
-     - AddSub: "ADD [2.0] | SUB [1.5]"
-     - MulDivMixed: "MUL [3.5] | AddSub [0.5] | DIV [10.0] * AND [2.0]"
-
-
-In operations ``*`` and ``^``, the weight of the resulting expression is
-obtained by multiplying the weights of the individual opcodes.
-In the example above, the expression ``DIV [10.0] * AND [2.0]`` expands to
-``DIV * AND [20.0]``.
-
-Also, using the ``--define-main-histogram=<Name>`` option, you can override the main
-`histogram` with a histogram from the `histogram-patterns`. If you do not specify it,
-snippy uses the default value (``histogram``).
-
-For example, by providing ``--define-main-histogram=LoadStore``, only the following
-pairs will be generated:
-
-::
-
-   LD r1, [r2]
-   SD r3, [r4]
-
-or
-
-::
-
-   SD r1, [r2]
-   LD r3, [r4]
-
-.. important::
-
-   -  Patterns are currently incompatible with ``--valuegram-operands-regs``.
-   -  You cannot yet use vector or branch instructions in patterns.
-
-.. note::
-
-   Patterns are insensitive to `Random scheduling`_.
-   Patterns are designed to generate instruction sequences
-   with as much user control as possible, including
-   how those sequences are randomized.
+      histogram:
+      - [pattern: MultiHistogram, 1.0]
 
 .. _`_immediate_histograms`:
 
@@ -874,20 +1198,30 @@ configurations in the ``./yml`` directory.
    When using an immediate histogram with memory instructions, note that constant registers
    (such as x0 on RISC-V) will not be used as the base address register.
 
-.. _`_operation_codes_for_specific_architecture`:
-
-Operation Codes for Specific Architecture
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Opcodes for Specific Architecture
+---------------------------------
 
 To obtain the opcodes available for a certain architecture machine
-description, run:
+description, use the ``--list-opcode-names`` CLI option:
 
-.. code:: shell
+   .. admonition:: Example for RISC-V
 
-   ./llvm-snippy -mtriple=riscv64 -mcpu=<processor_model> \
-      -march=<ISA_string> --list-opcode-names
+      .. code:: shell
 
-For supported values of ``<ISA_string>``, see `Platform Support`_.
+         ./llvm-snippy -mtriple=riscv64 -mcpu=generic-rv64 \
+            -march=rv64i --list-opcode-names
+
+For information about possible arguments of ``-mtriple``,
+i.e. supported *target-triples*,
+please see the description of the `-mtriple`_ option.
+
+The list of supported arguments of ``-mcpu``,
+i.e. *processor-models*,
+can be found in the `Processor Models`_ section.
+
+For supported arguments of ``--march``,
+i.e. *isa-strings*,
+please see `Supported Architectures`_.
 
 .. _`_fpu_configuration`:
 
@@ -1879,9 +2213,10 @@ An example for collecting addresses:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64 -mcpu=scr9 ./yml/layout.yaml \
+   ./llvm-snippy -mtriple=riscv64 ./yml/layout.yaml \
        ./yml/eviction.yaml -model-plugin=spike -num-instrs=100 -seed=0 \
        --trace-log=log --dump-memory-accesses=acc.yaml \
+       -Wno-error=non-reproducible-execution \
        -o layout.elf
 
 .. container:: formalpara-title
@@ -2439,10 +2774,11 @@ setting:
 
 ::
 
-   ./llvm-snippy -mtriple=riscv64 -mcpu=scr9 \
+   ./llvm-snippy -mtriple=riscv64 -march=rv64imafdc_zba_zbb_zbc_zbs \
    ./yml/layout-branches-chaining.yaml ./yml/memory-aligned.yaml \
    -model-plugin=./riscv-sail-plugin.so -num-instrs=500 -seed=0 \
    -init-memory=full-with-addresses --init-cons-loop-in-prev-loop \
+   -Wno-error=non-reproducible-execution \
    --trace-log trace.log
 
 The result of such a configuration looks similar to the following:
@@ -3470,7 +3806,7 @@ The result may look like:
 where ``0x0080200802008020`` and ``0x2010080402010080`` are two
 different bitpatterns.
 
-.. _`_initializing_operand_registers`:
+.. _`-valuegram-operands-regs`:
 
 Initializing Operand Registers
 ------------------------------
@@ -3481,16 +3817,21 @@ instruction via valuegrams. To do this, use the
 with initialization values to use. Operands that are addresses are not
 initialized. For example:
 
-::
+.. code:: yaml
 
    ...
-     options:
-       valuegram-operands-regs: "registers.yaml"
+   options:
+      valuegram-operands-regs: "registers.yaml"
+   ...
 
 .. important::
 
-   Currently, this functionality does not support initialization of
-   vector registers.
+   **RISC-V:** Currently, this functionality does not support
+   initialization of vector registers.
+
+.. important::
+
+   This feature is currently incompatible with `Histogram Patterns`_.
 
 The input YAML file can have one of the following formats:
 
@@ -5526,20 +5867,31 @@ where you use:
 
 -  ``"<filename>.yaml"`` |nbsp| -- |nbsp| To dump the output to ``<filename>.yaml``.
 
-Platform Support
-================
+Supported Architectures
+=======================
 
 RISC-V
 ------
 
-Snippy supports the following RISC-V configurations:
+Wherever the manual mentions valid RISC-V *isa-string*,
+it implies a string composed according to the
+`RISC-V Extension Naming Conventions
+<https://docs.riscv.org/reference/isa/v20260120/unpriv/naming.html>`_,
+and then **converted to lowercase**.
 
-- **RV32I** - Base Integer Instruction Set (32-bit)
-- **RV64I** - Base Integer Instruction Set (64-bit)
+   .. admonition:: Example
 
-.. _RISC-V C extension:
-.. If/when we decide to create a separate section about RISC-V C
-   extension, the hyperlink references to it may remain the same.
+      ``rv32imafdc_zicsr``
+
+Supported Base Integer ISAs and Extensions are listed below.
+
+Base Integer RISC-V ISA
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Snippy supports the following RISC-V Base Integer ISA strings:
+
+- **rv32i** - Base Integer Instruction Set (32-bit)
+- **rv64i** - Base Integer Instruction Set (64-bit)
 
 RISC-V Extensions
 ~~~~~~~~~~~~~~~~~
@@ -5552,6 +5904,10 @@ RISC-V architecture is supported with the following extensions. For the details,
 
 
 **Standard Extensions**
+
+.. _RISC-V C extension:
+.. If/when we decide to create a separate section about RISC-V C
+   extension, the hyperlink references to it may remain the same.
 
 - **I** - Base Integer Instruction Set
 - **M** - Integer Multiplication and Division
@@ -5568,7 +5924,7 @@ RISC-V architecture is supported with the following extensions. For the details,
 - **Zcd** - Compressed double precision loads and stores
 - **Zcf** - Compressed single precision loads and stores
 - **Zcmop** - Compressed May-Be-Operations
-- **Zcmp** - Compressed Multiple‑Register/Stack Operations
+- **Zcmp** - Compressed Multiple-Register/Stack Operations
 - **Zcmt** - Compressed table jump instructions
 
 **Zi* Extensions**
@@ -5577,7 +5933,16 @@ RISC-V architecture is supported with the following extensions. For the details,
 - **Zicbom** - Cache-Block Clean/Flush/Invalidate
 - **Zicbop** - Cache-Block Prefetch
 - **Zicboz** - Cache-Block Zero
+- Main memory regions with both cacheability and coherence PMAs:
+
+  - **Ziccamoa** - Support all atomics in A
+  - **Ziccamoc** - Reliably support Zacas
+  - **Ziccif** - Support instruction fetch with atomicity requirement
+  - **Zicclsm** - Support misaligned loads and stores
+  - **Ziccrse** - Support forward progress on LR/SC sequences
+
 - **Zicond** - Integer Conditional Operations
+- **Zicsr** - CSR Instructions
 - **Zifencei** - Instruction-Fetch Fence
 - **Zihintntl** - Non-Temporal Locality Hints
 - **Zihintpause** - Pause hint
@@ -5585,9 +5950,12 @@ RISC-V architecture is supported with the following extensions. For the details,
 
 **Za* Extensions**
 
-- **Zaamo** - Custom AMO (Atomic Memory Operations) Extension
-- **Zabha** - Custom Byte-Hostile Atomic Extension
+- **Za128rs** - Reservation set size of 128 bytes
+- **Za64rs** - Reservation set size of 64 bytes
+- **Zaamo** - Atomic memory operations
+- **Zabha** - Byte and Halfword Atomic Memory Operations
 - **Zacas** - Atomic Compare-and-Swap (CAS) Instructions
+- **Zalrsc** - Load-Reserved/Store-Conditional Instructions
 
 **Zba* Extensions**
 
