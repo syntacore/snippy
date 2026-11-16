@@ -5600,6 +5600,26 @@ A SNTF file begins with a **header** containing, after **#** (comments), the fol
 
 Together, items 3 and 4 should list all features of the version from item 2.
 
+.. note::
+
+  Changes to the SNTF format are **additive only** within a fixed major
+  version family: a minor version bump (e.g. 1.1 to 1.2) may only introduce
+  new features, that is, new columns, while the syntax and semantics of all
+  existing features and columns remain unchanged. Any change that violates
+  these guarantees (e.g. altering, reordering, or removing existing
+  features or columns) requires a major version bump. The probability of
+  ever moving to a new major version, 2.0, is very low, which means
+  backward compatibility will most likely never be broken: the main idea
+  of the format is to add new feature flags, not break the old ones.
+
+.. note::
+
+  For any fixed major version N, a single compliant parser can support
+  **all** versions N.x: parsers that support an older version remain
+  compatible with newer versions within the same major version family, as
+  long as they ignore unknown features and the columns corresponding to
+  them.
+
 All names of the features in **version 1.1**:
 
 * ``time``
@@ -5640,6 +5660,18 @@ You can enable or disable these features using the ``sntf-config`` key in your l
 After the header, each line contains the entries that were selected in the
 header, separated by a whitespace.
 
+The order of columns in each entry strictly follows the order of the
+``+<feature>`` lines in the header: each enabled feature has its own
+column, printed in the same order as the feature is listed in the header.
+The only exception is ``csrs-changed`` — the only feature that does not
+have its own dedicated column. If ``registers-changed`` is enabled, it
+does not matter where ``csrs-changed`` is listed in the header: CSR
+updates are always printed in the column of register updates
+(``registers-changed``), separated from them and from each other by a
+comma. If ``registers-changed`` is disabled, CSR updates are printed in
+the column corresponding to the position of ``csrs-changed`` in the
+header.
+
 **Entry format:**
 
 +-----------+------------+---------------+------------+---------------+-------------------------------+
@@ -5656,15 +5688,51 @@ header, separated by a whitespace.
   (``vlen`` = 128) ``v4=[1]:0000000000227c3d[0]:0000000100227c3d``
 
   (``vlen`` = 256) ``v7=[3]:00000f0000000001[2]:0000000000000a00[1]:0000b00000000000[0]:00000c0000000000``
+* CSR updates are printed in the same column as register updates, in the form ``csr<csr-id>=<value>`` (e.g. ``csr1=00000000``).
 * The format of memory accesses: ``<Addr>:<AccessType>:<Value>``.
 
   The access size is determined by the number of characters in the Value. ``AccessType`` can be either **W** (write) or **R** (read).
 
-**Entry example:**
+**Detailed example:**
+
+The example below is a fragment of a real SNTF trace. Some columns of an
+entry are printed only when there is data to report for them: if an
+instruction made no memory accesses, the memory column is omitted; if no
+registers or CSRs were changed, the register column is omitted as well.
+Currently, this applies only to the register and memory columns — all
+the remaining columns are always printed.
 
 .. code:: yaml
 
-   520 000086d0 11010093 000086d4 f4=017f7ff0 2ff4fe98:W:fa,2ff4fe99:R:ee
+   48 0000000010000054 81497357 0000000010000058 x6=0000000000000005,csr8=0000000000000000,csr3104=0000000000000005,csr3105=00000000000000c0
+   49 0000000010000058 00010cb7 000000001000005c x25=0000000000010000
+   50 000000001000005c 140c8c93 0000000010000060 x25=0000000000010140
+   51 0000000010000060 028c8007 0000000010000064 v0=[1]:0000000000000000[0]:0000000000000000,csr8=0000000000000000 0000000000010140:R:00,0000000000010141:R:00,0000000000010142:R:00,0000000000010143:R:00,0000000000010144:R:00,0000000000010145:R:00,0000000000010146:R:00,0000000000010147:R:00,0000000000010148:R:00,0000000000010149:R:00,000000000001014a:R:00,000000000001014b:R:00,000000000001014c:R:00,000000000001014d:R:00,000000000001014e:R:00,000000000001014f:R:00
+   52 0000000010000064 036d8c57 0000000010000068 v24=[1]:ffffffffffffffff[0]:fffffff2aff856b9,csr8=0000000000000000
+   53 0000000010000068 00a209d7 000000001000006c v19=[1]:ffffffffffffffff[0]:ffffffffffffffff,csr8=0000000000000000
+   54 000000001000006c 03db5393 0000000010000070 x7=0000000000000006
+   55 0000000010000070 01615593 0000000010000074 x11=0000003742dd95c0
+   56 0000000010000074 003956b3 0000000010000078 x13=0000000000000000
+   57 0000000010000078 00000713 000000001000007c x14=0000000000000000
+   58 000000001000007c 0040006f 0000000010000080
+   59 0000000010000080 00000f93 0000000010000084 x31=0000000000000000
+   60 0000000010000084 0c000d93 0000000010000088 x27=00000000000000c0
+   61 0000000010000088 81bffed7 000000001000008c x29=0000000000000000,csr8=0000000000000000,csr3104=0000000000000000
+   62 000000001000008c 7e002057 0000000010000090 csr8=0000000000000000
+   63 0000000010000090 297bc2b7 0000000010000094 x5=00000000297bc000
+   64 0000000010000094 cc628293 0000000010000098 x5=00000000297bbcc6
+   65 0000000010000098 bef2a523 000000001000009c 00000000297bb8b0:W:2ff404b1
+   66 000000001000009c 26a1f437 00000000100000a0 x8=0000000026a1f000
+   67 00000000100000a0 e7440413 00000000100000a4 x8=0000000026a1ee74
+   68 00000000100000a4 d0a42223 00000000100000a8 0000000026a1eb78:W:00000004
+   69 00000000100000a8 41b205b3 00000000100000ac x11=080943f912ba21f3
+
+So, in the entries above, the instruction ``0040006f`` changed no
+registers and accessed no memory, so its entry line simply has no
+register and no memory columns. The instruction ``7e002057`` changed
+only a CSR, so its register column contains the CSR update alone. The
+entries of the store instructions (``bef2a523`` and ``d0a42223``)
+contain only the memory column.
 
 For example, you can use the following layout:
 

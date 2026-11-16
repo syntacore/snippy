@@ -59,7 +59,7 @@ RISCVConverterSNTF::RISCVConverterSNTF(const unsigned XL,
   if (SNTFFlags.EnableCSRVals)
     Features.push_back([this](raw_ostream &LogsBuff) {
       if (!CSRLogs.empty()) {
-        if (SNTFFlags.EnableRegVals && RegLogs.empty())
+        if (!SNTFFlags.EnableRegVals || RegLogs.empty())
           LogsBuff << " ";
         printRegLogs(LogsBuff, CSRLogs);
       }
