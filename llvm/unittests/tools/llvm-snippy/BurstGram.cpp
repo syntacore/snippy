@@ -122,10 +122,12 @@ TEST_P(BurstGramDataBurstAssertOnNonEmptyGroupingsModesInit,
 
   BurstGramData BGD = testing::getBurstGramData(GetParam());
 
+#ifndef NDEBUG
   ASSERT_DEBUG_DEATH(
       BGD.convertToCustomMode(testing::getDummyHistogram(),
                               testing::getDummyState().getInstrInfo()),
       R"(Groupings are specified but burst mode is not \\"custom\\")");
+#endif
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -879,7 +881,9 @@ TEST(BurstGramDataAllBurstOpcodes, NulloptGroupings) {
 TEST(BurstGramDataOpcodeToNumBurstGroups, NulloptGroupings) {
   BurstGramData BGD =
       testing::getBurstGramData(BurstMode::CustomBurst, std::nullopt);
+#ifndef NDEBUG
   ASSERT_DEBUG_DEATH(BGD.getOpcodeToNumBurstGroups(), "Groupings");
+#endif
 }
 
 struct BurstGramDataAllGroupsOpcodesInitData {
