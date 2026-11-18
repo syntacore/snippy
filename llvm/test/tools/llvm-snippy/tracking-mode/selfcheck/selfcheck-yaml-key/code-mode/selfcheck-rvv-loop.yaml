@@ -1,0 +1,32 @@
+# REQUIRES: riscv-snippy-model-any
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 1000
+  init-regs-in-elf: true
+  dump-mf: true
+
+include:
+  - "../../../Inputs/sections-selfcheck-stack.yaml"
+  - "../Inputs/rvv-unit-random.yaml"
+  - "../Inputs/histogram-rvv-all-instrs-branches.yaml"
+
+selfcheck:
+  mode: code
+  selfcheck-td-options:
+    enable-selfcheck-rvv: true
+
+branches:
+  permutation: on
+  loop-ratio: 1.0
+  number-of-loop-iterations:
+    min: 3
+    max: 3
+  max-depth:
+    loop: 3
+    if: 0
+
+# CHECK: VADD_VV

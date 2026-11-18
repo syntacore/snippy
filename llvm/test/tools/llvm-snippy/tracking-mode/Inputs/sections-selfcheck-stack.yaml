@@ -1,0 +1,26 @@
+sections:
+  - name:      1
+    VMA:       0x80000000
+    SIZE:      0x100000
+    LMA:       0x80000000
+    ACCESS:    rx
+  - name:      2
+    VMA:       0x80200000
+    SIZE:      0x100000
+    LMA:       0x80200000
+    ACCESS:    rw
+  - name:      rom
+    VMA:       0x80300000
+    SIZE:      0x100000
+    LMA:       0x80300000
+    ACCESS:    r
+  - name:      selfcheck
+    VMA:       0x80400000
+    SIZE:      0x100000
+    LMA:       0x80400000
+    ACCESS:    rw
+  - name:      stack
+    VMA:       0x80600000
+    SIZE:      0x100000
+    LMA:       0x80600000
+    ACCESS:    rw

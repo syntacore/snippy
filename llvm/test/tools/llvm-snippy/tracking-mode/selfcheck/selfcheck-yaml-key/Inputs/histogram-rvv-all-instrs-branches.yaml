@@ -1,0 +1,13 @@
+histogram:
+  - [VSETVL, 0.1]
+  - [VSETVLI, 0.1]
+  - [VSETIVLI, 0.1]
+  - [VADD_VV, 2.0]
+  - [V.*_.*, 5.0]
+  - [BEQ, 1.0]
+  - [BNE, 1.0]
+  - [BLT, 1.0]
+  - [BGEU, 1.0]
+  - [ADD, 0.5]
+  - [LD, 2.0]
+  - [SD, 2.0]
