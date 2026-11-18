@@ -1,0 +1,42 @@
+# REQUIRES: riscv-snippy-model-any
+
+# RUN: llvm-snippy %s -selfcheck
+# RUN: llvm-snippy %s -backtrack
+# RUN: llvm-snippy %s -enable-address-value-hazards
+
+options:
+  mtriple: riscv64
+  mattr: +m,+d
+  num-instrs: 1000
+  init-regs-in-elf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+
+include:
+  - Inputs/sections-selfcheck-stack.yaml
+
+histogram:
+  - [BEQ, 1.0]
+  - [BNE, 1.0]
+  - [BLT, 1.0]
+  - [BGEU, 1.0]
+  - [ADD, 5.0]
+  - [MUL, 5.0]
+  - [LD, 3.0]
+  - [SD, 3.0]
+  - [FLD, 3.0]
+  - [FSD, 3.0]
+  - [WriteFFLAGS, 1.0]
+  - [FADD_S, 5.0]
+  - [FMUL_S, 5.0]
+  - [FADD_D, 5.0]
+  - [FDIV_D, 5.0]
+  - [FSQRT_D, 5.0]
+  - [FCVT_W_D, 5.0]
+  - [FMV_X_D, 5.0]
+
+branches:
+  loop-ratio: 1.0
+  number-of-loop-iterations:
+    min: 2
+    max: 2

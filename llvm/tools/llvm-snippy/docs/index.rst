@@ -2857,8 +2857,83 @@ the histogram. To turn the option on, explicitly add:
      loop-counters:
        place-on-stack: on
 
-The option is turned off by default. If the option is off, and you also
-have the tracking mode enabled, you will receive an error.
+The option is not set by default. However, in `tracking modes`_, snippy always
+places loop counters on the stack, and turning the option off explicitly is
+an error. See `Loops in Tracking Modes`_.
+
+Tracking Modes
+~~~~~~~~~~~~~~
+
+In **tracking modes**, snippy executes each generated instruction on the
+model plugin during generation and uses the resulting state to
+generate the following instructions.
+
+.. important::
+   All tracking modes require a model plugin.
+
+The tracking modes are:
+
+-  `Self-check`_.
+
+-  `Address Hazard Mode`_.
+
+-  Backtracking (the ``--backtrack`` option).
+
+-  The ``if-model-detected-nan`` mode of `NaN Overwriting`_.
+
+Tracking modes can be combined with each other.
+
+
+Snippy reports an error if a tracking mode is used together with:
+
+-  Call instructions in the histogram.
+
+-  `SMC Blocks`_.
+
+-  ``LR`` and ``SC`` instructions in the same histogram.
+
+
+Initial State in Tracking Modes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Snippy generates code based on the state of the model plugin. Therefore, in
+all tracking modes, the generated code is valid only if the snippet starts
+from the same state as the model plugin:
+
+-  Use the ``--init-regs-in-elf`` option, so the initial register values
+   are the same in the model and in the snippet.
+   Otherwise, the environment must set the registers to these values before
+   running the snippet. See `Dumping Initial Registers State`_ and
+   `Loading Initial Registers State`_.
+
+-  If the snippet loads values from memory, initialize it.
+   See `Memory Initialization`_.
+
+Loops in Tracking Modes
+^^^^^^^^^^^^^^^^^^^^^^^
+
+Tracking modes support loops, including loops with floating-point and
+vector instructions.
+
+While generating a loop in a tracking mode, snippy executes its body on the
+model plugin only once. That is why all iterations must yield identical side
+effects. To achieve that, snippy inserts ancillary code at the end of each
+iteration. This code restores the registers, CSRs, and memory modified by the
+loop body to their values at the loop entry. The ``stack`` and ``selfcheck``
+sections are not restored. This ancillary code is called
+**Loop Compensation Code**.
+
+Requirements:
+
+-  The layout must contain the ``stack`` section. Loop counters are always
+   placed on the stack.
+
+-  The ``branches.loop-counters.place-on-stack`` option must not be
+   turned off explicitly. See `Loops with Counters Spilled onto Stack`_.
+
+.. warning::
+
+   The Loop Compensation Code increases the size of the snippet.
 
 
 .. _`_restricting_compressed_instructions_for_loop_counters`:
@@ -4014,7 +4089,8 @@ Address Hazard Mode
 
 .. important::
 
-   This feature is not supported without a model plugin.
+   Address Hazard Mode is one of the `tracking modes`_. It requires a model plugin and
+   a consistent initial state, see `Initial State in Tracking Modes`_.
 
 In this mode, snippy tries to create a data dependency when forming the
 address part of the memory instruction. To enable this mode, use the
@@ -5068,9 +5144,14 @@ Self-Check
 
    Self-check features are not supported without a model plugin.
 
+Self-check is one of the `tracking modes`_. The snippet must start
+from the same state as the model plugin, see `Initial State in Tracking Modes`_.
+
 Self-check is a code generation mode that supports validation of the results
 of the primary instructions. The reference values are obtained from the
-model plugin. There are three families of self-check modes:
+model plugin.
+
+There are three families of self-check modes:
 
 -  Memory-based ``code`` mode |nbsp| -- |nbsp| This is the default.
    After each ``N`` primary instructions, snippy materializes
@@ -5161,6 +5242,15 @@ where:
    You cannot specify the same setting (self-check period, ``selfcheck-gv``,
    ``enable-selfcheck-rvv``) both as a command-line option and inside the
    ``selfcheck`` configuration key at the same time.
+
+Self-Check with Loops
+---------------------
+
+Self-check supports loops (see `Generating Loops`_) in all modes, and, when enabled,
+floating-point and vector instructions (see
+`Self-check for RVV`_) inside loops. Every iteration of a loop yields the
+same side effects, so the reference values remain valid for all iterations.
+See `Loops in Tracking Modes`_ for details and requirements.
 
 Memory-Based Self-Check
 -----------------------
