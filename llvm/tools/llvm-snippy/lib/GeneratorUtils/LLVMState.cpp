@@ -155,7 +155,10 @@ Expected<LLVMState> LLVMState::create(const SelectedTargetInfo &TargetInfo) {
   if (!TargetFeatures.empty())
     TargetFeatures += ",";
   TargetFeatures += TargetInfo.Features;
-  const TargetOptions Options;
+
+  TargetOptions Options;
+  Options.MCOptions.ABIName = TargetInfo.ABI;
+
   auto TM = std::unique_ptr<TargetMachine>(static_cast<TargetMachine *>(
       Tgt->createTargetMachine(TheTriple, TargetInfo.CPU, TargetFeatures,
                                Options, Reloc::Model::Static)));

@@ -1,0 +1,16 @@
+# RUN: llvm-snippy %s -o %t.elf -model-plugin None
+# RUN: llvm-readelf -h %t.elf | FileCheck %s
+
+options:
+  march: rv64gc
+  mtriple: riscv64
+  mabi: lp64d
+
+include:
+  - Inputs/sections.yaml
+
+histogram:
+  - [ADD, 1]
+
+# CHECK: Machine:                           RISC-V
+# CHECK: Flags:                             0x5, RVC, double-float ABI
