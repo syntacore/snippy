@@ -26,6 +26,10 @@ struct MemoryRangeTestCase {
 
 class MemoryRangesTest : public ::testing::TestWithParam<MemoryRangeTestCase> {
 protected:
+  void SetUp() override {
+    RandEngine::init(::testing::GTEST_FLAG(random_seed));
+  }
+
   void assertValidAddress(AddressInfo Res, const MemoryAccessRange &MR,
                           const AddressGenInfo &GenInfo) const {
     auto Start = MR.Start;
@@ -93,7 +97,6 @@ TEST_P(MemoryRangesTest, GetRandomAddressTest) {
   auto TestCase = GetParam();
   auto &MR = TestCase.MR;
 
-  RandEngine::init(1);
   llvm::for_each(InstrAccesses, [&](const auto &GenInfo) {
     const auto &Res = MR.randomAddress(GenInfo);
     assertValidAddress(Res, MR, GenInfo);
@@ -120,8 +123,6 @@ TEST_P(MemoryRangesTest, MultipleDoesntExceedSize) {
 
   auto TestCase = GetParam();
   auto &MR = TestCase.MR;
-
-  RandEngine::init(::testing::GTEST_FLAG(random_seed));
 
   llvm::for_each(InstrAccesses, [&](const AddressGenInfo &GenInfo) {
     if (!MR.isLegal(GenInfo))

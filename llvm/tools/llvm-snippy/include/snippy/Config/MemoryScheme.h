@@ -35,6 +35,7 @@
 
 namespace llvm {
 
+class raw_ostream;
 class MCInstrDesc;
 
 namespace snippy {
@@ -75,6 +76,8 @@ struct AddressInfo {
   // |   |   |   |   |   |   |   |
   // |<----- MaxAccessSize ----->|
 };
+
+raw_ostream &operator<<(raw_ostream &OS, const AddressInfo &AI);
 
 struct MemRange {
   const MemAddr Start;
@@ -288,6 +291,8 @@ struct AddressGenInfo {
   }
 };
 
+raw_ostream &operator<<(raw_ostream &OS, const AddressGenInfo &GI);
+
 class MemoryAccess {
 public:
   MemoryAccess(MemoryAccessMode MAM) : Mode(MAM) {}
@@ -445,10 +450,14 @@ struct MemoryAccessEviction final : MemoryAccess {
   MemAddr getLowerBound() const override { return Fixed; }
 };
 
+raw_ostream &operator<<(raw_ostream &OS, const MemoryAccessEviction &MAE);
+
 struct AccessAddress {
   MemAddr Addr;
   size_t AccessSize;
 };
+
+raw_ostream &operator<<(raw_ostream &OS, const AccessAddress &AA);
 
 using AddressSeq = std::vector<AccessAddress>;
 
@@ -486,6 +495,8 @@ struct MemoryAccessAddresses final : MemoryAccess {
         "getLowerBound for 'Addresses' memory scheme is not implemented");
   }
 };
+
+raw_ostream &operator<<(raw_ostream &OS, const MemoryAccessAddresses &MA);
 
 struct MemoryAccessesGroup {
   double Weight = 1.0;

@@ -1221,6 +1221,38 @@ MemoryScheme::validateSchemes(LLVMContext &Ctx,
   return std::nullopt;
 }
 
+raw_ostream &operator<<(raw_ostream &OS, const AddressInfo &AI) {
+  return OS << "AddressInfo { Address: " << formatv("0x{0:x}", AI.Address)
+            << ", MaxOffset: " << AI.MaxOffset
+            << ", MinOffset: " << AI.MinOffset
+            << ", AccessSize: " << AI.AccessSize
+            << ", MinStride: " << AI.MinStride << " }";
+}
+
+raw_ostream &operator<<(raw_ostream &OS, const AccessAddress &AA) {
+  return OS << "AccessAddress { Addr: " << formatv("0x{0:x}", AA.Addr)
+            << ", AccessSize: " << AA.AccessSize << " }";
+}
+
+raw_ostream &operator<<(raw_ostream &OS, const AddressGenInfo &GI) {
+  return OS << "AddressGenInfo { AccessSize: " << GI.AccessSize
+            << ", Alignment: " << GI.Alignment
+            << ", AllowMisalign: " << format("{0:t}", GI.AllowMisalign)
+            << ", BurstMode: " << format("{0:t}", GI.BurstMode)
+            << ", NumElements: " << GI.NumElements
+            << ", MinStride: " << GI.MinStride << " }";
+}
+
+raw_ostream &operator<<(raw_ostream &OS, const MemoryAccessEviction &MAE) {
+  outputYAMLToStream(MAE, OS);
+  return OS;
+}
+
+raw_ostream &operator<<(raw_ostream &OS, const MemoryAccessAddresses &MA) {
+  outputYAMLToStream(MA, OS);
+  return OS;
+}
+
 } // namespace snippy
 
 size_t yaml::SequenceTraits<snippy::SectionsDescriptions>::size(

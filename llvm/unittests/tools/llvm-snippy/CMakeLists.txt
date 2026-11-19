@@ -45,6 +45,8 @@ set(snippy_sources
   Support.cpp
   ImmediateHistogram.cpp
   MemoryAccessRange.cpp
+  MemoryAccessAddresses.cpp
+  MemoryAccessEviction.cpp
   FormattedAPIntWithSign.cpp
   HistogramPatterns.cpp
   ProbabilityUtils.cpp
