@@ -32,8 +32,10 @@ histogram:
 # COM: For vadc, vsbc and vmerge the instruction encoding is reserved if the
 #      destination vector register is v0.
 # CHECK-NOT: $v0 = VADC
+# FIXME: It's not possible now, but we have to be able to do it.
 # CHECK-NOT: $v0 = VMADC
 # CHECK-NOT: $v0 = VSBC
+# FIXME: It's not possible now, but we have to be able to do it.
 # CHECK-NOT: $v0 = VMSBC
 # CHECK-NOT: $v0 = VMERGE
 # CHECK-NOT: $v0 = VFMERGE

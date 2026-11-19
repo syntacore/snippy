@@ -1,0 +1,2 @@
+# REQUIRES: riscv-snippy-model-any
+# RUN: llvm-snippy %S/../reduction.yaml

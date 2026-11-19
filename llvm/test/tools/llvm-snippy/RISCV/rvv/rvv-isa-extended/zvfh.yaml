@@ -138,6 +138,8 @@ histogram:
 
   - [VFREDOSUM_VS, 1.0]
   - [VFREDUSUM_VS, 1.0]
+  - [VFWREDOSUM_VS, 1.0]
+  - [VFWREDUSUM_VS, 1.0]
   - [VFREDMAX_VS, 1.0]
   - [VFREDMIN_VS, 1.0]
 

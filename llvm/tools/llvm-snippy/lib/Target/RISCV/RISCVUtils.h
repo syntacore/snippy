@@ -93,7 +93,7 @@ inline bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
     if (SEW < 16u &&
         !(mayBeZvfh8BitIntConversion(Opcode) && ST->hasStdExtZvfh()))
       return false;
-    if (SEW < 32u && !((isZvfh(Opcode) && ST->hasStdExtZvfh()) ||
+    if (SEW < 32u && !(ST->hasStdExtZvfh() ||
                        (isZvfhmin(Opcode) && ST->hasStdExtZvfhmin()))) {
       // If the EEW of a vector floating-point operand does not correspond to a
       // supported IEEE floating-point type, the instruction encoding is
@@ -117,12 +117,14 @@ inline bool isLegalRVVInstr(unsigned Opcode, const RVVPrimaryConfig &Cfg,
   // legal element width.
   if (isZvfbf(Opcode) && SEW != 16u)
     return false;
-  if (isRVVIntegerWidening(Opcode) || isRVVFPWidening(Opcode) ||
-      isRVVIntegerNarrowing(Opcode) || isRVVFPNarrowing(Opcode)) {
+  if (isRVVWidening(Opcode) || isRVVNarrowing(Opcode)) {
     // Both widening and narrowing instructions use operands with EEW = SEW * 2.
     auto EEW = SEW * 2u;
     if (!isLegalSEW(EEW))
       return false;
+    // The wide operands are scalars (have EMUL = 1).
+    if (isRVVWideningReduction(Opcode))
+      return true;
     // Check that LMUL * 2 is also legal.
     return isValidEMUL(ELEN, SEW, EEW, LMUL);
   }

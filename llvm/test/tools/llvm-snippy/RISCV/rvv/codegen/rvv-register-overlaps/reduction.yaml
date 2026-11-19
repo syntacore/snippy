@@ -1,0 +1,42 @@
+# REQUIRES: riscv-snippy-model-None
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  march: rv64imfdv
+  num-instrs: 1000
+  dump-mf: on
+  reserved-regs-list: ["V([0-7]|2[0-9])"]
+
+include:
+  - Inputs/sections.yaml
+
+riscv-vector-unit:
+  mode-distribution:
+    VM:
+      - [any_legal, 1.0]
+    VL:
+      - [any_legal, 1.0]
+    VXRM:
+      rnu: 1.0
+    VTYPE:
+      SEW:
+        sew_32: 1.0
+      LMUL:
+        m8: 1.0
+      VMA:
+        mu: 1.0
+      VTA:
+        tu: 1.0
+
+histogram:
+  - [VSETIVLI, 1.0]
+  - [VWREDSUM_VS, 1.0]
+
+# COM: The destination vector register can overlap the source operands,
+#      including the mask register.
+# CHECK-DAG: $v8 = VWREDSUM_VS $v8
+# CHECK-DAG: [[VR:\$v[0-9]+]] = VWREDSUM_VS $v8, [[VR]]
+
+# FIXME: It's not possible now, but we have to be able to do it.
+# CHECK-NOT: $v0 = VWREDSUM_VS $v{{.*}}, $v{{.*}}, $v0
