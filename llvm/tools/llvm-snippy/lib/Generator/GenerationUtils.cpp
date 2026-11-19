@@ -23,6 +23,8 @@
 
 #include <functional>
 
+#define DEBUG_TYPE "snippy-generation-utils"
+
 namespace llvm {
 namespace snippy {
 extern cl::OptionCategory Options;
@@ -363,6 +365,8 @@ std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
   assert(OpcodeIdxToBaseReg.size() == Count);
   assert(OpcodeIdxToAI.size() == Count);
   DenseSet<Register> Destinations;
+  LLVM_DEBUG(llvm::dbgs()
+             << "Selected operands for consecutive memory instructions:\n");
   for (unsigned Idx = 0; Idx < Count; ++Idx) {
     auto Opcode = Opcodes[Idx];
     auto BaseReg = OpcodeIdxToBaseReg[Idx];
@@ -396,6 +400,13 @@ std::map<unsigned, APInt> selectOperandsForMemoryInstructions(
     AddressInfo ActualAI = AI;
     auto Offset = getOffsetImmediate(Preselected);
     ActualAI.Address += Offset.value_or(0);
+    LLVM_DEBUG({
+      dbgs() << InstrInfo.getName(Opcode)
+             << ": base reg = " << State.getRegInfo().getName(BaseReg) << "("
+             << BaseReg << "), offset = " << Offset.value_or(0)
+             << ", effective address = 0x" << Twine::utohexstr(ActualAI.Address)
+             << "\n";
+    });
     markMemAccessAsUsed(InstrGenCtx, InstrDesc, ActualAI, Kind,
                         InstrGenCtx.MAI);
   }

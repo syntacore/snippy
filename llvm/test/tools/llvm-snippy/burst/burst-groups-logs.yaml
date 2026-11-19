@@ -1,0 +1,29 @@
+# REQUIRES: asserts
+# RUN: llvm-snippy %s -debug-only=snippy-generation-utils \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 90
+
+sections:
+    - name:      1
+      VMA:       0x80000000
+      SIZE:      0x400000
+      LMA:       0x80000000
+      ACCESS:    rx
+    - name:      2
+      VMA:       0x80600000
+      SIZE:      0x400000
+      LMA:       0x80600000
+      ACCESS:    rw
+
+histogram:
+    - [SD, 1.0]
+    - [LD, 1.0]
+
+include:
+  - Inputs/burst-mixed.yaml
+
+# CHECK: Selected operands for consecutive memory instructions:
+# CHECK-COUNT-90: {{[a-zA-Z_]+}}: base reg = {{[a-zA-Z0-9_]+}}({{[0-9]+}}), offset = {{.*}}, effective address = {{.*}}
