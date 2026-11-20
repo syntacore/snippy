@@ -331,15 +331,7 @@ void Interpreter::dumpRegsAsYAML(const IRegisterState &Regs, raw_ostream &OS) {
 }
 
 void Interpreter::dumpRegs(const IRegisterState &Regs, StringRef YamlPath) {
-  if (YamlPath.empty())
-    return;
-
-  std::error_code EC;
-  raw_fd_ostream File(YamlPath, EC);
-  if (EC)
-    snippy::fatal(formatv("Register dump error: {0}", EC.message()));
-
-  dumpRegsAsYAML(Regs, File);
+  Regs.saveAsYAMLFile(YamlPath);
 }
 
 void Interpreter::dumpOneRange(NamedMemoryRange Range,
