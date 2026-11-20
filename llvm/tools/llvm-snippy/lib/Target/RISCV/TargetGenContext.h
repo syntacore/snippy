@@ -230,6 +230,8 @@ public:
     constexpr std::pair<unsigned, bool> EMUL1 = {/* Multiplier */ 1,
                                                  /* IsFractional */ false};
 
+    if (isRVVScalarMove(Opcode))
+      return EMUL1;
     auto EEW = getOperandEEW(InstrDesc, OpIndex, SEW);
     // riscv-v-spec-1.0: For the purpose of determining register group overlap
     // constraints, mask elements have EEW=1. A vector mask occupies only one
@@ -313,7 +315,8 @@ public:
     }
 
     if (isRVVWholeRegisterInstr(Opcode))
-      return std::make_pair(getRVVWholeRegisterCount(Opcode), 0);
+      return std::make_pair(getRVVWholeRegisterCount(Opcode),
+                            /*IsFractional=*/0);
     return computeDecodedEMUL(ELEN, SEW, EEW, LMUL);
   }
 

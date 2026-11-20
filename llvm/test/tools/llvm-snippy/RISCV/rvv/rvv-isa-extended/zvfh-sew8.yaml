@@ -31,6 +31,7 @@ histogram:
   - [VFNCVT_X_F_W, 1.0]
   - [VFNCVT_XU_F_W, 1.0]
   - [VFNCVT_RTZ_XU_F_W, 1.0]
+  - [VFNCVT_RTZ_X_F_W, 1.0]
   - [VFWCVT_F_X_V, 1.0]
   - [VFWCVT_F_XU_V, 1.0]
 
