@@ -132,6 +132,8 @@ findMaxDepthReachedImpl(CFPermBIIter Beg, CFPermBIIter End,
                         unsigned DepthLimit) {
   assert(Beg <= End && "Respect iteration order");
   return std::find_if(Beg, End, [=, &BlocksInfo](const auto &BI) {
+    // To avoid compiler warning.
+    (void)BlocksInfo;
     assert(BI.*DepthToCheck <= DepthLimit &&
            "Depth expected to be not more than MaxDepth");
     bool Reached = BI.*DepthToCheck == DepthLimit;

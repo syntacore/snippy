@@ -1026,7 +1026,7 @@ void BlockGenPlanningImpl::fillReqForTopLoopBySize(const MachineLoop &ML) {
 }
 
 void BlockGenPlanningImpl::processFunctionMixed(const MachineFunction &MF) {
-  const auto &Cfg = GenCtx->getConfig();
+  [[maybe_unused]] const auto &Cfg = GenCtx->getConfig();
   assert(Cfg.getGenerationMode() == GenerationMode::Mixed);
 
   // Process blocks out of loops

@@ -28,8 +28,6 @@ namespace snippy {
 class GeneratorContext;
 
 class RegisterGenerator final {
-  bool RequiresRollBack = false;
-
   Expected<Register>
   generateRandom(const SnippyTarget &SnippyTgt, const MCRegisterClass &RC,
                  const MCRegisterInfo &RI, const RegPoolWrapper &RP,
@@ -44,7 +42,6 @@ public:
            const MachineBasicBlock &MBB, const SnippyTarget &SnippyTgt,
            ArrayRef<Register> Exclude = {}, ArrayRef<Register> Include = {},
            AccessMaskBit Mask = AccessMaskBit::RW) {
-    assert(!RequiresRollBack && "Can't generate without failure recovery");
     return generateRandom(SnippyTgt, RC, RI, RP, MBB, Exclude, Include, Mask);
   }
 };

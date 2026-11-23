@@ -421,7 +421,7 @@ public:
     for (T J = Max - N + 1; J <= Max; ++J) {
       auto Val = genInRangeInclusive(Min, J);
       if (!ResSet.insert(Val).second) {
-        auto [It, Inserted] = ResSet.insert(J);
+        [[maybe_unused]] auto [_, Inserted] = ResSet.insert(J);
         assert(Inserted);
       }
     }

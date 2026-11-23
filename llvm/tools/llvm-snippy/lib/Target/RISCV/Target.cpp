@@ -1085,7 +1085,7 @@ static void initExcludeResult(unsigned OpIndex, const MCInstrDesc &InstrDesc,
     return;
   // Otherwise instructions can use V0 as a mask, but can't use it as
   // destination operand or temporary register.
-  auto Operand = InstrDesc.operands()[OpIndex];
+  [[maybe_unused]] auto Operand = InstrDesc.operands()[OpIndex];
   assert(Operand.RegClass != RISCV::VMV0RegClassID);
   auto &State = ProgCtx.getLLVMState();
   constexpr auto DestIdx = 0u;
@@ -3264,7 +3264,7 @@ public:
     const auto &AllowedRegs = getMemInitRegs(ProgCtx);
 
     auto RP = IGC.pushRegPool();
-    auto RA = ProgCtx.getReturnAddress();
+    [[maybe_unused]] auto RA = ProgCtx.getReturnAddress();
     assert(!AllowedRegs.contains(RA));
     for (unsigned Reg = RISCV::X0; Reg <= RISCV::X31; ++Reg)
       if (!AllowedRegs.contains(Reg))
@@ -4174,7 +4174,7 @@ public:
       return genImmNonZeroUINT<5>(IH, StridedImm);
     case OPERAND_VTYPEI10:
     case OPERAND_VTYPEI11:
-      assert(false && "VTYPE immediates should not be randomly sampled");
+      snippy::fatal("VTYPE immediates should not be randomly sampled");
     case OPERAND_RVKRNUM:
       return genImmInInterval<0, 10>(IH, StridedImm);
     case OPERAND_RVKRNUM_0_7:

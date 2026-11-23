@@ -588,15 +588,17 @@ static std::string toString(VXRMMode XRM) {
   llvm_unreachable("Unknown XRM");
 }
 
-static void printRawSewLmulProbs(raw_ostream &OS, const SEWInfo &SEWProbs,
-                                 const LMULInfo &LMULProbs) {
+LLVM_ATTRIBUTE_UNUSED static void
+printRawSewLmulProbs(raw_ostream &OS, const SEWInfo &SEWProbs,
+                     const LMULInfo &LMULProbs) {
   OS << "=== Raw SEW Probabilities ===\n";
   SEWProbs.print(OS, [](VSEW SEW) { return toString(SEW); });
   OS << "=== Raw LMUL Probabilities ===\n";
   LMULProbs.print(OS, [](VLMUL LMUL) { return toString(LMUL); });
 }
 
-static void printModeList(raw_ostream &OS, const SewLmulDistribution &Dist) {
+LLVM_ATTRIBUTE_UNUSED static void
+printModeList(raw_ostream &OS, const SewLmulDistribution &Dist) {
   OS << "=== Raw mode-list Probabilities ===\n";
   Dist.print(OS, [](const SewLmulPair &SewLmul) {
     auto [SEW, LMUL] = SewLmul;
@@ -604,8 +606,8 @@ static void printModeList(raw_ostream &OS, const SewLmulDistribution &Dist) {
   });
 }
 
-static void printCombinedSewLmulProbs(raw_ostream &OS,
-                                      const SewLmulDistribution &Dist) {
+LLVM_ATTRIBUTE_UNUSED static void
+printCombinedSewLmulProbs(raw_ostream &OS, const SewLmulDistribution &Dist) {
   constexpr auto SewSize = SEWInfo::size();
   constexpr auto LmulSize = LMULInfo::size();
   double Probs[SewSize][LmulSize] = {};
