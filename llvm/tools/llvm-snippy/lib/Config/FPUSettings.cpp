@@ -353,19 +353,14 @@ std::string yaml::MappingTraits<FloatOverwriteSettings>::validate(
           return GetSettingsForSemantics(Semantics);
         });
 
-    auto CheckedIntegralOverflowRange =
-        map_range(PresentSemantics, [&](const fltSemantics *Semantics) {
-          return checkIntegralRangeOverflow(*Cfg.IntegralRange, RM, *Semantics);
-        });
-
-    if (auto ErrIt = find_if_not(CheckedIntegralOverflowRange,
-                                 [](Error Err) {
-                                   auto Success = Err.success();
-                                   consumeError(std::move(Err));
-                                   return Success;
-                                 });
-        ErrIt != CheckedIntegralOverflowRange.end())
-      return toString(*ErrIt);
+    auto Errors = map_range(PresentSemantics, [&](const fltSemantics *Sema) {
+      return toString(
+          checkIntegralRangeOverflow(*Cfg.IntegralRange, RM, *Sema));
+    });
+    auto ErrIt =
+        llvm::find_if(Errors, [](StringRef Msg) { return !Msg.empty(); });
+    if (ErrIt != Errors.end())
+      return *ErrIt;
   }
 
   {
