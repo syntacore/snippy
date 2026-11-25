@@ -1,9 +1,13 @@
 # REQUIRES: riscv-snippy-model-spike
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 >& %t
+# RUN: llvm-snippy %s >& %t
 
 # RUN: FileCheck %s --input-file=%t --check-prefix=ADDR
 # RUN: FileCheck %s --input-file=%t --check-prefix=OFFSET
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
 
 include:
 - Inputs/memory-aligned-small.yaml

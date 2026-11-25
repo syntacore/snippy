@@ -1,8 +1,12 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config \
-# RUN:  |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10
+  riscv-dump-rvv-config: ""
 
 include:
 - Inputs/rvv-unit-sew64-lmulX.yaml

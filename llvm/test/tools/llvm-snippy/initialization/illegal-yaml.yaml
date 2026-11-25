@@ -1,9 +1,12 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: not llvm-snippy %s -mtriple=riscv64  \
-# RUN:    -num-instrs=10 \
-# RUN:    -initial-regs-yaml=%S/Inputs/jabberwocky.yaml \
-# RUN:    -dump-registers-yaml=%t.regs.yaml \
+
+# RUN: not llvm-snippy %s -initial-regs-yaml=%S/Inputs/jabberwocky.yaml \
+# RUN:     -dump-registers-yaml=%t.regs.yaml \
 # RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
 
 sections:
     - name:      1

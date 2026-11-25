@@ -1,7 +1,18 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m -honor-target-abi \
-# RUN: -redefine-sp=reg::X4 -num-instrs=10 -external-stack \
-# RUN: -init-regs-in-elf -verify-mi -dump-mi |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +m
+  honor-target-abi: true
+  redefine-sp: reg::X4
+  num-instrs: 10
+  external-stack: true
+  init-regs-in-elf: true
+  verify-mi: true
+  dump-mi: true
+
 sections:
     - name:      1
       VMA:       0x500000

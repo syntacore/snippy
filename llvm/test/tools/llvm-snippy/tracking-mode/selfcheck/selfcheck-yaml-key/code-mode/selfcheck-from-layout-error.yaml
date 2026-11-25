@@ -1,6 +1,13 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c \
-# RUN: -num-instrs=10000 -model-plugin=NONEXISTENT \
-# RUN:  -init-regs-in-elf -verify-mi |& FileCheck %s
+# RUN: not llvm-snippy %s -model-plugin=NONEXISTENT \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +m,+c
+  num-instrs: 10000
+  init-regs-in-elf: true
+  verify-mi: true
+
 sections:
     - name:      1
       VMA:       0x500000

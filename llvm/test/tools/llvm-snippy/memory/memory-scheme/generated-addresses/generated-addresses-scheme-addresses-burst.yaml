@@ -1,14 +1,17 @@
 # REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
-# RUN: llvm-snippy %S/../Inputs/loadstore-layout.yaml %S/../Inputs/burst-mixed-big.yaml \
-# RUN:  %s -mtriple=riscv64 \
-# RUN:  -num-instrs=1000 --trace-log=%t-big.log
+
+# RUN: llvm-snippy %s %S/../Inputs/burst-mixed-big.yaml \
+# RUN:     %S/../Inputs/loadstore-layout.yaml --trace-log=%t-big.log
 # RUN: FileCheck %s --input-file=%t-big.log
 
-# RUN: llvm-snippy %S/../Inputs/loadstore-layout-1b.yaml %S/../Inputs/burst-mixed-small.yaml \
-# RUN:  %s -mtriple=riscv64 \
-# RUN:  -num-instrs=1000 --trace-log=%t-small.log
+# RUN: llvm-snippy %s %S/../Inputs/burst-mixed-small.yaml \
+# RUN:     %S/../Inputs/loadstore-layout-1b.yaml --trace-log=%t-small.log
 # RUN: FileCheck %s --input-file=%t-small.log
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
 
 access-addresses:
   - ordered: true

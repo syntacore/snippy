@@ -1,10 +1,14 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=20 \  
-# RUN:    -mattr=-c \
-# RUN:    -o %t.layout.elf -dump-intervals-to-verify
-# RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
+# RUN: llvm-snippy %s -o %t.layout.elf
+# RUN: FileCheck --input-file=%t.layout.elf.intervals-to-verify.yaml %s
 
 # CHECK: intervals-to-verify:
 # CHECK-NEXT: [ 0x500000, 0x50004C ]
+
+options:
+  mtriple: riscv64
+  num-instrs: 20
+  mattr: -c
+  dump-intervals-to-verify: ""
 
 sections:
     - name:      1

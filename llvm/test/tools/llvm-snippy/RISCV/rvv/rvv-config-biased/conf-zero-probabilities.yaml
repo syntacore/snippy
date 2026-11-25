@@ -2,10 +2,14 @@
 # COM: This test checks that if the probabilities of mode changing and setting vill
 # COM: are zero then there are no instructions vset*
 
-# RUN:  llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:   -dump-mf --num-instrs=1000 -o %t \
-# RUN:  |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  dump-mf: true
+  num-instrs: 1000
 
 include:
 - Inputs/rvv-unit-p-0.yaml

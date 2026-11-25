@@ -1,13 +1,10 @@
 # REQUIRES: riscv-snippy-model-any
+
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10 -selfcheck -selfcheck-mem \
 # RUN:     -dump-memory-section=2,selfcheck -memory-section-file=%t11
 # RUN: llvm-objcopy -O ihex -I binary %t11 %t1 
 
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10 -selfcheck -selfcheck-mem \
 # RUN:     -dump-memory-section={rw} -memory-section-file=%t22
 # RUN: llvm-objcopy -O ihex -I binary %t22 %t2 
 
@@ -15,6 +12,12 @@
 
 # Dumping all RW sections means that hiden sections will be dumped as well
 # CHECK-NOT: {{[[:xdigit:]]}} 
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  selfcheck: ""
+  selfcheck-mem: true
 
 sections:
     - name:      0

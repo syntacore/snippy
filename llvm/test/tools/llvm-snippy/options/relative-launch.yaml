@@ -1,6 +1,10 @@
 # REQUIRES: skip-snippy-model-mixin
+
 # RUN: cd %llvm_tools
-# RUN: ./llvm-snippy %s %S/../Inputs/sections.yaml -o %t.elf
+# RUN: ./llvm-snippy %s -o %t.elf
+
+include:
+  - ../Inputs/sections.yaml
 
 options:
   mtriple: riscv64

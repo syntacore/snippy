@@ -1,8 +1,11 @@
 # REQUIRES: riscv-snippy-model-any
 
-# RUN: llvm-snippy %s -dump-mir=- --mattr=+zfh |& FileCheck %s
-# RUN: llvm-snippy %s -dump-mir=- --mattr=+f,+zfh |& FileCheck %s
-# RUN: llvm-snippy %s -dump-mir=- --mattr=+d,+zfh |& FileCheck %s
+# RUN: llvm-snippy %s --mattr=+zfh \
+# RUN: |& FileCheck %s
+# RUN: llvm-snippy %s --mattr=+f,+zfh \
+# RUN: |& FileCheck %s
+# RUN: llvm-snippy %s --mattr=+d,+zfh \
+# RUN: |& FileCheck %s
 
 options:
   mtriple: riscv64
@@ -10,6 +13,7 @@ options:
   num-instrs: 500
   verify-mi: true
   honor-target-abi: on
+  dump-mir: "-"
 
 sections:
   - name:      1

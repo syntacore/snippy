@@ -1,5 +1,14 @@
-# RUN: llvm-snippy %S/../../Inputs/jal-layout.yaml %s -mtriple=riscv64 -num-instrs=100 \
-# RUN: -num-instr-ancil=10 --dump-mf -verify-mi |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../../Inputs/jal-layout.yaml
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  num-instr-ancil: 10
+  dump-mf: true
+  verify-mi: true
 
 call-graph:
   entry-point: SnippyFunction

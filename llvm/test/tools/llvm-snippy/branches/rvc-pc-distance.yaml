@@ -1,6 +1,11 @@
-# RUN: llvm-snippy %s --mtriple=riscv64 \
-# RUN:   --num-instrs=10000 --trace-log %t.log \
-# RUN:   --init-regs-in-elf --last-instr=RET --mattr=+c
+# RUN: llvm-snippy %s --trace-log %t.log
+
+options:
+  mtriple: riscv64
+  num-instrs: 10000
+  init-regs-in-elf: true
+  last-instr: RET
+  mattr: +c
 
 sections:
   - name:      1

@@ -1,15 +1,22 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=1000 -selfcheck -selfcheck-mem -init-regs-in-elf \
-# RUN:     -init-memory=loads -memory-seed=11 \
-# RUN:     -dump-memory-section=2 -memory-section-file=%t11
+
+# RUN: llvm-snippy %s -memory-section-file=%t11
 
 # RUN: llvm-objcopy -O ihex -I binary %t11 %t1
-# RUN: cat %t1 |& FileCheck %s --dump-input fail
+# RUN: FileCheck %s --input-file=%t1
 
 # COMM: This is the reference of splitmix32 generation for memory-seed=11
 # CHECK: 330E1273299ED19A53102DED30FBF41C40
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  selfcheck: ""
+  selfcheck-mem: true
+  init-regs-in-elf: true
+  init-memory: loads
+  memory-seed: 11
+  dump-memory-section: [2]
 
 burst:
   mode: mixed

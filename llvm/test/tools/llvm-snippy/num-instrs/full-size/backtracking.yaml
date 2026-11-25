@@ -1,10 +1,14 @@
 # REQUIRES: riscv-snippy-model-callbacks
-# RUN: llvm-snippy %s -mtriple=riscv64  \
-# RUN: --init-regs-in-elf \
-# RUN: -num-instrs=all \
-# RUN: -backtrack \
-# RUN: --mattr=-c -dump-registers-yaml=%t
+
+# RUN: llvm-snippy %s -dump-registers-yaml=%t
 # RUN: FileCheck %s --input-file=%t
+
+options:
+  mtriple: riscv64
+  init-regs-in-elf: true
+  num-instrs: all
+  backtrack: true
+  mattr: -c
 
 sections:
     - name:      1

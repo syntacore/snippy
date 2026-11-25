@@ -1,4 +1,8 @@
-# RUN: llvm-snippy -mtriple=riscv64 -mattr=+i,+m,+a,+f,+d,+c,+zba,+zbb,+zbc,+zbs %s
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +i,+m,+a,+f,+d,+c,+zba,+zbb,+zbc,+zbs
 
 sections:
     - name: 0

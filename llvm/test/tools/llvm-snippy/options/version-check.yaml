@@ -1,4 +1,5 @@
-# RUN: llvm-snippy %s --version | FileCheck %s --dump-input always
+# RUN: llvm-snippy %s --version \
+# RUN: | FileCheck %s
 # CHECK: Snippy version: {{[[:digit:]]+}}.{{[[:digit:]]+}}.{{[[:digit:]]+}}
 
 options:

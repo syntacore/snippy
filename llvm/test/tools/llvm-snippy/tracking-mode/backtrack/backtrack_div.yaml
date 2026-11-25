@@ -2,10 +2,15 @@
 # COM: test checks that rv64 inputs can be read properly (no FP, no RVV)
 
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:    -num-instrs=500 -dump-mf -backtrack -mattr=+m \
-# RUN:    -initial-regs-yaml=%S/../../initialization/Inputs/initial_state_zero.yaml \
-# RUN: |& FileCheck %s --dump-input always
+# RUN:     -initial-regs-yaml=%S/../../initialization/Inputs/initial_state_zero.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 500
+  dump-mf: true
+  backtrack: true
+  mattr: +m
 
 sections:
     - name:      1

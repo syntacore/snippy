@@ -1,29 +1,24 @@
 # REQUIRES: riscv-rvv
 # REQUIRES: riscv-snippy-model-spike
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=1000 -o %t \
-# RUN:  --riscv-preference-for-rvv-mode-change=vsetvl \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETVL
+# RUN: llvm-snippy %s --riscv-preference-for-rvv-mode-change=vsetvl \
+# RUN: |& FileCheck %s --check-prefix=CHECK-VSETVL
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=1000 -o %t \
-# RUN:  --riscv-preference-for-rvv-mode-change=vsetvli \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETVLI
+# RUN: llvm-snippy %s --riscv-preference-for-rvv-mode-change=vsetvli \
+# RUN: |& FileCheck %s --check-prefix=CHECK-VSETVLI
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=1000 -o %t \
-# RUN:  --riscv-preference-for-rvv-mode-change=vsetivli \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-VSETIVLI
+# RUN: llvm-snippy %s --riscv-preference-for-rvv-mode-change=vsetivli \
+# RUN: |& FileCheck %s --check-prefix=CHECK-VSETIVLI
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=1000 -o %t \
-# RUN:  --riscv-preference-for-rvv-mode-change=any \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-ANY
+# RUN: llvm-snippy %s --riscv-preference-for-rvv-mode-change=any \
+# RUN: |& FileCheck %s --check-prefix=CHECK-ANY
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=1000 -o %t \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-ANY
+# RUN: llvm-snippy %s |& FileCheck %s --check-prefix=CHECK-ANY
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 1000
 
 include:
 - Inputs/rvv-lmul1-sewX.yaml

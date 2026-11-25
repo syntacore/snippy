@@ -1,12 +1,21 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=100 -selfcheck -selfcheck-mem \
-# RUN:     -init-memory=loads -redefine-ra=RA -init-regs-in-elf -external-mem-init-routine \
-# RUN:     -entry-point=Test -mangle-exported-names -o %t \
-# RUN:     |& FileCheck %s --check-prefix=EXEC 
 
-# RUN: llvm-objdump -D %t.elf |& FileCheck %s --dump-input=fail --check-prefix=DUMP
+# RUN: llvm-snippy %s -o %t \
+# RUN: |& FileCheck %s --check-prefix=EXEC
+
+# RUN: llvm-objdump -D %t.elf |& FileCheck %s --check-prefix=DUMP
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  selfcheck: ""
+  selfcheck-mem: true
+  init-memory: loads
+  redefine-ra: RA
+  init-regs-in-elf: true
+  external-mem-init-routine: true
+  entry-point: Test
+  mangle-exported-names: true
 
 sections:
     - name:      0

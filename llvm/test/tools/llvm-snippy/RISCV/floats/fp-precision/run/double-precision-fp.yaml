@@ -1,9 +1,15 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+d \
-# RUN:    -num-instrs=5000 \
-# RUN:    -init-regs-in-elf -verify-mi \
-# RUN:    -verify-gen-histogram -histogram-must-succeed=true \
-# RUN:    |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +d
+  num-instrs: 5000
+  init-regs-in-elf: true
+  verify-mi: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
 
 sections:
     - name:      1

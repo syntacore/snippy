@@ -1,15 +1,21 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10 \
-# RUN:     -init-memory=runtime -init-regs-in-elf -memory-seed=11  \
-# RUN:     -dump-memory-section=2,3 -dump-memory-as-ascii -memory-section-file=%t1
-# RUN: cat %t1 |& FileCheck %s
+
+# RUN: llvm-snippy %s -memory-section-file=%t1
+# RUN: FileCheck %s --input-file=%t1
 
 # CHECK:      Section {2}
 # CHECK-NEXT:   0x0: 33 0e 12 73 29 9e d1 9a 53 10 2d ed 30 fb f4 1c
 # CHECK-NEXT: Section {3}
 # CHECK-NEXT:   0x0: 33 0e 12 73 29 9e d1 9a 53 10 2d ed 30 fb f4 1c
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  init-memory: runtime
+  init-regs-in-elf: true
+  memory-seed: 11
+  dump-memory-section: [2, 3]
+  dump-memory-as-ascii: true
 
 sections:
     - name:      0

@@ -1,7 +1,11 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -dump-mf \
-# RUN:   -num-instrs=1000  >& %t
+# RUN: llvm-snippy %s >& %t
 # RUN: FileCheck %s --input-file=%t --check-prefix=LD
 # RUN: FileCheck %s --input-file=%t --check-prefix=SW
+
+options:
+  mtriple: riscv64
+  dump-mf: true
+  num-instrs: 1000
 
 sections:
     - name:      1

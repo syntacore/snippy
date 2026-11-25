@@ -1,8 +1,12 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
-# RUN: --enable-address-value-hazards |& FileCheck %s --check-prefix=TRACK-ENABLE
-# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
-# RUN: |& FileCheck %s --check-prefix=TRACK-DISABLE
+
+# RUN: not llvm-snippy %s --enable-address-value-hazards \
+# RUN: |& FileCheck %s --check-prefix=TRACK-ENABLE
+# RUN: not llvm-snippy %s |& FileCheck %s --check-prefix=TRACK-DISABLE
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
 
 sections:
   - name:      0

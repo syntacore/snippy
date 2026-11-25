@@ -1,9 +1,14 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:   --num-instrs=10000 -o %t \
-# RUN:   -rvv-init-mode=splats -init-regs-in-elf \
-# RUN:   -verify-gen-histogram  -histogram-must-succeed=true \
-# RUN:   -dump-mf \
-# RUN: |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10000
+  rvv-init-mode: splats
+  init-regs-in-elf: true
+  verify-gen-histogram: true
+  histogram-must-succeed: true
+  dump-mf: true
 
 include:
 - ../../Inputs/rvv-unit-all.yaml

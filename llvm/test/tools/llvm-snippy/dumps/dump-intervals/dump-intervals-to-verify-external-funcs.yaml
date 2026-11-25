@@ -1,7 +1,6 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:    -num-instrs=100 -num-instr-ancil=50 -o %t.layout.elf \
-# RUN:    -dump-intervals-to-verify=%t.layout.elf.intervals-to-verify.yaml
-# RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
+# RUN: llvm-snippy %s -o %t.layout.elf \
+# RUN:     -dump-intervals-to-verify=%t.layout.elf.intervals-to-verify.yaml
+# RUN: FileCheck --input-file=%t.layout.elf.intervals-to-verify.yaml %s
 
 # External functions are emitted as weak symbols with stub bodies for running
 # the snippet on a model. They are overridden by user-provided code in the
@@ -10,6 +9,11 @@
 # CHECK: intervals-to-verify:
 # CHECK-COUNT-3: [ {{0x[[:xdigit:]]+}}, {{0x[[:xdigit:]]+}} ]
 # CHECK-NOT: [ {{0x[[:xdigit:]]+}}, {{0x[[:xdigit:]]+}} ]
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  num-instr-ancil: 50
 
 call-graph:
   entry-point: SnippyFunction

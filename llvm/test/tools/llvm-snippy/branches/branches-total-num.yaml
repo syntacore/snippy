@@ -1,8 +1,13 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
-# RUN:     -verify-mi -dump-mf -mattr=+c -o %t |& FileCheck %s
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
-# RUN:     -verify-mi -dump-mf -mattr=+c -init-regs-in-elf -o %t |& \
-# RUN:     FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+# RUN: llvm-snippy %s -init-regs-in-elf \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  verify-mi: true
+  dump-mf: true
+  mattr: +c
 
 sections:
     - name:      1

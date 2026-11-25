@@ -1,7 +1,6 @@
 # COM: This test checks that even non-reserved registers will not be used, since they are included in aliases consisting of registers that are reserved.
 
-# RUN: not llvm-snippy %s \
-# RUN: |& FileCheck %s --dump-input always
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64

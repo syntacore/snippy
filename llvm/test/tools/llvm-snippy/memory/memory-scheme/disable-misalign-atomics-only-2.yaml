@@ -1,8 +1,11 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN: -mattr=+a -dump-memory-accesses=%t \
-# RUN: --riscv-disable-misaligned-access=atomics-only \
-# RUN: --num-instrs=300
+# RUN: llvm-snippy %s -dump-memory-accesses=%t
 # RUN: FileCheck %s --input-file=%t
+
+options:
+  mtriple: riscv64
+  mattr: +a
+  riscv-disable-misaligned-access: atomics-only
+  num-instrs: 300
 
 sections:
   - name:      1

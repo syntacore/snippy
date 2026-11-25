@@ -1,5 +1,6 @@
-# RUN: timeout 300 llvm-snippy %s --dump-mf -o %t | FileCheck %s
-# RUN: timeout 300 llvm-snippy %s --dump-mf -init-regs-in-elf -o %t | FileCheck %s
+# RUN: timeout 300 llvm-snippy %s | FileCheck %s
+# RUN: timeout 300 llvm-snippy %s -init-regs-in-elf \
+# RUN: | FileCheck %s
 
 options:
   mtriple: "riscv64"
@@ -37,6 +38,7 @@ options:
     - X29
     - X30
     - X31
+  dump-mf: true
 
 sections:
   - name:      text

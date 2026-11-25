@@ -1,8 +1,11 @@
 # COM: This test verifies that field "weight" can not be less than zero
 
-# RUN: not llvm-snippy %S/Inputs/default-layout.yaml %s -mtriple=riscv64 \
-# RUN:   -num-instrs=100 \
-# RUN: |& FileCheck %s --dump-input always
+# RUN: not llvm-snippy %s %S/Inputs/default-layout.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
 
 access-groups:
   - weight: -2
@@ -14,4 +17,4 @@ access-groups:
         last-offset: 2
         weight: 1.5
 
-# CHECK: access-groups-negative.yaml:8:5: error: Access-group weight can not be less than 0
+# CHECK: access-groups-negative.yaml:11:5: error: Access-group weight can not be less than 0

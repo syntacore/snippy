@@ -1,14 +1,17 @@
 # REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+f \
-# RUN:    -num-instrs=2 -init-regs-in-elf -selfcheck \
+
+# RUN: llvm-snippy %s -mattr=+f \
 # RUN: |& FileCheck %s
 
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+zfh \
-# RUN:     -num-instrs=2 -init-regs-in-elf -selfcheck -dump-mf -selfcheck-mem \
-# RUN: |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s -mattr=+zfh -dump-mf -selfcheck-mem \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 2
+  init-regs-in-elf: true
+  selfcheck: ""
 
 sections:
     - name:      1

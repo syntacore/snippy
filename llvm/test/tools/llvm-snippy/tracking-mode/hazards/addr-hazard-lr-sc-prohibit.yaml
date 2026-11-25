@@ -1,5 +1,10 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+a  -backtrack -enable-address-value-hazards\
-# RUN: |& FileCheck %s
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +a
+  backtrack: true
+  enable-address-value-hazards: true
 
 sections:
     - name:      1

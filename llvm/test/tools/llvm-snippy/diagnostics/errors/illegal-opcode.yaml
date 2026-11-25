@@ -1,6 +1,9 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 >& %t.notwork || true
-# RUN: FileCheck %s --input-file=%t.notwork --check-prefix=NOTWORK --dump-input always
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+f,+d |& FileCheck %s --check-prefix=WORK
+# RUN: not llvm-snippy %s |& FileCheck %s --check-prefix=NOTWORK
+# RUN: llvm-snippy %s -mattr=+f,+d \
+# RUN: |& FileCheck %s --check-prefix=WORK
+
+options:
+  mtriple: riscv64
 
 sections:
     - name:      1

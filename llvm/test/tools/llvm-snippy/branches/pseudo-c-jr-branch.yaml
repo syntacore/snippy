@@ -1,6 +1,12 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy -mtriple=riscv64 -mattr=+c \
-# RUN:      -num-instrs=500 -verify-gen-histogram %s
+
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  num-instrs: 500
+  verify-gen-histogram: true
 
 sections:
     - name:      text

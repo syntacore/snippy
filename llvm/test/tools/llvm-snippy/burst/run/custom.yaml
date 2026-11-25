@@ -1,22 +1,24 @@
 # RUN: llvm-snippy %s %S/../Inputs/custom-burst-mixed-memory-fence.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200
+# RUN:     -num-instrs=200
 
 # RUN: llvm-snippy %s %S/../Inputs/custom-burst-mixed-memory-fence.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200
+# RUN:     -num-instrs=200
 
-# RUN: llvm-snippy %s %S/../Inputs/fence-only-burst.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200
+# RUN: llvm-snippy %s %S/../Inputs/fence-only-burst.yaml -num-instrs=200
 
-# RUN: not llvm-snippy %s %S/../Inputs/custom-burst-amoadd.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200
+# RUN: not llvm-snippy %s %S/../Inputs/custom-burst-amoadd.yaml -num-instrs=200
 
 # RUN: llvm-snippy %s %S/../Inputs/custom-burst-fence-in-both-groups.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=500
+# RUN:     -num-instrs=500
 
 # RUN: llvm-snippy %S/../Inputs/options-in-layout-burst.yaml
 
 include:
   - ../Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +a,+f
 
 histogram:
     - [LW, 1.0]

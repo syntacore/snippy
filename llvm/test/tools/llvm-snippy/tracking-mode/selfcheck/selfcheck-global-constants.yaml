@@ -1,17 +1,21 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=-c \
-# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck \
-# RUN:    -selfcheck-gv -o %t
-# RUN:    llvm-objdump -t %t.elf \
+
+# RUN: llvm-snippy %s -o %t
+# RUN: llvm-objdump -t %t.elf \
 # RUN: |& FileCheck %s --check-prefix=UNMANGLED
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=-c \
-# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck \
-# RUN:    --entry-point=Test -mangle-exported-names \
-# RUN:    -selfcheck-gv -o %t
-# RUN:    llvm-objdump -t %t.elf \
+# RUN:     --entry-point=Test -mangle-exported-names -o %t
+# RUN: llvm-objdump -t %t.elf \
 # RUN: |& FileCheck %s --check-prefix=MANGLED
+
+options:
+  mtriple: riscv64
+  mattr: -c
+  num-instrs: 1000
+  init-regs-in-elf: true
+  selfcheck: ""
+  selfcheck-gv: true
+
 sections:
   - name:      1
     VMA:       0x310000

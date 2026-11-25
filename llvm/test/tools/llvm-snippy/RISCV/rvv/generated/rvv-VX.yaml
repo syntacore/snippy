@@ -1,12 +1,18 @@
 # REQUIRES: riscv-rvv
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  -o %t --num-instrs=100000 \
-# RUN:  --init-regs-in-elf --verify-mi \
-# RUN:  --entry-point=start \
-# RUN:  -verify-gen-histogram -histogram-max-deviation=5 -histogram-must-succeed=true \
-# RUN:  -rvv-init-mode=loads \
-# RUN:  -histogram-must-succeed=false \
-# RUN:  |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 100000
+  init-regs-in-elf: true
+  verify-mi: true
+  entry-point: start
+  verify-gen-histogram: true
+  histogram-max-deviation: 5
+  histogram-must-succeed: false
+  rvv-init-mode: loads
 
 include:
 - "../../../Inputs/memory-unaligned.yaml"

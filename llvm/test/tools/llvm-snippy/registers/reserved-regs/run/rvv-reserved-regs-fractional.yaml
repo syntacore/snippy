@@ -4,8 +4,7 @@
 # COM: This test checks that even with a very sparse space of legal registers 
 # COM: (no more than one in a row), with only fractional LMULs, it will be possible to select registers.
 
-# RUN: llvm-snippy %s \
-# RUN: |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64

@@ -1,15 +1,19 @@
 # COM: This test checks that before each instruction (rv64 floats with four operands), 
 # COM: the registers it uses are initialized. They are initialized only according to the histogram.
 
-# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml -mtriple=riscv64 \
-# RUN:    -mattr=+zfh,+d -valuegram-operands-regs=%S/Inputs/histograms.yaml \
-# RUN: |& FileCheck %s --check-prefix=DOUBLE 
+# RUN: llvm-snippy %s -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN: |& FileCheck %s --check-prefix=DOUBLE
 
+
+include:
+  - Inputs/double-floats.yaml
 
 options:
   num-instrs: 10000
   dump-mf: on
   valuegram-operands-regs-init-outputs: on
+  mtriple: riscv64
+  mattr: +zfh,+d
 
 sections:
     - name:      1

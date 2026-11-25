@@ -1,7 +1,6 @@
 # REQUIRES: riscv-snippy-model-spike
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+c \
-# RUN:   -num-instrs=200 >& %t
+# RUN: llvm-snippy %s >& %t
 # RUN: FileCheck %s --input-file=%t --check-prefixes=SW
 # RUN: FileCheck %s --input-file=%t --check-prefixes=SD
 # RUN: FileCheck %s --input-file=%t --check-prefixes=LW
@@ -10,6 +9,11 @@
 include:
   - Inputs/memory-for-compressed-burst.yaml
   - Inputs/mixed-burst.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  num-instrs: 200
 
 sections:
     - name: 1

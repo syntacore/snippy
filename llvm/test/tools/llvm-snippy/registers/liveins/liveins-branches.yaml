@@ -1,6 +1,6 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -verify-mi -dump-mir=- \
-# RUN: | FileCheck %s
+
+# RUN: llvm-snippy %s | FileCheck %s
 
 # COM: Check that we tracks the liveness and 'verify-mi' finishes without errors.
 
@@ -8,6 +8,8 @@ options:
   mtriple: riscv64
   num-instrs: 500
   init-regs-in-elf: true
+  verify-mi: true
+  dump-mir: "-"
 
 sections:
   - name: 1

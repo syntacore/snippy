@@ -1,4 +1,11 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 --selfcheck -mattr=-a -num-instrs=10 -model-plugin=NONEXISTENT |& FileCheck --dump-input always %s
+# RUN: not llvm-snippy %s -model-plugin=NONEXISTENT \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  selfcheck: ""
+  mattr: -a
+  num-instrs: 10
 
 sections:
     - name:      1

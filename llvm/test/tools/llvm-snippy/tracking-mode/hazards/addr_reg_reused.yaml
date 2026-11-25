@@ -1,6 +1,13 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -mtriple=riscv64  -dump-mf -backtrack -enable-address-value-hazards\
-# RUN: -num-instrs=1000 |& FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  dump-mf: true
+  backtrack: true
+  enable-address-value-hazards: true
+  num-instrs: 1000
 
 sections:
     - name:      1

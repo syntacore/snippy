@@ -1,8 +1,13 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: not llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -num-instrs=10 \
-# RUN:    -init-regs-in-elf -mattr=+a \
-# RUN: |& FileCheck %s
+
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  init-regs-in-elf: true
+  mattr: +a
+
 include:
 - ../../Inputs/unaligned-guarantee.yaml
 

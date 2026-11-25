@@ -1,5 +1,9 @@
-# RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -mtriple=riscv64 -num-instrs=10 >& %t || true
-# RUN: FileCheck --input-file=%t --dump-input always %s
+# RUN: not llvm-snippy %s %S/Inputs/default-layout.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
 
 access-evictions:
     - mask:  0x003c0000
@@ -18,5 +22,5 @@ access-evictions:
     - mask:  0x000be000
       fixed: 0x80001000
 
-# CHECK: duplicated_memory_mode.yaml:15:1: error: duplicated mapping key 'access-evictions' 
+# CHECK: duplicated_memory_mode.yaml:19:1: error: duplicated mapping key 'access-evictions' 
 # CHECK: access-evictions:

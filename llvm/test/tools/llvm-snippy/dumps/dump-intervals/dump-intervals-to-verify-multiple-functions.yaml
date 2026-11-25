@@ -1,11 +1,16 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:    -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN:    -num-instr-ancil=50 -o %t.layout.elf \
-# RUN:    -dump-intervals-to-verify=%t.layout.elf.intervals-to-verify.yaml
-# RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
+# RUN: llvm-snippy %s -o %t.layout.elf \
+# RUN:     -dump-intervals-to-verify=%t.layout.elf.intervals-to-verify.yaml
+# RUN: FileCheck --input-file=%t.layout.elf.intervals-to-verify.yaml %s
 
 # CHECK: intervals-to-verify:
 # CHECK-COUNT-20: [ {{0x[[:xdigit:]]+}}, {{0x[[:xdigit:]]+}} ]
+
+options:
+  mtriple: riscv64
+  function-number: 20
+  function-layers: 5
+  num-instrs: 100
+  num-instr-ancil: 50
 
 sections:
     - name:      1

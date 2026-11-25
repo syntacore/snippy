@@ -1,8 +1,13 @@
 # REQUIRES: riscv-snippy-model-None
 # COM: this is the test for checking possibility to put rvv-config in the body of main config
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -riscv-dump-rvv-config -o %t \
-# RUN:  |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10
+  riscv-dump-rvv-config: ""
 
 sections:
   - name:      3

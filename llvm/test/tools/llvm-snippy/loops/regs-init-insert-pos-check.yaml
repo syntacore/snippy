@@ -1,5 +1,11 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=3 \
-# RUN: -init-regs-in-elf --dump-mf |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 3
+  init-regs-in-elf: true
+  dump-mf: true
+
 branches:
   loop-ratio: 1
 sections:

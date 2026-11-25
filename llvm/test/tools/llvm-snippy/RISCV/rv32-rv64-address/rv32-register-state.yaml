@@ -1,9 +1,14 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv32 -mattr=-c \
-# RUN:    -num-instrs=10000 -init-regs-in-elf -dump-registers-yaml=%t_regs
 
-# RUN: FileCheck %s --input-file=%t_regs --dump-input always
+# RUN: llvm-snippy %s -dump-registers-yaml=%t_regs
+
+# RUN: FileCheck %s --input-file=%t_regs
+
+options:
+  mtriple: riscv32
+  mattr: -c
+  num-instrs: 10000
+  init-regs-in-elf: true
 
 include:
 - ../../Inputs/memory32.yaml

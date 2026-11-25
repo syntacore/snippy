@@ -1,12 +1,14 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
-# RUN: -preserve-caller-saved-regs=X,G,P |& FileCheck %s --check-prefix=CHECK1
+# RUN: not llvm-snippy %s -preserve-caller-saved-regs=X,G,P \
+# RUN: |& FileCheck %s --check-prefix=CHECK1
 
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
-# RUN: -preserve-caller-saved-regs=f,X,V |& FileCheck %s --check-prefix=CHECK2
+# RUN: not llvm-snippy %s -preserve-caller-saved-regs=f,X,V \
+# RUN: |& FileCheck %s --check-prefix=CHECK2
  
 options:
   num-instrs: 10
   verify-mi: on
+  mtriple: riscv64
+  mcpu: generic-rv64
 
 include:
   - Inputs/sections-with-stack.yaml

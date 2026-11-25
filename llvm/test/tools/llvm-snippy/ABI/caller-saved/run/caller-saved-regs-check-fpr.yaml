@@ -1,18 +1,14 @@
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+zfh -mcpu=generic-rv64 \
-# RUN:   -preserve-caller-saved-regs=F \
 # RUN: | FileCheck %s
 
 # RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+f -mcpu=generic-rv64 \
-# RUN:   -preserve-caller-saved-regs=F \
 # RUN: | FileCheck %s
 
 
 # RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+zfh -mcpu=generic-rv32 \
-# RUN:   -preserve-caller-saved-regs=F \
 # RUN: | FileCheck %s
 
 # RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+f -mcpu=generic-rv32 \
-# RUN:   -preserve-caller-saved-regs=F \
 # RUN: | FileCheck %s
 
 options:
@@ -20,6 +16,7 @@ options:
   redefine-sp: reg::X2
   verify-mi: on
   dump-mf: on
+  preserve-caller-saved-regs: [F]
 
 include:
   - ../Inputs/sections-with-stack.yaml

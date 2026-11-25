@@ -1,5 +1,13 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --call-graph-force-connect -verify-mi -num-instr-ancil=50
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  function-number: 20
+  function-layers: 5
+  num-instrs: 100
+  call-graph-force-connect: true
+  verify-mi: true
+  num-instr-ancil: 50
 
 sections:
   - name:      1

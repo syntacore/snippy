@@ -1,13 +1,16 @@
 # REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
-# RUN: llvm-snippy %S/../Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
-# RUN:   --riscv-disable-misaligned-access \
-# RUN:   -num-instrs=10 |& FileCheck %s \
-# RUN:   --check-prefix ORDER
 
-# RUN: llvm-snippy %S/../Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
-# RUN:   --riscv-disable-misaligned-access \
-# RUN:   -num-instrs=1000 |& FileCheck %s
+# RUN: llvm-snippy %s %S/../Inputs/loadstore-layout-1b.yaml -num-instrs=10 \
+# RUN: |& FileCheck %s --check-prefix ORDER
+
+# RUN: llvm-snippy %s %S/../Inputs/loadstore-layout-1b.yaml -num-instrs=1000 \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  riscv-disable-misaligned-access: ""
+
 access-addresses:
   - ordered: true
     plain:

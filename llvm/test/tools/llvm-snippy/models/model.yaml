@@ -1,6 +1,9 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -mtriple=riscv64 |& FileCheck %s \
-# RUN: --check-prefix=MODEL
+
+# RUN: llvm-snippy %s |& FileCheck %s --check-prefix=MODEL
+
+options:
+  mtriple: riscv64
 
 sections:
     - name:      1

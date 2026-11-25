@@ -1,18 +1,18 @@
 # REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
-# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
-# RUN:   -num-instrs=1000  \
-# RUN:   -riscv-disable-misaligned-access > %t
 
-# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=RANGE1
-# RUN: not FileCheck %s --input-file %t --dump-input fail --check-prefix=RANGE1MAX
-# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=RANGE4
-# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=ADDR1
-# RUN: not FileCheck %s --input-file %t --dump-input fail --check-prefix=ADDR1MAX
-# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=ADDR4
-# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=EVIC1
-# RUN: not FileCheck %s --input-file %t --dump-input fail --check-prefix=EVIC1MAX
-# RUN: FileCheck %s --input-file %t --dump-input fail --check-prefix=EVIC4
+# RUN: llvm-snippy %s %S/Inputs/loadstore-layout-1b.yaml \
+# RUN:     > %t
+
+# RUN: FileCheck %s --input-file=%t --check-prefix=RANGE1
+# RUN: not FileCheck %s --input-file=%t --check-prefix=RANGE1MAX
+# RUN: FileCheck %s --input-file=%t --check-prefix=RANGE4
+# RUN: FileCheck %s --input-file=%t --check-prefix=ADDR1
+# RUN: not FileCheck %s --input-file=%t --check-prefix=ADDR1MAX
+# RUN: FileCheck %s --input-file=%t --check-prefix=ADDR4
+# RUN: FileCheck %s --input-file=%t --check-prefix=EVIC1
+# RUN: not FileCheck %s --input-file=%t --check-prefix=EVIC1MAX
+# RUN: FileCheck %s --input-file=%t --check-prefix=EVIC4
 
 # We have total weight = 15, instruction count = 10000
 # Output waits for:
@@ -22,6 +22,11 @@
 #   No more:
 #     1600 checks for weight 1
 
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  riscv-disable-misaligned-access: ""
 
 access-ranges:
     - start: 0x80001000

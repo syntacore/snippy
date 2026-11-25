@@ -1,19 +1,18 @@
 # REQUIRES: riscv-rvv
 # REQUIRES: riscv-snippy-model-spike
 
-# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+v \
-# RUN:  -o %t --num-instrs=1000 \
-# RUN:  --init-regs-in-elf --entry-point=start \
-# RUN:  -rvv-init-mode=loads \
-# RUN:  --riscv-init-fregs-from-memory |& \
-# RUN: FileCheck %s --check-prefix=OUT-MEM
+# RUN: llvm-snippy %s |& FileCheck %s --check-prefix=OUT-MEM
 
-# RUN: llvm-snippy %s -mtriple=riscv32 -mattr=+v \
-# RUN:  -o %t --num-instrs=1000 \
-# RUN:  --init-regs-in-elf --entry-point=start \
-# RUN:  -rvv-init-mode=loads \
-# RUN:  --riscv-init-fregs-from-memory |& \
-# RUN: FileCheck %s --check-prefix=MEM
+# RUN: llvm-snippy %s |& FileCheck %s --check-prefix=MEM
+
+options:
+  mtriple: riscv32
+  mattr: +v
+  num-instrs: 1000
+  init-regs-in-elf: true
+  entry-point: start
+  rvv-init-mode: loads
+  riscv-init-fregs-from-memory: true
 
 include:
 - "../../../Inputs/memory-unaligned-small.yaml"

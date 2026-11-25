@@ -4,8 +4,7 @@
 # COM: This test checks that if not all VMs are suitable for selected VL snippy 
 #      choose suitable one.
 
-# RUN: llvm-snippy %s -model-plugin spike \ 
-# RUN: |& FileCheck %s 
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64

@@ -1,19 +1,24 @@
 # REQUIRES: riscv-snippy-model-any
 # REQUIRES: riscv-rvv
+
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+c,+v \
-# RUN:     -num-instrs=5000 -init-regs-in-elf  -rvv-init-mode=loads \
 # RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64gv.yaml \
 # RUN:     -dump-registers-yaml=%t_regs_1 -o %t_1
 
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+c,+v \
-# RUN:     -num-instrs=5000 -init-regs-in-elf  -rvv-init-mode=loads \
 # RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64gv.yaml \
 # RUN:     -dump-registers-yaml=%t_regs_2 -o %t_2 -random-scheduling
 
 # RUN: diff %t_regs_1 %t_regs_2
 # RUN: not diff -q %t_1.elf %t_2.elf
+
+options:
+  mtriple: riscv64
+  mattr: +c,+v
+  num-instrs: 5000
+  init-regs-in-elf: true
+  rvv-init-mode: loads
+
 include:
 - ../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml
 

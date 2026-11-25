@@ -1,6 +1,16 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c \
-# RUN: -num-instrs=1000 -dump-mf -redefine-sp=SP \
-# RUN: -honor-target-abi --reserved-regs-list=ra,s4 -init-regs-in-elf -verify-mi |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +m,+c
+  num-instrs: 1000
+  dump-mf: true
+  redefine-sp: SP
+  honor-target-abi: true
+  reserved-regs-list: [ra, s4]
+  init-regs-in-elf: true
+  verify-mi: true
+
 sections:
     - name:      1
       VMA:       0x500000

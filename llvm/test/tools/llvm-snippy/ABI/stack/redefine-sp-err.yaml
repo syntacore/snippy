@@ -1,13 +1,19 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m \
-# RUN: -redefine-sp=reg::X0 -num-instrs=10 \
-# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=X0-CHECK
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m \
-# RUN: -redefine-sp=reg::X32 -num-instrs=10 \
-# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=ILL-CHECK
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=+m \
-# RUN: -redefine-sp=any-no-SP -num-instrs=10 \
-# RUN: -init-regs-in-elf -verify-mi |& FileCheck %s -check-prefix=NO-OPT-CHECK
+
+# RUN: not llvm-snippy %s -redefine-sp=reg::X0 \
+# RUN: |& FileCheck %s -check-prefix=X0-CHECK
+# RUN: not llvm-snippy %s -redefine-sp=reg::X32 \
+# RUN: |& FileCheck %s -check-prefix=ILL-CHECK
+# RUN: not llvm-snippy %s -redefine-sp=any-no-SP \
+# RUN: |& FileCheck %s -check-prefix=NO-OPT-CHECK
+
+options:
+  mtriple: riscv64
+  mattr: +m
+  num-instrs: 10
+  init-regs-in-elf: true
+  verify-mi: true
+
 sections:
     - name:      1
       VMA:       0x500000

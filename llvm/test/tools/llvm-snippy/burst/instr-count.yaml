@@ -1,10 +1,14 @@
 # COM: basic checks to ensure that we track number of instructions for
 # COM: burst group
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -dump-mf \
-# RUN: -num-instrs=500 \
-# RUN: --histogram-must-succeed=false --verify-gen-histogram \
-# RUN:    |& FileCheck %s --check-prefix=CHECK-MIXED-HUGEGROUP
+# RUN: llvm-snippy %s |& FileCheck %s --check-prefix=CHECK-MIXED-HUGEGROUP
+
+options:
+  mtriple: riscv64
+  dump-mf: true
+  num-instrs: 500
+  histogram-must-succeed: false
+  verify-gen-histogram: true
 
 sections:
     - name:      1

@@ -1,5 +1,6 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s --dump-mir=- |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64
@@ -7,6 +8,7 @@ options:
   init-regs-in-elf: on
   honor-target-abi: on
   verify-mi: on 
+  dump-mir: "-"
 
 include:
   - Inputs/sections-with-stack.yaml

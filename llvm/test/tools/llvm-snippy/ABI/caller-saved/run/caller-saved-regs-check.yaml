@@ -1,8 +1,8 @@
 # RUN: llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
-# RUN: -preserve-caller-saved-regs=X | FileCheck %s --check-prefix=RV64-GPR-CHECK
+# RUN: | FileCheck %s --check-prefix=RV64-GPR-CHECK
 
 # RUN: llvm-snippy %s -mtriple=riscv32 -mcpu=generic-rv32 \
-# RUN: -preserve-caller-saved-regs=X | FileCheck %s --check-prefix=RV32-GPR-CHECK
+# RUN: | FileCheck %s --check-prefix=RV32-GPR-CHECK
 
 options:
   num-instrs: 1000
@@ -10,6 +10,7 @@ options:
   redefine-ra: reg::X1
   verify-mi: on
   dump-mf: on
+  preserve-caller-saved-regs: [X]
 
 include:
   - ../Inputs/sections-with-stack.yaml

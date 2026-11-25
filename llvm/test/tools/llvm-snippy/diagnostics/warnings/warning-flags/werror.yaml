@@ -1,6 +1,11 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: not llvm-snippy %s -mtriple=riscv64 -Werror \
-# RUN: -num-instrs=10 |& FileCheck %s --dump-input always
+
+# RUN: not llvm-snippy %s -Werror \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
 
 sections:
     - name:      1

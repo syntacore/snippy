@@ -1,12 +1,17 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=30 -selfcheck -selfcheck-mem \
-# RUN:     -init-memory=full -o %t
+
+# RUN: llvm-snippy %s -o %t
 
 # RUN: llvm-readelf --hex-dump=.snippy.2.rw  %t.elf \
-# RUN: llvm-readelf --hex-dump=.snippy.3.rw %t.elf \
-# RUN: |& FileCheck %s --dump-input fail
+# RUN:     llvm-readelf --hex-dump=.snippy.3.rw %t.elf \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 30
+  selfcheck: ""
+  selfcheck-mem: true
+  init-memory: full
 
 sections:
     - name:      0

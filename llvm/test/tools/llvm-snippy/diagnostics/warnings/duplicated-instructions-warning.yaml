@@ -1,11 +1,13 @@
 # REQUIRES: riscv-snippy-model-None
 # COM: This test checks that an error occurs if the options are incompatible
 
-# RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN: |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
 include:
   - ../../Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
 
 histogram:
   - [ADD, 1.0] # ADD duplicate 1

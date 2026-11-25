@@ -1,8 +1,13 @@
 # REQUIRES: riscv-rvv
-# RUN: llvm-snippy %S/Inputs/rvv-loadstore.yaml %s %S/Inputs/rvv-lmul1-sew64-max_encodable.yaml -mtriple=riscv64 -mattr=+v \
-# RUN:  -num-instrs=1000 \
-# RUN:  -dump-memory-accesses=%t
+
+# RUN: llvm-snippy %s %S/Inputs/rvv-loadstore.yaml \
+# RUN:     %S/Inputs/rvv-lmul1-sew64-max_encodable.yaml -dump-memory-accesses=%t
 # RUN: FileCheck --input-file=%t %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 1000
 
 access-ranges:
     - start: 0x80002000

@@ -1,9 +1,9 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:   --init-memory=ascii-file --init-memory-file=%S/Inputs/memory-map-unaligned.yaml \
-# RUN:   --dump-memory-section=2  --memory-section-file=%t1 --dump-memory-as-ascii
 
-# RUN: cat %t1 |& FileCheck %s
+# RUN: llvm-snippy %s --init-memory-file=%S/Inputs/memory-map-unaligned.yaml \
+# RUN:     --memory-section-file=%t1
+
+# RUN: FileCheck %s --input-file=%t1
 
 # CHECK:      Section {2}:
 # CHECK-NEXT: 0x0:  11 22 33 44 55 66 77 88
@@ -24,6 +24,9 @@ options:
   mtriple: "riscv64"
   mcpu: "generic-rv64"
   num-instrs: 10
+  init-memory: ascii-file
+  dump-memory-section: [2]
+  dump-memory-as-ascii: true
 
   
 histogram:

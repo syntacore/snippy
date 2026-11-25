@@ -1,13 +1,15 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -march=rv64gcv \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-DEFAULT
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -march=rv64gcv_zvl512b \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config \
-# RUN:  |& FileCheck %s --check-prefix=CHECK-VLEN512
+# RUN: llvm-snippy %s -march=rv64gcv \
+# RUN: |& FileCheck %s --check-prefix=CHECK-DEFAULT
+
+# RUN: llvm-snippy %s -march=rv64gcv_zvl512b \
+# RUN: |& FileCheck %s --check-prefix=CHECK-VLEN512
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  riscv-dump-rvv-config: ""
 
 include:
 - Inputs/rvv-unit-sew8-lmul4.yaml

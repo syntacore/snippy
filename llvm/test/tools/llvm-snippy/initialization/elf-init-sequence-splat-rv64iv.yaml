@@ -1,7 +1,13 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:    -num-instrs=10 -dump-mf -init-regs-in-elf \
-# RUN:    -rvv-init-mode=splats --verify-mi \
-# RUN: |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10
+  dump-mf: true
+  init-regs-in-elf: true
+  rvv-init-mode: splats
+  verify-mi: true
 
 sections:
     - name:      1

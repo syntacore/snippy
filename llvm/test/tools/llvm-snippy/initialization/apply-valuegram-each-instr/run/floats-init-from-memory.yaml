@@ -3,15 +3,16 @@
 # COM: This test checks that before each instruction, the registers it uses
 # COM: are initialized from memory and according to the histograms. 
 
-# RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:    -riscv-init-fregs-from-memory -mattr=+f,+d \              
-# RUN:    -valuegram-operands-regs=%S/../Inputs/histograms.yaml \
+# RUN: llvm-snippy %s -valuegram-operands-regs=%S/../Inputs/histograms.yaml \
 # RUN: |& FileCheck %s
 
 options:
   num-instrs: 1000
   dump-mf: on
   valuegram-operands-regs-init-outputs: on
+  mtriple: riscv64
+  riscv-init-fregs-from-memory: true
+  mattr: +f,+d
 
 sections:
     - name:      0

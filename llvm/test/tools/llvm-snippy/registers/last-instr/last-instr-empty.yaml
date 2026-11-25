@@ -1,11 +1,14 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a,+m \
-# RUN:    -last-instr= -dump-mi \
-# RUN:    -num-instrs=10 |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s -last-instr= \
+# RUN: |& FileCheck %s
 
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=-a,+m \
-# RUN:    "-last-instr= " -dump-mi \
-# RUN:    -num-instrs=10 |& FileCheck %s --dump-input always \
-# RUN:    -check-prefix=TRICKY-EMPTY
+# RUN: not llvm-snippy %s "-last-instr= " \
+# RUN: |& FileCheck %s -check-prefix=TRICKY-EMPTY
+
+options:
+  mtriple: riscv64
+  mattr: -a,+m
+  dump-mi: true
+  num-instrs: 10
 
 sections:
     - name:      1

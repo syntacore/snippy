@@ -1,7 +1,14 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=800 \
-# RUN:   -verify-mi -mattr=+c -histogram-max-deviation=2.1 \
-# RUN:   -verify-gen-histogram -o %t 2>&1 | FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 800
+  verify-mi: true
+  mattr: +c
+  histogram-max-deviation: 2.1
+  verify-gen-histogram: true
 
 sections:
     - name:      1

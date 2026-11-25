@@ -1,8 +1,11 @@
-# RUN: llvm-snippy %s -march=rv64gc -init-regs-in-elf -dump-mf |& FileCheck %s
-# RUN: llvm-snippy %s -march=rv64gc -init-regs-in-elf -dump-mf -mattr=-d \
-# RUN:     |& FileCheck %s --check-prefix=NO-DOUBLE
+# RUN: llvm-snippy %s |& FileCheck %s
+# RUN: llvm-snippy %s -mattr=-d \
+# RUN: |& FileCheck %s --check-prefix=NO-DOUBLE
 options:
   mtriple: riscv64
+  march: rv64gc
+  init-regs-in-elf: true
+  dump-mf: true
 
 sections:
     - name:      1

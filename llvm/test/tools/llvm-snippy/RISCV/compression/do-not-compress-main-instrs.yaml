@@ -1,5 +1,5 @@
 # COM: run snippy and print MF that contains opcodes as we generated them in snippy
-# RUN: llvm-snippy %s -o %t -dump-mf >& %t.dump.mf
+# RUN: llvm-snippy %s -o %t >& %t.dump.mf
 
 # COM: objdump resulting elf, compressed instructions will be parsed with "c.*"
 # RUN: llvm-objdump %t.elf -M no-aliases -d >& %t.dump.obj
@@ -16,6 +16,7 @@ options:
   mtriple: riscv64
   mattr: +c
   num-instrs: 100000
+  dump-mf: true
 
 sections:
   - name:      1

@@ -1,13 +1,9 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=2 \
-# RUN:  -histogram-max-deviation=2.1 -verify-gen-histogram \
-# RUN:  -mattr=+a \
-# RUN:  -dump-mf
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=2 \
-# RUN:  -histogram-max-deviation=2.1 -histogram-must-succeed=false -verify-gen-histogram \
-# RUN:  -mattr=+a \
-# RUN:  -dump-mf |& FileCheck %s --dump-input always
+# RUN: not llvm-snippy %s
+
+# RUN: llvm-snippy %s -histogram-must-succeed=false \
+# RUN: |& FileCheck %s
 
 # CHECK: Start Verification for function: SnippyFunction:
 # CHECK-NEXT: Start generated instructions statistics:
@@ -20,6 +16,15 @@
 # CHECK-NEXT: Percent of support instructions:
 # CHECK-NEXT: End Verification for function: SnippyFunction
 #
+
+options:
+  mtriple: riscv64
+  num-instrs: 2
+  histogram-max-deviation: 2.1
+  verify-gen-histogram: true
+  mattr: +a
+  dump-mf: true
+
 sections:
     - name:      1
       VMA:       0x80000000

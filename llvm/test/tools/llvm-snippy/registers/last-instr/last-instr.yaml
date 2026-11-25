@@ -1,6 +1,11 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a,+m \
-# RUN:    -last-instr=DIV -dump-mi \
-# RUN:    -num-instrs=10 |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -a,+m
+  last-instr: DIV
+  dump-mi: true
+  num-instrs: 10
 
 sections:
     - name:      1

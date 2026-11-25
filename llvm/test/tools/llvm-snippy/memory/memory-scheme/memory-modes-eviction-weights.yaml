@@ -1,8 +1,12 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %S/Inputs/loadstore-layout-1b.yaml %s -mtriple=riscv64 \
-# RUN:   -num-instrs=10 -seed=2 \
-# RUN:   -riscv-disable-misaligned-access \
-# RUN: |& FileCheck %s --dump-input fail
+
+# RUN: llvm-snippy %s %S/Inputs/loadstore-layout-1b.yaml -seed=2 \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  riscv-disable-misaligned-access: ""
 
 access-evictions:
     - mask:  0x00000000

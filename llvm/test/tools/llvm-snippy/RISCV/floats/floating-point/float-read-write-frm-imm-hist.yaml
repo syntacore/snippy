@@ -1,8 +1,9 @@
 # REQUIRES: riscv-snippy-model-None
+
 # RUN: llvm-snippy %s -mattr +f,-d -o %t
-# RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s
 # RUN: llvm-snippy %s -mattr +d -o %t
-# RUN: llvm-objdump %t.elf -d |& FileCheck %s -dump-input fail
+# RUN: llvm-objdump %t.elf -d |& FileCheck %s
 include:
   - ../../Inputs/sections.yaml
 options:

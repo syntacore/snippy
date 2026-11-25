@@ -4,8 +4,7 @@
 # COM: This test checks that only compatible with VL::max_encodable=4 immediate 
 #      VMs are encountered.
 
-# RUN: llvm-snippy %s -model-plugin spike \ 
-# RUN: |& FileCheck %s 
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64

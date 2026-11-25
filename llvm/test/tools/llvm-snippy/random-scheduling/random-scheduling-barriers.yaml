@@ -1,14 +1,16 @@
 # REQUIRES: asserts
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10000 -init-regs-in-elf -debug-only=snippy-riscv \
+
+# RUN: llvm-snippy %s -debug-only=snippy-riscv \
 # RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml \
-# RUN:     -random-scheduling \
-# RUN:  |& FileCheck %s 
+# RUN: |& FileCheck %s
 
 options:
   mattr: +zifencei
+  mtriple: riscv64
+  num-instrs: 10000
+  init-regs-in-elf: true
+  random-scheduling: true
 sections:
     - name:      0
       VMA:       0x10000

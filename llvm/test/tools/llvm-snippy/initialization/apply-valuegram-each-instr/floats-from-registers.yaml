@@ -1,15 +1,18 @@
 # COM: This test checks that initialization takes place only according to the "registers" file.
 
-# RUN: llvm-snippy %s %S/Inputs/double-floats.yaml --mtriple=riscv64 \
-# RUN:    -valuegram-operands-regs=%S/Inputs/registers.yaml \
+# RUN: llvm-snippy %s -valuegram-operands-regs=%S/Inputs/registers.yaml \
 # RUN: |& FileCheck %s --check-prefix=DOUBLE
 
+
+include:
+  - Inputs/double-floats.yaml
 
 options:
   num-instrs: 1000
   mattr: +zfh,+d
   dump-mf: on
   valuegram-operands-regs-init-outputs: on
+  mtriple: riscv64
 
 sections:
     - name:      1

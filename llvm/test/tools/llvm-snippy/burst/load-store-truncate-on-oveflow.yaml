@@ -1,9 +1,13 @@
-# RUN: llvm-snippy %s -mtriple=riscv64  \
-# RUN: -num-instrs=1010 --dump-mi \
-# RUN: --histogram-must-succeed=false --verify-gen-histogram \
-# RUN:  >& %t
+# RUN: llvm-snippy %s >& %t
 # RUN: FileCheck --input-file=%t %s --check-prefixes=CHECK,LD
 # RUN: FileCheck --input-file=%t %s --check-prefixes=CHECK,SD
+
+options:
+  mtriple: riscv64
+  num-instrs: 1010
+  dump-mi: true
+  histogram-must-succeed: false
+  verify-gen-histogram: true
 
 sections:
     - name:      1

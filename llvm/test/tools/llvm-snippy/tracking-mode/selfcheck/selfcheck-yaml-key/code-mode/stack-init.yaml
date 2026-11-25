@@ -1,9 +1,14 @@
 # REQUIRES: riscv-snippy-model-spike
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:    -num-instrs=1000 -init-regs-in-elf \
-# RUN:    -honor-target-abi -trace-log %t --redefine-sp=reg::x23
-# RUN: FileCheck %s --input-file %t --dump-input fail
+
+# RUN: llvm-snippy %s -trace-log %t
+# RUN: FileCheck %s --input-file=%t
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  init-regs-in-elf: true
+  honor-target-abi: true
+  redefine-sp: reg::x23
 
 sections:
   - name:      0

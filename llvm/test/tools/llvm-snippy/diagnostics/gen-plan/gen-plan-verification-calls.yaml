@@ -1,5 +1,13 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: -num-instr-ancil=50 -verify-gen-plan -verify-mi |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  function-number: 20
+  function-layers: 5
+  num-instrs: 100
+  num-instr-ancil: 50
+  verify-gen-plan: true
+  verify-mi: true
 
 sections:
   - name:      1

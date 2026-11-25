@@ -1,7 +1,12 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:    -dump-mi -num-instrs=2000 -last-instr=RET \
-# RUN:    | FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s | FileCheck %s
+
+options:
+  mtriple: riscv64
+  dump-mi: true
+  num-instrs: 2000
+  last-instr: RET
 
 sections:
   - name:      1

@@ -3,11 +3,14 @@
 # no F or D extension enabled
 
 # RUN: not llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+c \
-# RUN:    -num-instrs=10 \
-# RUN:    -initial-regs-yaml=%S/Inputs/initial_state_rv64g.yaml \
-# RUN:    -dump-registers-yaml=%t.regs.yaml \
+# RUN:     -initial-regs-yaml=%S/Inputs/initial_state_rv64g.yaml \
+# RUN:     -dump-registers-yaml=%t.regs.yaml \
 # RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  num-instrs: 10
 
 sections:
     - name:      1

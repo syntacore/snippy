@@ -1,6 +1,11 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
-# RUN:     -mattr=+c
+
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  mattr: +c
 
 branches:
   consecutive-loops: 0

@@ -1,6 +1,11 @@
 # REQUIRES: snippy-long-tests
-# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=5000 \
-# RUN:     -dump-mf -o %t
+
+# RUN: timeout 300 llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 5000
+  dump-mf: true
 
 sections:
     - name:      1

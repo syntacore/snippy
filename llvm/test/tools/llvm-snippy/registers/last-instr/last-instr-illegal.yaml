@@ -1,6 +1,11 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=-a,+m \
-# RUN:    -last-instr=abrakadabra -dump-mi \
-# RUN:    -num-instrs=10 |& FileCheck %s --dump-input always
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -a,+m
+  last-instr: abrakadabra
+  dump-mi: true
+  num-instrs: 10
 
 sections:
     - name:      1

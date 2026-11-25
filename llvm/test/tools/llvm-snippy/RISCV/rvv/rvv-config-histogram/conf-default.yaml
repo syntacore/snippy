@@ -1,26 +1,24 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config \
-# RUN:  |& FileCheck %s
+
+# RUN: llvm-snippy %s -riscv-dump-rvv-config \
+# RUN: |& FileCheck %s
 
 # COM: this just ensures that we still have proper execution
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config
+# RUN: llvm-snippy %s -riscv-dump-rvv-config
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config=%t.rvv.config.info
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.rvv.config.info
 # RUN: FileCheck --input-file=%t.rvv.config.info %s
 
 # COM: this just ensures that we still have proper execution
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config=%t.rvv.config.info
+# RUN: llvm-snippy %s -riscv-dump-rvv-config=%t.rvv.config.info
 
 include:
   - ../Inputs/rvv-sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10
 
 histogram:
 

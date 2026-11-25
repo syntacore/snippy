@@ -1,11 +1,15 @@
 # REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
-# RUN: llvm-snippy %S/../Inputs/loadstore-layout-4b.yaml %s -mtriple=riscv64 \
-# RUN:  -num-instrs=1000 \
-# RUN:  --riscv-disable-misaligned-access \
-# RUN:  -dump-memory-accesses=%t.accesses \
-# RUN:  -trace-log=%t.dump
+
+# RUN: llvm-snippy %s %S/../Inputs/loadstore-layout-4b.yaml \
+# RUN:     -dump-memory-accesses=%t.accesses \
+# RUN:     -trace-log=%t.dump
 # RUN: FileCheck --input-file=%t.dump %s --check-prefix=CNT
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  riscv-disable-misaligned-access: ""
 
 burst:
   mode: mixed

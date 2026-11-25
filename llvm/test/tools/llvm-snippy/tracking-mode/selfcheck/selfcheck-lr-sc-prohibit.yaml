@@ -1,8 +1,14 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 \
-# RUN:   -init-regs-in-elf -force-emit-linker-script \
-# RUN:   -selfcheck -selfcheck-gv -mattr=+c,+a,+m |& FileCheck %s
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 # CHECK: error: selfcheck / backtrack / address-value-hazards execution with both LR/SC is prohibited
+
+options:
+  mtriple: riscv64
+  init-regs-in-elf: true
+  force-emit-linker-script: true
+  selfcheck: ""
+  selfcheck-gv: true
+  mattr: +c,+a,+m
 
 sections:
   - name:      0

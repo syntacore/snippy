@@ -1,10 +1,10 @@
 # REQUIRES: riscv-snippy-model-None
+
 # RUN: llvm-snippy %s \
-# RUN:    -mattr=-c,+m \
-# RUN:    -o %t.layout.elf \
-# RUN:    -initial-regs-yaml=%S/../../initialization/Inputs/histogram_rv64gv.yaml \
-# RUN:    -dump-intervals-to-verify=%t.layout.elf.intervals-to-verify.yaml
-# RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
+# RUN:     -o %t.layout.elf \
+# RUN:     -initial-regs-yaml=%S/../../initialization/Inputs/histogram_rv64gv.yaml \
+# RUN:     -dump-intervals-to-verify=%t.layout.elf.intervals-to-verify.yaml
+# RUN: FileCheck --input-file=%t.layout.elf.intervals-to-verify.yaml %s
 # RUN: llvm-objdump %t.layout.elf -d |& FileCheck %s --check-prefix=DIS
 
 
@@ -21,6 +21,7 @@ options:
   honor-target-abi: on
   mtriple: riscv64
   num-instrs: 20
+  mattr: -c,+m
 
 sections:
     - name:      1

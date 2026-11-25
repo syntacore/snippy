@@ -1,4 +1,11 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a -num-instrs=10 -dump-mf -init-regs-in-elf |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -a
+  num-instrs: 10
+  dump-mf: true
+  init-regs-in-elf: true
 
 sections:
     - name:      1

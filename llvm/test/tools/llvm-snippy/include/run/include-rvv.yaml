@@ -2,11 +2,15 @@
 # REQUIRES: riscv-rvv
 
 # COM: this is the test for checking the possibility to include rvv-config
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
 include:
   - ../Inputs/rvv-unit-all.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10
 
 sections:
   - name:      3

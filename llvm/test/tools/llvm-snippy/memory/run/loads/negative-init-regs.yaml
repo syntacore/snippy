@@ -1,8 +1,11 @@
-# RUN: not llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=1000 -selfcheck -selfcheck-mem \
-# RUN:     -init-memory=loads \
-# RUN: |& FileCheck %s
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  selfcheck: ""
+  selfcheck-mem: true
+  init-memory: loads
 
 sections:
     - name:      0

@@ -1,4 +1,11 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a -list-opcode-names -dump-mi -num-instrs=10 |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -a
+  list-opcode-names: true
+  dump-mi: true
+  num-instrs: 10
 
 sections:
     - name:      1

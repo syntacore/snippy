@@ -1,6 +1,9 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: not llvm-snippy %s %S/Inputs/sections.yaml --redefine-ra=RA \
-# RUN:   |& FileCheck %s --dump-input=fail
+
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - Inputs/sections.yaml
 
 options:
   mtriple: riscv64
@@ -11,6 +14,7 @@ options:
   init-regs-in-elf: true
   external-stack: true
   honor-target-abi: on
+  redefine-ra: RA
 
 histogram:
     - [SLL, 1.0]

@@ -1,10 +1,15 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=50 \
-# RUN:    -verify-mi -o %t.layout.elf \
-# RUN:    -dump-intervals-to-verify -init-regs-in-elf
-# RUN: FileCheck -input-file=%t.layout.elf.intervals-to-verify.yaml %s
+# RUN: llvm-snippy %s -o %t.layout.elf
+# RUN: FileCheck --input-file=%t.layout.elf.intervals-to-verify.yaml %s
 
 # CHECK: intervals-to-verify:
 # CHECK-NEXT: [ {{0x[[:xdigit:]]+}}, {{0x[[:xdigit:]]+}} ]
+
+options:
+  mtriple: riscv64
+  num-instrs: 50
+  verify-mi: true
+  dump-intervals-to-verify: ""
+  init-regs-in-elf: true
 
 sections:
     - name:      1

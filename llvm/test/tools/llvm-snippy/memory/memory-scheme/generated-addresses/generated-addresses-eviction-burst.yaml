@@ -1,12 +1,15 @@
 # REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
-# RUN: llvm-snippy %S/../Inputs/loadstore-layout.yaml %s -mtriple=riscv64 \
-# RUN:   -num-instrs=1000 |& FileCheck %s \
-# RUN:   --check-prefix ALL
 
-# RUN: llvm-snippy %S/../Inputs/loadstore-layout.yaml %s -mtriple=riscv64 \
-# RUN:   -num-instrs=1000 |& FileCheck %s \
-# RUN:   --check-prefix CNT
+# RUN: llvm-snippy %s %S/../Inputs/loadstore-layout.yaml \
+# RUN: |& FileCheck %s --check-prefix ALL
+
+# RUN: llvm-snippy %s %S/../Inputs/loadstore-layout.yaml \
+# RUN: |& FileCheck %s --check-prefix CNT
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
 
 access-evictions:
     - mask:  0x0000100c

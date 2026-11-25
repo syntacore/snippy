@@ -1,13 +1,15 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck \
+
+# RUN: llvm-snippy %s -selfcheck \
 # RUN: |& FileCheck %s --check-prefixes=FULL,CHECK
 
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:    -num-instrs=1000 -init-regs-in-elf -selfcheck=600 \
+# RUN: llvm-snippy %s -selfcheck=600 \
 # RUN: |& FileCheck %s --check-prefixes=PART,CHECK
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  init-regs-in-elf: true
 
 sections:
     - name:      1

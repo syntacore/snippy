@@ -1,10 +1,14 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+a,+f -dump-mf \
-# RUN: -num-instrs=1000 \
-# RUN: >& %t
-# RUN: FileCheck --input-file=%t %s --dump-input=always --check-prefixes=THREE,CHECK
-# RUN: FileCheck --input-file=%t %s --dump-input=always --check-prefixes=FOUR,CHECK
-# RUN: not FileCheck --input-file=%t %s --dump-input=always --check-prefixes=ONE
-# RUN: not FileCheck --input-file=%t %s --dump-input=always --check-prefixes=TWO
+# RUN: llvm-snippy %s >& %t
+# RUN: FileCheck --input-file=%t %s --check-prefixes=THREE,CHECK
+# RUN: FileCheck --input-file=%t %s --check-prefixes=FOUR,CHECK
+# RUN: not FileCheck --input-file=%t %s --check-prefixes=ONE
+# RUN: not FileCheck --input-file=%t %s --check-prefixes=TWO
+
+options:
+  mtriple: riscv64
+  mattr: +a,+f
+  dump-mf: true
+  num-instrs: 1000
 
 include:
 - Inputs/mixed-burst-random-group-size.yaml

@@ -1,4 +1,9 @@
-# RUN: llvm-snippy %s -march=rv64gc -mtriple=riscv64 -num-instrs=10
+# RUN: llvm-snippy %s
+
+options:
+  march: rv64gc
+  mtriple: riscv64
+  num-instrs: 10
 
 sections:
   - name: text

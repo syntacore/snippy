@@ -1,13 +1,16 @@
 # REQUIRES: riscv-snippy-model-spike
 
-# RUN: llvm-snippy %S/Inputs/default-layout.yaml %S/Inputs/memory-restricted.yaml \
-# RUN:   %s -mtriple=riscv64 \
-# RUN:   -num-instrs=100 \
-# RUN:   -riscv-disable-misaligned-access \
-# RUN: |& FileCheck %s --dump-input fail
+# RUN: llvm-snippy %s %S/Inputs/memory-restricted.yaml \
+# RUN:     %S/Inputs/default-layout.yaml \
+# RUN: |& FileCheck %s
 
 # CHECK-NOT: mem 0x0000000080002000
 # CHECK-NOT: mem 0x0000000080003f00
 # CHECK-NOT: mem 0x0000000080004000
 # CHECK-NOT: mem 0x0000000080201000
 # CHECK: #===Simulation Start===
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  riscv-disable-misaligned-access: ""

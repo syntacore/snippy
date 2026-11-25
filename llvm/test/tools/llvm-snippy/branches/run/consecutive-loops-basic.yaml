@@ -1,5 +1,12 @@
-# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=20 \
-# RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops
+# RUN: timeout 300 llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 20
+  verify-mi: true
+  mattr: -c
+  dump-mf: true
+  verify-consecutive-loops: true
 
 sections:
     - name:      1

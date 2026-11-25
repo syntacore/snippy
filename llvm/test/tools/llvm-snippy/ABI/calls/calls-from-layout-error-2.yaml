@@ -1,5 +1,14 @@
-# RUN: not llvm-snippy %S/../../Inputs/jal-layout.yaml %s -mtriple=riscv64 -num-instrs=100 \
-# RUN: -num-instr-ancil=10 --dump-mf -verify-mi |& FileCheck %s
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../../Inputs/jal-layout.yaml
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  num-instr-ancil: 10
+  dump-mf: true
+  verify-mi: true
 
 call-graph:
   entry-point: SnippyFunction
@@ -16,4 +25,4 @@ call-graph:
         - fun3
     - name: fun3
 
-# CHECK: calls-from-layout-error-2.yaml:5:3: error: Call graph has multiple entries for 'fun1' function
+# CHECK: calls-from-layout-error-2.yaml:14:3: error: Call graph has multiple entries for 'fun1' function

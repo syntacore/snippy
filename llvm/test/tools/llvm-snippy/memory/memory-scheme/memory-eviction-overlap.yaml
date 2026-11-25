@@ -1,9 +1,12 @@
-# RUN: not llvm-snippy %S/Inputs/default-layout.yaml %s \
-# RUN:   -mtriple=riscv64 -num-instrs=100 \
-# RUN:   |& FileCheck --dump-input always %s
+# RUN: not llvm-snippy %s %S/Inputs/default-layout.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
 
 access-evictions:
     - mask:  0x003f0000
       fixed: 0x80010000
 
-# CHECK: memory-eviction-overlap.yaml:6:7: error: Bits in mask and fixed fields for eviction overlap
+# CHECK: memory-eviction-overlap.yaml:9:7: error: Bits in mask and fixed fields for eviction overlap

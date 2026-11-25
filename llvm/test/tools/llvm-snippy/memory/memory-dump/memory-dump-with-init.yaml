@@ -1,38 +1,30 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10 -selfcheck -selfcheck-mem \
-# RUN:     -init-memory=runtime -init-regs-in-elf -memory-seed=11  \
+
+# RUN: llvm-snippy %s -selfcheck -selfcheck-mem \
 # RUN:     -dump-memory-section=2,3 -memory-section-file=%t11
 
 # COMM: Dump of sections 2,3
 # RUN: llvm-objcopy -O ihex -I binary %t11 %t1
-# RUN: cat %t1 |& FileCheck %s --dump-input fail
+# RUN: FileCheck %s --input-file=%t1
 
 
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10 \
-# RUN:     -init-memory=runtime -init-regs-in-elf -memory-seed=11  \
 # RUN:     -dump-memory-section={rw} -memory-section-file=%t22
 
 # COMM: Dump of sections 2 and 3.
 # COMM: All RW sections include implicit ones such as selfchech and stack
 # COMM: (here they are disabled)
 # RUN: llvm-objcopy -O ihex -I binary %t22 %t2
-# RUN: cat %t2 |& FileCheck %s --dump-input always
+# RUN: FileCheck %s --input-file=%t2
 
 
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10 \
-# RUN:     -init-memory=runtime -init-regs-in-elf -memory-seed=11  \
 # RUN:     -dump-memory-section={rw},2,2 -memory-section-file=%t33
 
 # COMM: Shows that sections may duplicate others in the input option,
 # COMM:   but final dump will contain each section only once.
 # RUN: llvm-objcopy -O ihex -I binary %t33 %t3
-# RUN: cat %t3 |& FileCheck %s --dump-input always
+# RUN: FileCheck %s --input-file=%t3
 
 # COMM: According to Ihex standart each satrts with number of bytes in the line.
 # COMM: This means that we will have 2 lines with 0x10 bytes. (10 bytes for each section)
@@ -45,6 +37,11 @@
 
 options:
   trace-log: "/dev/null"
+  mtriple: riscv64
+  num-instrs: 10
+  init-memory: runtime
+  init-regs-in-elf: true
+  memory-seed: 11
 
 sections:
     - name:      0

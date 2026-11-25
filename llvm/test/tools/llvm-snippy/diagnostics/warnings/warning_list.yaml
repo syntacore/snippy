@@ -1,7 +1,12 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN: -external-stack=true -redefine-sp=SP \
-# RUN: -num-instrs=10 |& FileCheck %s --dump-input fail
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  external-stack: true
+  redefine-sp: SP
+  num-instrs: 10
 
 sections:
     - name:      1

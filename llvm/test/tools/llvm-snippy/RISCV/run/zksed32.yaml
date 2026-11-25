@@ -1,6 +1,12 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -num-instrs=1000 -mtriple=riscv32 \
-# RUN: -mattr=+zksed -dump-mf |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  num-instrs: 1000
+  mtriple: riscv32
+  mattr: +zksed
+  dump-mf: true
 
 histogram:
 - [SM4ED, 1.0]

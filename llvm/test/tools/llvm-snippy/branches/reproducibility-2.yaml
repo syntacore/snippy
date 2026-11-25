@@ -1,12 +1,15 @@
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=-c,+m \
-# RUN:    -num-instrs=1000 -init-regs-in-elf \
-# RUN:    -o %t.1
+# RUN:     -o %t.1
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=-c,+m \
-# RUN:    -num-instrs=1000 -init-regs-in-elf \
-# RUN:    -o %t.2
+# RUN:     -o %t.2
 # RUN: diff %t.1.elf %t.2.elf
+
+options:
+  mtriple: riscv64
+  mattr: -c,+m
+  num-instrs: 1000
+  init-regs-in-elf: true
+
 sections:
     - name:      1
       VMA:       0x100000

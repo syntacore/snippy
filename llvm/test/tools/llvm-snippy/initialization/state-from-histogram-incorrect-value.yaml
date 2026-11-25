@@ -2,11 +2,14 @@
 # COM: Check that if there is a minus before the number in valuegram and radix is not equal to 10 - this is an error
 
 # RUN: not llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+c \
-# RUN:    -num-instrs=10 \
-# RUN:    -initial-regs-yaml=%S/Inputs/histogram_incorrect_value.yaml \
-# RUN:    -dump-registers-yaml=%t.regs.yaml \
+# RUN:     -initial-regs-yaml=%S/Inputs/histogram_incorrect_value.yaml \
+# RUN:     -dump-registers-yaml=%t.regs.yaml \
 # RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  num-instrs: 10
 
 sections:
     - name:      1

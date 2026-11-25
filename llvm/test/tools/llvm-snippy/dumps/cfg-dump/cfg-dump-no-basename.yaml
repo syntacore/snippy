@@ -1,7 +1,12 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s --num-instrs=100 --mtriple=riscv64 \
-# RUN:   --dump-cfg
+
+# RUN: llvm-snippy %s
 # RUN: rm SnippyFunction-cfg-dump.dot
+
+options:
+  num-instrs: 100
+  mtriple: riscv64
+  dump-cfg: true
 
 sections:
   - name:      0

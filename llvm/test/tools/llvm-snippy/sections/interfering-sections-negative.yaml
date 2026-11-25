@@ -1,7 +1,12 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1 \
-# RUN:  --selfcheck --selfcheck-ref-value-storage=memory  |& FileCheck %s
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 # CHECK: error: Incorrect list of sections: section 2 and section selfcheck are interfering
+
+options:
+  mtriple: riscv64
+  num-instrs: 1
+  selfcheck: ""
+  selfcheck-ref-value-storage: memory
 
 sections:
     - name:      1

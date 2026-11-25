@@ -1,9 +1,14 @@
 # REQUIRES: riscv-snippy-model-callbacks
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=-c,+m \
-# RUN:    -num-instrs=1000 -init-regs-in-elf \
-# RUN:    --model-plugin=spike \
-# RUN: |& FileCheck %s
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -c,+m
+  num-instrs: 1000
+  init-regs-in-elf: true
+
 burst:
   mode: store
   min-size: 33

@@ -1,30 +1,36 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s %S/Inputs/burst-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=STORE
 
-# RUN: llvm-snippy %s %S/Inputs/burst-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=STORE-ERR
+# RUN: llvm-snippy %s %S/Inputs/burst-store.yaml -num-instrs=200 \
+# RUN: |& FileCheck %s -check-prefix=STORE
 
-# RUN: llvm-snippy %s %S/Inputs/burst-load.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=LOAD
+# RUN: llvm-snippy %s %S/Inputs/burst-store.yaml -num-instrs=200 \
+# RUN: |& FileCheck %s -check-prefix=STORE-ERR
 
-# RUN: llvm-snippy %s %S/Inputs/burst-load.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=LOAD-ERR
+# RUN: llvm-snippy %s %S/Inputs/burst-load.yaml -num-instrs=200 \
+# RUN: |& FileCheck %s -check-prefix=LOAD
 
-# RUN: llvm-snippy %s %S/Inputs/burst-mixed.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 |& FileCheck %s -check-prefix=MIXED
+# RUN: llvm-snippy %s %S/Inputs/burst-load.yaml -num-instrs=200 \
+# RUN: |& FileCheck %s -check-prefix=LOAD-ERR
 
-# RUN: llvm-snippy %s %S/Inputs/burst-load-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200  |& FileCheck %s -check-prefix=LOADSTORE
+# RUN: llvm-snippy %s %S/Inputs/burst-mixed.yaml -num-instrs=200 \
+# RUN: |& FileCheck %s -check-prefix=MIXED
+
+# RUN: llvm-snippy %s %S/Inputs/burst-load-store.yaml -num-instrs=200 \
+# RUN: |& FileCheck %s -check-prefix=LOADSTORE
 
 # Generate many instructions to have extremely high probability that desired
 # pattern wasn't met because it cannot be emitted. It's not the most robust test
 # case. Please, improve it if you have better ideas.
-# RUN: llvm-snippy %s %S/Inputs/burst-load-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=1000 |& FileCheck %s -check-prefix=LOADSTORE-ERR
+# RUN: llvm-snippy %s %S/Inputs/burst-load-store.yaml -num-instrs=1000 \
+# RUN: |& FileCheck %s -check-prefix=LOADSTORE-ERR
 
-# RUN: llvm-snippy %s %S/Inputs/burst-mixed-huge.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=500 |& FileCheck %s -check-prefix=MIXED-HUGEGROUP
+# RUN: llvm-snippy %s %S/Inputs/burst-mixed-huge.yaml -num-instrs=500 \
+# RUN: |& FileCheck %s -check-prefix=MIXED-HUGEGROUP
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  dump-mf: true
 
 sections:
     - name:      1

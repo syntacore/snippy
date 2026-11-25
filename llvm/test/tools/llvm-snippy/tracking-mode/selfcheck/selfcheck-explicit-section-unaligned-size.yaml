@@ -1,8 +1,14 @@
 # REQUIRES: riscv-rvv
-# RUN: not llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+v \
-# RUN:     -num-instrs=2 -init-regs-in-elf -selfcheck -enable-selfcheck-rvv  \
-# RUN: |& FileCheck %s --check-prefix=UNALIGNED_SIZE
+
+# RUN: not llvm-snippy %s |& FileCheck %s --check-prefix=UNALIGNED_SIZE
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 2
+  init-regs-in-elf: true
+  selfcheck: ""
+  enable-selfcheck-rvv: true
 
 include:
 - ../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml

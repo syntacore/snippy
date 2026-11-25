@@ -4,14 +4,14 @@
 # COM: (target and support, for generating values ​​in registers).
 
 # RUN: llvm-snippy %s \
-# RUN:    -generate-insertion-point-hints \
-# RUN:    -valuegram-operands-regs=%S/Inputs/histograms.yaml \
+# RUN:     -valuegram-operands-regs=%S/Inputs/histograms.yaml \
 # RUN: |& FileCheck %s
 
 options:
   mtriple: "riscv64"
   num-instrs: 100
   dump-mf: on
+  generate-insertion-point-hints: true
 
 sections:
     - name:      0

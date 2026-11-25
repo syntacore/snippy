@@ -1,17 +1,17 @@
-# RUN: llvm-snippy %s %S/../Inputs/burst-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200 
+# RUN: llvm-snippy %s %S/../Inputs/burst-store.yaml -num-instrs=200
 
-# RUN: llvm-snippy %s %S/../Inputs/burst-load.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200
+# RUN: llvm-snippy %s %S/../Inputs/burst-load.yaml -num-instrs=200
 
-# RUN: llvm-snippy %s %S/../Inputs/burst-mixed.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200
+# RUN: llvm-snippy %s %S/../Inputs/burst-mixed.yaml -num-instrs=200
 
-# RUN: llvm-snippy %s %S/../Inputs/burst-load-store.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=200
+# RUN: llvm-snippy %s %S/../Inputs/burst-load-store.yaml -num-instrs=200
 
-# RUN: llvm-snippy %s %S/../Inputs/burst-mixed-huge.yaml -mtriple=riscv64 -mattr=+c -dump-mf \
-# RUN: -num-instrs=500
+# RUN: llvm-snippy %s %S/../Inputs/burst-mixed-huge.yaml -num-instrs=500
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  dump-mf: true
 
 sections:
     - name:      1

@@ -1,6 +1,14 @@
-# RUN:  llvm-snippy %s -mtriple=riscv64 \
-# RUN:      -num-instrs=10 -num-instr-ancil=10 --dump-mf -verify-mi \
-# RUN:      -init-regs-in-elf -init-memory=runtime
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  num-instr-ancil: 10
+  dump-mf: true
+  verify-mi: true
+  init-regs-in-elf: true
+  init-memory: runtime
+
 sections:
   - name: 1
     VMA: 0x210000

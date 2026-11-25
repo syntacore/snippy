@@ -1,16 +1,16 @@
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:    -num-instrs=10000 -init-regs-in-elf -o %t_1 \
-# RUN:    -mattr=+c,+f \
-# RUN:    -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml
+# RUN: llvm-snippy %s -o %t_1 \
+# RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml
 
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:    -num-instrs=10000 -init-regs-in-elf -o %t_2 \
-# RUN:    -mattr=+c,+f -random-scheduling \
-# RUN:    -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml
+# RUN: llvm-snippy %s -o %t_2 -random-scheduling \
+# RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml
 
 # RUN: not diff -q %t_1.elf %t_2.elf
+
+options:
+  mtriple: riscv64
+  num-instrs: 10000
+  init-regs-in-elf: true
+  mattr: +c,+f
 
 sections:
     - name:      1

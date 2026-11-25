@@ -1,14 +1,16 @@
 # REQUIRES: riscv-snippy-model-spike
 # REQUIRES: riscv-snippy-model-callbacks
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-c \
-# RUN:   -num-instrs=100 \
+# RUN: llvm-snippy %s |& FileCheck %s
+
+# RUN: llvm-snippy %s \
+# RUN:     -enable-address-value-hazards=true -backtrack --init-regs-in-elf \
 # RUN: |& FileCheck %s
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-c \
-# RUN:   -num-instrs=100 \
-# RUN:   -enable-address-value-hazards=true -backtrack --init-regs-in-elf \
-# RUN: |& FileCheck %s
+options:
+  mtriple: riscv64
+  mattr: -c
+  num-instrs: 100
 
 include:
 - Inputs/memory.yaml

@@ -1,27 +1,41 @@
 # Check that all the ways to pass burst configuration work the same.
 
-# RUN: llvm-snippy %s %S/Inputs/mixed-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
-# RUN: -num-instrs=200 -dump-layout |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
-# RUN: llvm-snippy %S/Inputs/layout-include-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
-# RUN: -num-instrs=200 -dump-layout |& FileCheck %s
+# RUN: llvm-snippy %S/Inputs/layout-include-burst.yaml -mtriple=riscv64 \
+# RUN:     -mattr=+a,+f -dump-mf -num-instrs=200 -dump-layout \
+# RUN: |& FileCheck %s
 
-# RUN: llvm-snippy %S/Inputs/layout-with-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
-# RUN: -num-instrs=200 -dump-layout |& FileCheck %s
+# RUN: llvm-snippy %S/Inputs/layout-with-burst.yaml -mtriple=riscv64 \
+# RUN:     -mattr=+a,+f -dump-mf -num-instrs=200 -dump-layout \
+# RUN: |& FileCheck %s
 
 # Check that there's an error message when burst configuration passed more than once.
 
-# RUN: not llvm-snippy %S/Inputs/layout-with-burst.yaml %S/Inputs/mixed-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
-# RUN: -num-instrs=200 |& FileCheck %s --check-prefix=DOUBLESPEC
+# RUN: not llvm-snippy %S/Inputs/layout-with-burst.yaml \
+# RUN:     %S/Inputs/mixed-burst.yaml -mtriple=riscv64 -mattr=+a,+f -dump-mf \
+# RUN:     -num-instrs=200 \
+# RUN: |& FileCheck %s --check-prefix=DOUBLESPEC
 
-# RUN: not llvm-snippy %S/Inputs/layout-include-burst.yaml %S/Inputs/mixed-burst.yaml -mtriple=riscv64 -mattr=+a,+f \
-# RUN: -num-instrs=200 |& FileCheck %s --check-prefix=DOUBLESPEC
+# RUN: not llvm-snippy %S/Inputs/layout-include-burst.yaml \
+# RUN:     %S/Inputs/mixed-burst.yaml -mtriple=riscv64 -mattr=+a,+f \
+# RUN:     -num-instrs=200 \
+# RUN: |& FileCheck %s --check-prefix=DOUBLESPEC
 
-# RUN: not llvm-snippy %S/Inputs/error-layout-with-burst-and-include.yaml -mtriple=riscv64 -mattr=+a,+f \
-# RUN: -num-instrs=200 |& FileCheck %s --check-prefix=DOUBLESPEC
+# RUN: not llvm-snippy %S/Inputs/error-layout-with-burst-and-include.yaml \
+# RUN:     -mtriple=riscv64 -mattr=+a,+f -num-instrs=200 \
+# RUN: |& FileCheck %s --check-prefix=DOUBLESPEC
 
 include:
   - Inputs/sections.yaml
+  - Inputs/mixed-burst.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +a,+f
+  dump-mf: true
+  num-instrs: 200
+  dump-layout: true
 
 histogram:
     - [LW, 1.0]

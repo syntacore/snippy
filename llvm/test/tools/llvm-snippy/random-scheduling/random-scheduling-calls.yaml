@@ -1,18 +1,25 @@
 # REQUIRES: asserts
-# RUN: llvm-snippy %S/../Inputs/jal-layout.yaml %s \
-# RUN:    -mtriple=riscv64 -enable-static-stack=false \
-# RUN:    -num-instrs=10000 -mattr=+c \
-# RUN:    -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml \
-# RUN:    -o %t_1
 
-# RUN: llvm-snippy %S/../Inputs/jal-layout.yaml %s \
-# RUN:    -mtriple=riscv64 -enable-static-stack=false \
-# RUN:    -num-instrs=10000 -mattr=+c -debug-only=snippy-riscv \
-# RUN:    -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml \
-# RUN:    -o %t_2 -random-scheduling \
-# RUN:  |& FileCheck %s
+# RUN: llvm-snippy %s \
+# RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml \
+# RUN:     -o %t_1
+
+# RUN: llvm-snippy %s -debug-only=snippy-riscv \
+# RUN:     -initial-regs=%S/../initialization/Inputs/initial_state_rv64i.yaml \
+# RUN:     -o %t_2 -random-scheduling \
+# RUN: |& FileCheck %s
 
 # RUN: not diff -q %t_1.elf %t_2.elf
+
+include:
+  - ../Inputs/jal-layout.yaml
+
+options:
+  mtriple: riscv64
+  enable-static-stack: false
+  num-instrs: 10000
+  mattr: +c
+
 call-graph:
   entry-point: SnippyFunction
   function-list:

@@ -1,8 +1,13 @@
 # REQUIRES: riscv-snippy-model-callbacks
 
-# RUN: llvm-snippy %s \
-# RUN: -mtriple=riscv64 -mattr=+m,+c \
-# RUN: -num-instrs=1000 -init-regs-in-elf -enable-address-value-hazards
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +m,+c
+  num-instrs: 1000
+  init-regs-in-elf: true
+  enable-address-value-hazards: true
 
 sections:
     - name:      1

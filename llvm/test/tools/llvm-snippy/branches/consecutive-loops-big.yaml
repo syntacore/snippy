@@ -1,6 +1,15 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=200 \
-# RUN:     -verify-mi -mattr=-c -dump-mf --verify-consecutive-loops -o %t
+
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 200
+  verify-mi: true
+  mattr: -c
+  dump-mf: true
+  verify-consecutive-loops: true
+
 sections:
     - name:      1
       VMA:       0x1000

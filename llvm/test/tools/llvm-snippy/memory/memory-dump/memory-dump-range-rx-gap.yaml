@@ -3,7 +3,7 @@
 # RUN: llvm-snippy %s -memory-section-file=%t1 -seed=1
 
 # RUN: llvm-objcopy -O ihex -I binary %t1 %t11
-# RUN: cat %t11 |& FileCheck %s
+# RUN: FileCheck %s --input-file=%t11
 
 # This is the dump for seed=1 and memory-seed=11.
 

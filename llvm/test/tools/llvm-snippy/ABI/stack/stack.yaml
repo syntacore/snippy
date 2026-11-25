@@ -1,8 +1,17 @@
 # REQUIRES: riscv-snippy-model-spike
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+m,+c -redefine-sp=SP \
-# RUN:  -num-instrs=10000 -enable-static-stack=false \
-# RUN:  -spilled-regs-list=X1 -init-regs-in-elf -verify-mi |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +m,+c
+  redefine-sp: SP
+  num-instrs: 10000
+  enable-static-stack: false
+  spilled-regs-list: [X1]
+  init-regs-in-elf: true
+  verify-mi: true
+
 sections:
     - name:      1
       VMA:       0x500000

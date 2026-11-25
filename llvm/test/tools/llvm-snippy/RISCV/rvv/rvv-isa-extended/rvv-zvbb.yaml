@@ -1,7 +1,14 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v,+zvbb \
-# RUN:  -o %t --num-instrs=1000 \
-# RUN:  --init-regs-in-elf --verify-mi -verify-gen-histogram
+
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +v,+zvbb
+  num-instrs: 1000
+  init-regs-in-elf: true
+  verify-mi: true
+  verify-gen-histogram: true
 
 include:
 - ../../../Inputs/memory-unaligned.yaml

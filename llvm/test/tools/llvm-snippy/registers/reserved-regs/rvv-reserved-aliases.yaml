@@ -3,7 +3,8 @@
 # COM: which are sub-registers of {V2_V3, V4_V5, V6_V7, ...} when LMUL == 2,
 # COM: then these registers are not taken. It means that {V2, V4, V6, ...}
 # COM: do not found in the machine function dump.
-# RUN: llvm-snippy %s |& FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64

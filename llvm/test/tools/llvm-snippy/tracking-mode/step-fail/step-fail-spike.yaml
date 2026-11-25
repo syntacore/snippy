@@ -1,9 +1,13 @@
 # REQUIRES: riscv-snippy-model-spike
 
-# RUN: not llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -num-instrs=1000  \
-# RUN:    -init-regs-in-elf -mattr=+a \
-# RUN: |& FileCheck %s --check-prefix=UNALIGNED
+# RUN: not llvm-snippy %s |& FileCheck %s --check-prefix=UNALIGNED
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  init-regs-in-elf: true
+  mattr: +a
+
 include:
 - ../../Inputs/unaligned-guarantee.yaml
 

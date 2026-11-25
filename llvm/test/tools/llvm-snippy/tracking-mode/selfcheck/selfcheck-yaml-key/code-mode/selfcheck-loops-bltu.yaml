@@ -1,8 +1,13 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=-c,+m \
-# RUN:    -num-instrs=1000 -init-regs-in-elf \
-# RUN: |& FileCheck %s --dump-input fail
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -c,+m
+  num-instrs: 1000
+  init-regs-in-elf: true
+
 sections:
     - name:      1
       VMA:       0x100000

@@ -1,8 +1,13 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=1000 -o %t \
-# RUN:  --init-regs-in-elf \
-# RUN:  -riscv-dump-rvv-config
+
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 1000
+  init-regs-in-elf: true
+  riscv-dump-rvv-config: ""
 
 include:
 - ../rvv-config-biased/Inputs/rvv-unit-sew64-lmulX.yaml

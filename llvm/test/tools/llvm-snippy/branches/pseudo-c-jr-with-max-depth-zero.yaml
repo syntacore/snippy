@@ -1,7 +1,11 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy                                \
-# RUN:      -mtriple=riscv64 -mattr=+c                   \
-# RUN:      -num-instrs=500 %s
+
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  num-instrs: 500
 
 sections:
     - name:      text

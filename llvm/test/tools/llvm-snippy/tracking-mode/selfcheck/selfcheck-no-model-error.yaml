@@ -1,7 +1,12 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: not llvm-snippy %s \
-# RUN: -mtriple=riscv64 -mattr=-c \
-# RUN: -selfcheck -dump-mf |& FileCheck --dump-input always %s
+
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -c
+  selfcheck: ""
+  dump-mf: true
 
 sections:
     - name:      1

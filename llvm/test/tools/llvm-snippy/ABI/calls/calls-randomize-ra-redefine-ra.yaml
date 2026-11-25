@@ -5,13 +5,12 @@
 # COM: Here we check that the redefined return address register is used
 # COM: (it is spilled and restored when -preserve-ra is specified).
 
-# RUN: llvm-snippy %s -preserve-ra \
-# RUN: |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
 
 # COM: Here we check that the return addresses are randomized.
 # COM: There are at least three different return addresses.
 
-# RUN: llvm-snippy %s -preserve-ra &> %t.mf
+# RUN: llvm-snippy %s &> %t.mf
 # RUN: grep -E 'x[0-9]+ = PseudoJALCall' %t.mf \
 # COM: Leave only names of the registers of the return address
 # RUN: | sed -E 's/.*(x[0-9]+).*/\1/' \
@@ -31,6 +30,7 @@ options:
   num-instr-ancil: 50
   verify-mi: on
   dump-mf: on
+  preserve-ra: true
 
 include:
   - Inputs/sections-with-stack.yaml

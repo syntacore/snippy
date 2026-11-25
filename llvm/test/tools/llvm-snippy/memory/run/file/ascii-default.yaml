@@ -1,14 +1,15 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:   --init-memory=runtime --memory-seed=11 -init-regs-in-elf \
-# RUN:   --dump-memory-as-ascii --dump-memory-section=2 --memory-section-file=%t1
 
 # RUN: llvm-snippy %s \
-# RUN:   --init-memory=ascii-file --init-memory-file=%t1 \
-# RUN:   --dump-memory-section=2  --memory-section-file=%t11
+# RUN:     --init-memory=runtime --memory-seed=11 -init-regs-in-elf \
+# RUN:     --dump-memory-as-ascii --memory-section-file=%t1
+
+# RUN: llvm-snippy %s \
+# RUN:     --init-memory=ascii-file --init-memory-file=%t1 \
+# RUN:     --memory-section-file=%t11
 
 # RUN: llvm-objcopy -O ihex -I binary %t11 %t2
-# RUN: cat %t2 |& FileCheck %s --dump-input fail
+# RUN: FileCheck %s --input-file=%t2
 
 # COMM: This is the reference of splitmix32 generation for memory-seed=11
 # CHECK: 330E1273299ED19A53102DED30FBF41C40
@@ -29,6 +30,7 @@ options:
   mtriple: "riscv64"
   mcpu: "generic-rv64"
   num-instrs: 10
+  dump-memory-section: [2]
 
 histogram:
     - [LB, 2.0]

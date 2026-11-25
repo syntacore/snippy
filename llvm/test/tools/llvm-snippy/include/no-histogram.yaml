@@ -1,8 +1,13 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: not llvm-snippy %s -mtriple=riscv64 \
-# RUN:   --dump-mf --num-instrs=150 |& FileCheck %s
+
+# RUN: not llvm-snippy %s |& FileCheck %s
 
 include:
   - Inputs/only-sections.yaml
+
+options:
+  mtriple: riscv64
+  dump-mf: true
+  num-instrs: 150
 
 # CHECK: error: OpcodeGenerator initialization failure: empty histogram specified

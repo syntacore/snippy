@@ -1,7 +1,12 @@
-# RUN: llvm-snippy %s --mtriple=riscv64 \
-# RUN:   --num-instrs=1000 --trace-log %t.log \
-# RUN:   --init-regs-in-elf --last-instr=EBREAK --mattr=+c \
-# RUN:   --init-cons-loop-in-prev-loop
+# RUN: llvm-snippy %s --trace-log %t.log
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  init-regs-in-elf: true
+  last-instr: EBREAK
+  mattr: +c
+  init-cons-loop-in-prev-loop: true
 
 sections:
   - name:      1

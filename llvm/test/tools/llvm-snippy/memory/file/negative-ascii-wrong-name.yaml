@@ -1,6 +1,7 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: not llvm-snippy %s \
-# RUN:   --init-memory=ascii-file --init-memory-file=%S/Inputs/memory-map.yaml |& FileCheck %s
+
+# RUN: not llvm-snippy %s --init-memory-file=%S/Inputs/memory-map.yaml \
+# RUN: |& FileCheck %s
 
 sections:
   - name:      1
@@ -18,6 +19,7 @@ options:
   mtriple: "riscv64"
   mcpu: "generic-rv64"
   num-instrs: 10
+  init-memory: ascii-file
 
   
 histogram:

@@ -1,12 +1,16 @@
-# REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
-# RUN: |& FileCheck %s --check-prefix=DISABLED
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
-# RUN: --chained-rx-sections-fill |& FileCheck %s --check-prefix=ENABLED
-# RUN: not llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
-# RUN: --chained-rx-sections-fill --selfcheck |& FileCheck %s --check-prefix=ERROR
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
-# RUN: --chained-rx-sections-fill -model-plugin=spike --chained-rx-sorted |& FileCheck %s --check-prefix=SORTED
+# REQUIRES: riscv-snippy-model-spike
+
+# RUN: llvm-snippy %s |& FileCheck %s --check-prefix=DISABLED
+# RUN: llvm-snippy %s --chained-rx-sections-fill \
+# RUN: |& FileCheck %s --check-prefix=ENABLED
+# RUN: not llvm-snippy %s --chained-rx-sections-fill --selfcheck \
+# RUN: |& FileCheck %s --check-prefix=ERROR
+# RUN: llvm-snippy %s --chained-rx-sections-fill --chained-rx-sorted \
+# RUN: |& FileCheck %s --check-prefix=SORTED
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
 
 sections:
   - name:      3

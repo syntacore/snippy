@@ -1,11 +1,13 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN:  llvm-snippy %s -mtriple=riscv64 -mcpu=generic-rv64 \
-# RUN:  |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
  
 options:
   preserve-caller-saved-regs: [X]
   num-instrs: 10
   external-stack: on
+  mtriple: riscv64
+  mcpu: generic-rv64
 
 sections:
   - name:      1

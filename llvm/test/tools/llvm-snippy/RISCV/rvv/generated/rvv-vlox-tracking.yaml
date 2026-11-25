@@ -1,10 +1,17 @@
 # REQUIRES: riscv-snippy-model-any
 # REQUIRES: riscv-rvv
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  -o %t --num-instrs=10 \
-# RUN:  --init-regs-in-elf --entry-point=start \
-# RUN:  --selfcheck=1 --enable-selfcheck-rvv=1 \
-# RUN:  -rvv-init-mode=loads
+
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10
+  init-regs-in-elf: true
+  entry-point: start
+  selfcheck: 1
+  enable-selfcheck-rvv: true
+  rvv-init-mode: loads
 
 include:
 - "../../../Inputs/memory-unaligned.yaml"

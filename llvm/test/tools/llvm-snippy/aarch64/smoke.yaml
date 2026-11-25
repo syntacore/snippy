@@ -1,11 +1,13 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -dump-mi -last-instr= \
-# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: aarch64
   mattr: +cssc
   num-instrs: 1000
+  dump-mi: true
+  last-instr: ""
 
 include:
   - Inputs/simple_sections.yaml

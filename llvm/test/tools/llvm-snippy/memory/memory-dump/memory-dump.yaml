@@ -1,22 +1,19 @@
 # REQUIRES: riscv-snippy-model-any
+
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10 \
 # RUN:     -dump-memory-section=2,3 -memory-section-file=%t11
 
 # COMM: Dump of sections 2,3
 # RUN: llvm-objcopy -O ihex -I binary %t11 %t1 
-# RUN: cat %t1 |& FileCheck %s --dump-input fail
+# RUN: FileCheck %s --input-file=%t1
 
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=10 \
 # RUN:     -dump-memory-section={rw},2,2 -memory-section-file=%t33
 
 # COMM: Shows that sections may duplicate others in the input option,
 # COMM:   but final dump will contain each section only once.
 # RUN: llvm-objcopy -O ihex -I binary %t33 %t3
-# RUN: cat %t3 |& FileCheck %s --dump-input always
+# RUN: FileCheck %s --input-file=%t3
 
 # According to Ihex standart each satrts with number of bytes in the line.
 # This means that we will have 2 lines with 0x10 bytes. (10 bytes for each section)
@@ -25,6 +22,10 @@
 # CHECK:      :1000000000000000000000000000000000000000F0
 # CHECK-NEXT: :1000100000000000000000000000000000000000E0
 # CHECK-NEXT: :00
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
 
 sections:
     - name:      0

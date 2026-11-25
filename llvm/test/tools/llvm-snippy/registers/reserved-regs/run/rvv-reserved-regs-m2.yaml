@@ -4,8 +4,7 @@
 # COM: This test checks that registers forming one register group (LMUL = 2) do not both occur
 # COM: if only one register from that register group is reserved
 
-# RUN: llvm-snippy %s \
-# RUN: |& FileCheck %s --dump-input always
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64

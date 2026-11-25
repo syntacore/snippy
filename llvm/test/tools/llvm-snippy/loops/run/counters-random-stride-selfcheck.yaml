@@ -1,9 +1,11 @@
 # REQUIRES: riscv-snippy-model-spike
-# RUN: timeout 300 llvm-snippy %s -selfcheck |& FileCheck %s
+
+# RUN: timeout 300 llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64
   num-instrs: 50
+  selfcheck: ""
 
 include:
   - ../../loops/Inputs/sections.yaml

@@ -1,6 +1,6 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=1000 \
-# RUN:     -verify-mi
+
+# RUN: llvm-snippy %s
 
 sections:
     - name:      1
@@ -36,3 +36,6 @@ options:
     - X13
     - X14
     - X15
+  mtriple: riscv64
+  num-instrs: 1000
+  verify-mi: true

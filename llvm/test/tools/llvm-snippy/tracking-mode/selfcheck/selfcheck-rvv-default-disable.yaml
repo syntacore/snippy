@@ -1,9 +1,16 @@
 # REQUIRES: riscv-snippy-model-any
 # REQUIRES: riscv-rvv
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+v \
-# RUN:     -num-instrs=2 -init-regs-in-elf -selfcheck -dump-mf -selfcheck-mem \
-# RUN: |& FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 2
+  init-regs-in-elf: true
+  selfcheck: ""
+  dump-mf: true
+  selfcheck-mem: true
 
 include:
 - "../../RISCV/rvv/rvv-config-biased/Inputs/rvv-unit-all.yaml"

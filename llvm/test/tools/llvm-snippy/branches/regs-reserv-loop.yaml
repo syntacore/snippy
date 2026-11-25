@@ -2,9 +2,14 @@
 #COM: test checks that register reservations for loops depend on the branch instruction
 #COM: in case C_BNEZ only one register is expected to be reserved
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+c -num-instrs=1 \ 
-# RUN:     -verify-mi -dump-mf -o %t |& \
-# RUN: FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +c
+  num-instrs: 1
+  verify-mi: true
+  dump-mf: true
 
 sections:
     - name:      1

@@ -1,10 +1,11 @@
-# RUN: llvm-snippy %s -model-plugin=None -dump-mi -o %t.elf \
+# RUN: llvm-snippy %s -model-plugin=None -o %t.elf \
 # RUN: |& FileCheck %s
 
 options:
   mtriple: aarch64
   mattr: +cssc
   num-instrs: 1000
+  dump-mi: true
 
 include:
   - ../Inputs/simple_sections.yaml

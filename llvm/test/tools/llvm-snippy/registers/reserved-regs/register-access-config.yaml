@@ -1,9 +1,13 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s %S/Inputs/sections.yaml --dump-layout \
-# RUN:   | FileCheck %s --check-prefix=MYCHECK
+
+# RUN: llvm-snippy %s | FileCheck %s --check-prefix=MYCHECK
+
+include:
+  - Inputs/sections.yaml
 
 options:
   mtriple: riscv64
+  dump-layout: true
 
 histogram:
   - [ADD, 1.0]

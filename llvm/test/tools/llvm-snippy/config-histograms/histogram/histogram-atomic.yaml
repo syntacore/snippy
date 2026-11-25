@@ -1,8 +1,6 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=5000 \
-# RUN:  -histogram-max-deviation=2.1 -verify-gen-histogram \
-# RUN:  -mattr=+a \
-# RUN:  -dump-mf |& FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s |& FileCheck %s
 
 # FIXME: Basically, we do not know what opcodes were generated to fill value in reg.
 # CHECK: Start Verification for function:
@@ -18,6 +16,15 @@
 # CHECK-NOT: ERROR: some opcodes from histogram not generated:
 # CHECK-NOT: End information for non-generated opcodes
 # CHECK: End Verification for function: SnippyFunction
+
+options:
+  mtriple: riscv64
+  num-instrs: 5000
+  histogram-max-deviation: 2.1
+  verify-gen-histogram: true
+  mattr: +a
+  dump-mf: true
+
 sections:
     - name:      1
       VMA:       0x80000000

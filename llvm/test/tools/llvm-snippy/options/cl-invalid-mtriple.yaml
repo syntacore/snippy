@@ -1,10 +1,17 @@
-# RUN: not llvm-snippy -mtriple=riscv64-unknown-elf-mattr=+m |& FileCheck %s --check-prefix=TRAILING_ERROR1 -dump-input fail
-# RUN: not llvm-snippy -mtriple=riscv64-unknown- |& FileCheck %s --check-prefix=TRAILING_ERROR2 -dump-input fail
-# RUN: not llvm-snippy -mtriple=riscv64- |& FileCheck %s --check-prefix=TRAILING_ERROR3 -dump-input fail
-# RUN: not llvm-snippy -mtriple=riscv64------ |& FileCheck %s --check-prefix=TRAILING_ERROR4 -dump-input fail
-# RUN: not llvm-snippy -mtriple=riscv64-something-something |& FileCheck %s --check-prefix=SMTHSMTH -dump-input fail
-# RUN: not llvm-snippy -mtriple=riscv64-unknown-elfsomethingsomething |& FileCheck %s --check-prefix=UNKNOWNSMTH -dump-input fail
-# RUN: not llvm-snippy -mtriple=riscv64-linux-gnu |& FileCheck %s --check-prefix=RVLINUXGNU -dump-input fail
+# RUN: not llvm-snippy -mtriple=riscv64-unknown-elf-mattr=+m \
+# RUN: |& FileCheck %s --check-prefix=TRAILING_ERROR1
+# RUN: not llvm-snippy -mtriple=riscv64-unknown- \
+# RUN: |& FileCheck %s --check-prefix=TRAILING_ERROR2
+# RUN: not llvm-snippy -mtriple=riscv64- \
+# RUN: |& FileCheck %s --check-prefix=TRAILING_ERROR3
+# RUN: not llvm-snippy -mtriple=riscv64------ \
+# RUN: |& FileCheck %s --check-prefix=TRAILING_ERROR4
+# RUN: not llvm-snippy -mtriple=riscv64-something-something \
+# RUN: |& FileCheck %s --check-prefix=SMTHSMTH
+# RUN: not llvm-snippy -mtriple=riscv64-unknown-elfsomethingsomething \
+# RUN: |& FileCheck %s --check-prefix=UNKNOWNSMTH
+# RUN: not llvm-snippy -mtriple=riscv64-linux-gnu \
+# RUN: |& FileCheck %s --check-prefix=RVLINUXGNU
 
 # TRAILING_ERROR1: error: unknown target specified: 'riscv64-unknown-elf-mattr=+m'
 # TRAILING_ERROR2: error: unknown target specified: 'riscv64-unknown-'

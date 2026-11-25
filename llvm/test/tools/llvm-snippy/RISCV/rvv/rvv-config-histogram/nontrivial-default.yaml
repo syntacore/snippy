@@ -1,8 +1,6 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  --num-instrs=10 -o %t \
-# RUN:  -riscv-dump-rvv-config \
-# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
 
 # COM: With -riscv-rvv-use-uniform-distribution and no explicit riscv-vector-unit, the
 # COM: default configuration space is broadened from the single { e64, m1, tu,
@@ -12,6 +10,12 @@
 
 include:
   - ../Inputs/rvv-sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  num-instrs: 10
+  riscv-dump-rvv-config: ""
 
 histogram:
     - [VSETIVLI, 1.0]

@@ -6,9 +6,13 @@
 # COM:    3. Access-groups may exist with regular memory-schemes (access-ranges, ...)
 # COM:    4. Zero weight is handled correctly
 
-# RUN: llvm-snippy %S/Inputs/default-layout.yaml %s -mtriple=riscv64 \
-# RUN:   -num-instrs=100 -dump-layout=true \
-# RUN:   | FileCheck %s --dump-input always
+# RUN: llvm-snippy %s %S/Inputs/default-layout.yaml \
+# RUN: | FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  dump-layout: true
 
 access-evictions:
   - mask:  0x003c0000

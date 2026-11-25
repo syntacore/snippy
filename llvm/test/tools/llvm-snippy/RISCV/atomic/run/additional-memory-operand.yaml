@@ -12,9 +12,13 @@
 #  corrupted, trap access fault will be generated upon reload in epilogue
 #  and last instruction(ebreak) will not be reached.
 #
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+v \
-# RUN:  -honor-target-abi \
-# RUN:  --num-instrs=3000 -o %t |& FileCheck %s --dump-input=always
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  honor-target-abi: true
+  num-instrs: 3000
 
 include:
 - ../../../RISCV/rvv/codegen/Inputs/rvv-lmul1-sew32-vlany.yaml

@@ -1,5 +1,13 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=1000 \
-# RUN: --dump-mf -num-instr-ancil=50 -verify-mi |& FileCheck %s
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  function-number: 20
+  function-layers: 5
+  num-instrs: 1000
+  dump-mf: true
+  num-instr-ancil: 50
+  verify-mi: true
 
 sections:
   - name:      1

@@ -1,9 +1,13 @@
 # REQUIRES: riscv-snippy-model-any
 
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=-a \
-# RUN:    -num-instrs=10 \
-# RUN:    --initial-regs-yaml=%S/Inputs/initial_state_invalid_PC.yaml \
-# RUN: |& FileCheck %s 
+# RUN: not llvm-snippy %s \
+# RUN:     --initial-regs-yaml=%S/Inputs/initial_state_invalid_PC.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -a
+  num-instrs: 10
 
 sections:
     - name:      1

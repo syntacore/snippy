@@ -1,7 +1,11 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
-# RUN:     -verify-mi -mattr=+c
-# RUN: llvm-snippy %s -mtriple=riscv64 -num-instrs=100 \
-# RUN:     -verify-mi -mattr=+c -init-regs-in-elf
+# RUN: llvm-snippy %s
+# RUN: llvm-snippy %s -init-regs-in-elf
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  verify-mi: true
+  mattr: +c
 
 sections:
     - name:      1

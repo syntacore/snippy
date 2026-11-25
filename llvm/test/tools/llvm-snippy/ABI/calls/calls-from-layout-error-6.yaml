@@ -1,5 +1,14 @@
-# RUN: not llvm-snippy %S/../../Inputs/jal-layout.yaml %s -mtriple=riscv64 -num-instrs=100 \
-# RUN: -num-instr-ancil=10 --dump-mf -verify-mi |& FileCheck %s
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+include:
+  - ../../Inputs/jal-layout.yaml
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  num-instr-ancil: 10
+  dump-mf: true
+  verify-mi: true
 
 call-graph:
   entry-point: SnippyFunction
@@ -17,4 +26,4 @@ call-graph:
     - name: fun3
     - name: ""
 
-# CHECK: calls-from-layout-error-6.yaml:18:7: error: Empty names are not allowed for function in call graph
+# CHECK: calls-from-layout-error-6.yaml:27:7: error: Empty names are not allowed for function in call graph

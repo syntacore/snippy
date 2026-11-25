@@ -1,8 +1,15 @@
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:    -num-instrs=10 -dump-mf -backtrack \
-# RUN:    -initial-regs-yaml=%S/../initialization/Inputs/initial_state_zero.yaml >& %t || true \
-# RUN: FileCheck --input-file=%t --dump-input always %s 
+# REQUIRES: riscv-snippy-model-any
+
+# RUN: not llvm-snippy %s \
+# RUN:     -initial-regs-yaml=%S/../../initialization/Inputs/initial_state_zero.yaml \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 10
+  dump-mf: true
+  backtrack: true
+  mattr: +m
 
 sections:
     - name:      1
@@ -19,4 +26,4 @@ sections:
 histogram:
     - [DIV, 1.0]
 
-# CHECK: LLVM ERROR: Back-tracking events threshold is exceeded
+# CHECK: Back-tracking events threshold is exceeded

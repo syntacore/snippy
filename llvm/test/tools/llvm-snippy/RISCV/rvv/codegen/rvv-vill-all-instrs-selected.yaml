@@ -2,9 +2,8 @@
 # COM: This test checks that all opcodes from histogram have been selected
 
 # RUN: llvm-snippy %S/Inputs/rvv-vill-all-instrs-selected.yaml \
-# RUN:  -mtriple=riscv64 -mattr=+v \
-# RUN:  -dump-mf --num-instrs=10000 -o %t \
-# RUN:  |& FileCheck %s
+# RUN:     -mtriple=riscv64 -mattr=+v -dump-mf --num-instrs=10000 \
+# RUN: |& FileCheck %s
 
 # CHECK: VL1RE16_V
 # CHECK: VL1RE32_V

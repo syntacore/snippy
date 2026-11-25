@@ -1,5 +1,10 @@
-# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=50 \
-# RUN:     -verify-mi -mattr=+c
+# RUN: timeout 300 llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 50
+  verify-mi: true
+  mattr: +c
 
 sections:
     - name:      1

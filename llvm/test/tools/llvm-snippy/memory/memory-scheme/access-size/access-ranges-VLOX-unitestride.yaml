@@ -1,7 +1,8 @@
 # REQUIRES: riscv-rvv
+
 # RUN: llvm-snippy %s  -dump-memory-accesses=%t
-# RUN: cat %t |& FileCheck %s --check-prefix=POSITIVE-CHECK
-# RUN: cat %t |& FileCheck %s --check-prefix=NEGATIVE-CHECK
+# RUN: FileCheck %s --check-prefix=POSITIVE-CHECK --input-file=%t
+# RUN: FileCheck %s --check-prefix=NEGATIVE-CHECK --input-file=%t
 
 # NEGATIVE-CHECK-NOT:  0x80004
 # NEGATIVE-CHECK-NOT:  0x80002

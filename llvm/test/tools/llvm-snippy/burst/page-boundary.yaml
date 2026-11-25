@@ -1,5 +1,9 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+a,+f \
-# RUN: -num-instrs=1000
+# RUN: llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  mattr: +a,+f
+  num-instrs: 1000
 
 burst:
   mode: mixed

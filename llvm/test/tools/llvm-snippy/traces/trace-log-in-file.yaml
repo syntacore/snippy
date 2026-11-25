@@ -1,8 +1,12 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -mtriple=riscv64 \
-# RUN:  --num-instrs=100 -o %t.elf --trace-log %t.trace.log
+
+# RUN: llvm-snippy %s --trace-log %t.trace.log
 
 # RUN: FileCheck --input-file=%t.trace.log %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
 
 sections:
     - name:      1

@@ -1,8 +1,11 @@
-# RUN: llvm-snippy %S/Inputs/loadstore-layout-4b.yaml %s -mtriple=riscv64 \
-# RUN:  -num-instrs=1000 \
-# RUN:  --riscv-disable-misaligned-access \
-# RUN:  -dump-memory-accesses=%t.accesses >& %t.dump
+# RUN: llvm-snippy %s %S/Inputs/loadstore-layout-4b.yaml \
+# RUN:     -dump-memory-accesses=%t.accesses >& %t.dump
 # RUN: FileCheck --input-file=%t.accesses %s --check-prefix=SCHEME
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  riscv-disable-misaligned-access: ""
 
 access-evictions:
     - mask:  0x00000080

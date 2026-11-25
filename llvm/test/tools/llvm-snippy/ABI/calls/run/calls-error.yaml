@@ -1,8 +1,17 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: not llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -num-instr-ancil=50 -backtrack |& FileCheck %s --check-prefix=TRACK
-# RUN: not llvm-snippy %s -mtriple=riscv64 -function-number=20 -function-layers=5 -num-instrs=100 \
-# RUN: --dump-mf -num-instr-ancil=50 -selfcheck |& FileCheck %s --check-prefix=TRACK
+
+# RUN: not llvm-snippy %s -backtrack \
+# RUN: |& FileCheck %s --check-prefix=TRACK
+# RUN: not llvm-snippy %s -selfcheck \
+# RUN: |& FileCheck %s --check-prefix=TRACK
+
+options:
+  mtriple: riscv64
+  function-number: 20
+  function-layers: 5
+  num-instrs: 100
+  dump-mf: true
+  num-instr-ancil: 50
 
 sections:
   - name:      1

@@ -1,10 +1,15 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a \
-# RUN:    -num-instrs=10 \
-# RUN:    -dump-registers-yaml=%t2.yaml -dump-initial-registers-yaml=%t1.yaml 
 
-# RUN: FileCheck %s --check-prefix=INITIAL < %t1.yaml
-# RUN: FileCheck %s --check-prefix=FINAL < %t2.yaml
+# RUN: llvm-snippy %s \
+# RUN:     -dump-registers-yaml=%t2.yaml -dump-initial-registers-yaml=%t1.yaml
+
+# RUN: FileCheck %s --check-prefix=INITIAL --input-file=%t1.yaml
+# RUN: FileCheck %s --check-prefix=FINAL --input-file=%t2.yaml
+
+options:
+  mtriple: riscv64
+  mattr: -a
+  num-instrs: 10
 
 sections:
     - name:      1

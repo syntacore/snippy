@@ -1,6 +1,9 @@
-# RUN: not llvm-snippy %s -mtriple=riscv64 -mattr=-v \
-# RUN:  --num-instrs=100 -o %t \
-# RUN:  |& FileCheck %s
+# RUN: not llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -v
+  num-instrs: 100
 
 include:
 - Inputs/rvv-unit-all.yaml

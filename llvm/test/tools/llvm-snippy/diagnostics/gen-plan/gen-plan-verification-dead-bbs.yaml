@@ -1,7 +1,13 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -verify-gen-plan \
-# RUN:    -mtriple=riscv64 -mattr=+m \
-# RUN:    -num-instrs=600 -selfcheck |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  verify-gen-plan: true
+  mtriple: riscv64
+  mattr: +m
+  num-instrs: 600
+  selfcheck: ""
 
 sections:
     - name:      1

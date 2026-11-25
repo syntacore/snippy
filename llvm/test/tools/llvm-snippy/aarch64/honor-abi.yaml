@@ -1,8 +1,11 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -dump-mi -honor-target-abi |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
 options:
   mtriple: aarch64
   num-instrs: 10
+  dump-mi: true
+  honor-target-abi: true
 
 sections:
   - name:      1

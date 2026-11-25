@@ -1,5 +1,5 @@
 # RUN: llvm-snippy %s  -dump-memory-accesses=%t
-# RUN: cat %t |& FileCheck %s --check-prefix=POSITIVE-CHECK
+# RUN: FileCheck %s --check-prefix=POSITIVE-CHECK --input-file=%t
 
 # POSITIVE-CHECK-DAG:     0x80003
 # POSITIVE-CHECK-DAG:     0x80005

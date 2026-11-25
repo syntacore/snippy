@@ -1,30 +1,34 @@
 # REQUIRES: riscv-snippy-model-None
 
 # RUN: llvm-snippy %s %S/Inputs/custom-burst-mixed-memory-fence.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200 -dump-layout \
-# RUN:   | FileCheck %s --check-prefix=DUMP
+# RUN:     -num-instrs=200 -dump-layout \
+# RUN: | FileCheck %s --check-prefix=DUMP
 
 # RUN: llvm-snippy %s %S/Inputs/custom-burst-mixed-memory-fence.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200 --dump-mf \
-# RUN:   |& FileCheck %s --check-prefix=MEMFENCE
+# RUN:     -num-instrs=200 --dump-mf \
+# RUN: |& FileCheck %s --check-prefix=MEMFENCE
 
 # RUN: llvm-snippy %s %S/Inputs/fence-only-burst.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200 --dump-mf \
-# RUN:   |& FileCheck %s --check-prefix=FENCE
+# RUN:     -num-instrs=200 --dump-mf \
+# RUN: |& FileCheck %s --check-prefix=FENCE
 
 # RUN: not llvm-snippy %s %S/Inputs/custom-burst-amoadd.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=200 --dump-mf \
-# RUN:   |& FileCheck %s --check-prefix=ERROR
+# RUN:     -num-instrs=200 --dump-mf \
+# RUN: |& FileCheck %s --check-prefix=ERROR
 
 # RUN: llvm-snippy %s %S/Inputs/custom-burst-fence-in-both-groups.yaml \
-# RUN:   -mtriple=riscv64 -mattr=+a,+f -num-instrs=500 --dump-mf \
-# RUN:   |& FileCheck %s --check-prefix=FENCEINBOTH
+# RUN:     -num-instrs=500 --dump-mf \
+# RUN: |& FileCheck %s --check-prefix=FENCEINBOTH
 
 # RUN: llvm-snippy %S/Inputs/options-in-layout-burst.yaml \
-# RUN:   |& FileCheck %s --check-prefix=FENCEINBOTH
+# RUN: |& FileCheck %s --check-prefix=FENCEINBOTH
 
 include:
   - Inputs/sections.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +a,+f
 
 histogram:
     - [LW, 1.0]

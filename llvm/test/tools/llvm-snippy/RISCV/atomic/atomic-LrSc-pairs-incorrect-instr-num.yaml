@@ -1,17 +1,19 @@
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+a \
-# RUN:   --init-regs-in-elf --verify-mi \
-# RUN:   --num-instrs=4 \
-# RUN:   --histogram-must-succeed=false --verify-gen-histogram \
-# RUN:    |& FileCheck %s --check-prefixes=EVEN
+# RUN: llvm-snippy %s --num-instrs=4 \
+# RUN: |& FileCheck %s --check-prefixes=EVEN
 
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=+a \
-# RUN:   --init-regs-in-elf --verify-mi \
-# RUN:   --num-instrs=5 \
-# RUN:   --histogram-must-succeed=false --verify-gen-histogram \
-# RUN:    |& FileCheck %s --check-prefixes=ODD
+# RUN: llvm-snippy %s --num-instrs=5 \
+# RUN: |& FileCheck %s --check-prefixes=ODD
 
 # EVEN: Number of primary instructions: 4
 # ODD: Number of primary instructions: 5
+
+options:
+  mtriple: riscv64
+  mattr: +a
+  init-regs-in-elf: true
+  verify-mi: true
+  histogram-must-succeed: false
+  verify-gen-histogram: true
 
 sections:
     - name:      1

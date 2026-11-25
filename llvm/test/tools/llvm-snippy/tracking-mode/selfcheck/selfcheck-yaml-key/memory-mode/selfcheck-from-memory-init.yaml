@@ -1,9 +1,11 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 \
-# RUN:     -num-instrs=200 \
-# RUN:     -init-memory=full \
-# RUN: |& FileCheck %s --dump-input fail
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 200
+  init-memory: full
 
 sections:
     - name:      0

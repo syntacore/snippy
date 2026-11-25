@@ -1,9 +1,15 @@
 # REQUIRES: riscv-snippy-model-any
+
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+m \
-# RUN:    -num-instrs=1000 -backtrack -dump-mf \
-# RUN:    -initial-regs-yaml=%S/../initialization/Inputs/initial_state_zero.yaml \
+# RUN:     -initial-regs-yaml=%S/../initialization/Inputs/initial_state_zero.yaml \
 # RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +m
+  num-instrs: 1000
+  backtrack: true
+  dump-mf: true
 
 sections:
     - name:      1

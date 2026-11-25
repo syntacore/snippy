@@ -1,24 +1,29 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -num-instrs=100 -mtriple=riscv64 \
-# RUN:   --dump-cfg-before-all --cfg-basename=%t -o %t
+
+# RUN: llvm-snippy %s --cfg-basename=%t
 # RUN: rm %t_SnippyFunction-cfg-dump-before-snippy-register-reserve.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-simulator-context-wrapper.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-simulator-context-preserver.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-cf-generator.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-loop-alignment.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-loop-canonicalization.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-loop-latcher.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-regs-init-insertion.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-block-gen-plan.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-flow-generator.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-prologue-epilogue-insertion.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-fill-external-functions-stubs.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-riscv-expand-pseudo.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-riscv-expand-atomic-pseudo.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-branch-lengthener.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-post-verification.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-inst-postprocess.dot \
-# RUN:  %t_SnippyFunction-cfg-dump-before-snippy-function-distribute.dot
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-simulator-context-wrapper.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-simulator-context-preserver.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-cf-generator.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-loop-alignment.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-loop-canonicalization.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-loop-latcher.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-regs-init-insertion.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-block-gen-plan.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-flow-generator.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-prologue-epilogue-insertion.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-fill-external-functions-stubs.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-riscv-expand-pseudo.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-riscv-expand-atomic-pseudo.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-branch-lengthener.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-post-verification.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-inst-postprocess.dot \
+# RUN:     %t_SnippyFunction-cfg-dump-before-snippy-function-distribute.dot
+
+options:
+  num-instrs: 100
+  mtriple: riscv64
+  dump-cfg-before-all: true
 
 sections:
   - name:      0

@@ -1,6 +1,12 @@
 # REQUIRES: riscv-snippy-model-any
-# RUN: llvm-snippy %s -num-instrs=1000 -mtriple=riscv64 \
-# RUN: -mattr=+zksh -dump-mf |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  num-instrs: 1000
+  mtriple: riscv64
+  mattr: +zksh
+  dump-mf: true
 
 histogram:
 - [SM3P0, 1.0]

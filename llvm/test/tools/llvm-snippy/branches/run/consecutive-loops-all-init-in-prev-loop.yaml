@@ -1,6 +1,12 @@
-# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=20 \
-# RUN:     --verify-mi --mattr=-c --verify-consecutive-loops \
-# RUN:     --init-cons-loop-in-prev-loop -o %t
+# RUN: timeout 300 llvm-snippy %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 20
+  verify-mi: true
+  mattr: -c
+  verify-consecutive-loops: true
+  init-cons-loop-in-prev-loop: true
 
 sections:
     - name:      1

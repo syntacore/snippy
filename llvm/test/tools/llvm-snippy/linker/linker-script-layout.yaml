@@ -1,9 +1,14 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a -num-instrs=10 -o %t
+
+# RUN: llvm-snippy %s -o %t
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=UNMANGLED
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a -num-instrs=10 -o %t \
-# RUN: -entry-point=Test -mangle-exported-names
+# RUN: llvm-snippy %s -o %t -entry-point=Test -mangle-exported-names
 # RUN: FileCheck %s --input-file=%t.ld --check-prefix=MANGLED
+
+options:
+  mtriple: riscv64
+  mattr: -a
+  num-instrs: 10
 
 sections:
     - name:      1

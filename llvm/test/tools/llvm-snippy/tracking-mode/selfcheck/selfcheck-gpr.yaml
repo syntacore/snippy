@@ -1,10 +1,16 @@
 # REQUIRES: riscv-snippy-model-any
 # UNSUPPORTED: riscv-snippy-model-whisper
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=-c \
-# RUN:    -num-instrs=2 -init-regs-in-elf -selfcheck \
-# RUN:    -reserved-regs-list=X0      \
-# RUN: |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -c
+  num-instrs: 2
+  init-regs-in-elf: true
+  selfcheck: ""
+  reserved-regs-list: [X0]
+
 sections:
     - name:      1
       VMA:       0x100000

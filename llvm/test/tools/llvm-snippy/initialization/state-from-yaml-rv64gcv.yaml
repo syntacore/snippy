@@ -4,11 +4,14 @@
 # REQUIRES: riscv-rvv
 
 # RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+m,+a,+f,+d,+c,+v \
-# RUN:    -num-instrs=10 \
-# RUN:    -initial-regs-yaml=%S/Inputs/initial_state_rv64gv.yaml \
-# RUN:    -dump-registers-yaml=%t.regs.yaml
-# RUN: FileCheck %s --input-file %t.regs.yaml
+# RUN:     -initial-regs-yaml=%S/Inputs/initial_state_rv64gv.yaml \
+# RUN:     -dump-registers-yaml=%t.regs.yaml
+# RUN: FileCheck %s --input-file=%t.regs.yaml
+
+options:
+  mtriple: riscv64
+  mattr: +m,+a,+f,+d,+c,+v
+  num-instrs: 10
 
 sections:
     - name:      1

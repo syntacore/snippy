@@ -1,12 +1,18 @@
-# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/BLOCK/number-of-loop-iterations/ > %t.1.yaml
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e s/BLOCK/number-of-loop-iterations/ \
+# RUN:     > %t.1.yaml
 # RUN: not llvm-snippy %t.1.yaml -mtriple=riscv64 -num-instrs=50 \
-# RUN:     -verify-mi -dump-mf -o %t |& FileCheck %s
-# RUN: sed -e "/# RUN:.*$/d" %s | sed -e "s/BLOCK/distance:\n      blocks/" > %t.2.yaml
+# RUN:     -verify-mi -dump-mf \
+# RUN: |& FileCheck %s
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e "s/BLOCK/distance:\n      blocks/" \
+# RUN:     > %t.2.yaml
 # RUN: not llvm-snippy %t.2.yaml -mtriple=riscv64 -num-instrs=50 \
-# RUN:     -verify-mi -dump-mf -o %t |& FileCheck %s
-# RUN: sed -e "/# RUN:.*$/d" %s | sed -e "s/BLOCK/distance:\n      pc/" > %t.3.yaml
+# RUN:     -verify-mi -dump-mf \
+# RUN: |& FileCheck %s
+# RUN: sed -e "/# RUN:.*$/d" %s | sed -e "s/BLOCK/distance:\n      pc/" \
+# RUN:     > %t.3.yaml
 # RUN: not llvm-snippy %t.3.yaml -mtriple=riscv64 -num-instrs=50 \
-# RUN:     -verify-mi -dump-mf -o %t |& FileCheck %s
+# RUN:     -verify-mi -dump-mf \
+# RUN: |& FileCheck %s
 
 sections:
     - name:      1

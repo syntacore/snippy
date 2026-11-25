@@ -1,8 +1,10 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -dump-mir=- |& FileCheck %s
+
+# RUN: llvm-snippy %s |& FileCheck %s
 
 options:
   mtriple: riscv64
+  dump-mir: "-"
 
 histogram:
   - [ADD, 1.0]

@@ -1,10 +1,19 @@
 # REQUIRES: riscv-snippy-model-any
 # REQUIRES: riscv-rvv
-# RUN: llvm-snippy %s \
-# RUN:    -mtriple=riscv64 -mattr=+v -rvv-init-mode=loads -selfcheck --riscv-preference-for-rvv-mode-change=vsetvl\
-# RUN:     -num-instrs=1 -init-regs-in-elf -selfcheck -dump-mf -enable-selfcheck-rvv \
-# RUN:     -selfcheck-mem \
-# RUN: |& FileCheck %s --dump-input always
+
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: +v
+  rvv-init-mode: loads
+  selfcheck: ""
+  riscv-preference-for-rvv-mode-change: vsetvl
+  num-instrs: 1
+  init-regs-in-elf: true
+  dump-mf: true
+  enable-selfcheck-rvv: true
+  selfcheck-mem: true
 
 include:
 - "../../RISCV/rvv/rvv-config-histogram/Inputs/rvv-unit-sew8-lmul4-max_encodable-bias.yaml"

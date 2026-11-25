@@ -1,6 +1,6 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -redefine-sp=reg::X5 |& \
-# RUN: FileCheck %s --ignore-case
+
+# RUN: llvm-snippy %s |& FileCheck %s --ignore-case
 
 options:
   mtriple: riscv64
@@ -9,6 +9,7 @@ options:
   num-instrs: 100
   init-regs-in-elf: on
   dump-mf: on
+  redefine-sp: reg::X5
 
 sections:
   - name:      0

@@ -1,8 +1,9 @@
 # REQUIRES: riscv-snippy-model-any
+
 # RUN: llvm-snippy %s -o %t
 
 # RUN: llvm-readelf --hex-dump=.snippy.2.rw %t.elf \
-# RUN:    |& FileCheck %s -dump-input fail
+# RUN: |& FileCheck %s
 
 options:
   mtriple: riscv64

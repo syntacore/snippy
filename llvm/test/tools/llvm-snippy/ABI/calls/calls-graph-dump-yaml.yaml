@@ -1,7 +1,16 @@
-# RUN: llvm-snippy %S/../../Inputs/jal-layout.yaml %s -mtriple=riscv64 -num-instrs=100 \
-# RUN: -num-instr-ancil=10 --dump-mf -verify-mi \
-# RUN: -call-graph-dump-filename=%t -call-graph-dump-format=yaml
+# RUN: llvm-snippy %s -call-graph-dump-filename=%t
 # RUN: FileCheck %s --input-file=%t
+
+include:
+  - ../../Inputs/jal-layout.yaml
+
+options:
+  mtriple: riscv64
+  num-instrs: 100
+  num-instr-ancil: 10
+  dump-mf: true
+  verify-mi: true
+  call-graph-dump-format: yaml
 
 call-graph:
   entry-point: SnippyFunction

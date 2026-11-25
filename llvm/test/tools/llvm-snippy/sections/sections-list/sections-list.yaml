@@ -1,6 +1,12 @@
 # REQUIRES: riscv-snippy-model-None
-# RUN: llvm-snippy %s -mtriple=riscv64 -mattr=-a -num-instrs=10 -o %t
+
+# RUN: llvm-snippy %s -o %t
 # RUN: llvm-objdump -h %t.elf | cat - <(echo "EOF") | FileCheck %s
+
+options:
+  mtriple: riscv64
+  mattr: -a
+  num-instrs: 10
 
 sections:
     - name:      1

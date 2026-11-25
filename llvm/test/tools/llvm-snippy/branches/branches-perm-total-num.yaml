@@ -1,8 +1,13 @@
-# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=50 \
-# RUN:     -verify-mi -dump-mf -mattr=+c -o %t |& FileCheck %s
-# RUN: timeout 300 llvm-snippy %s -mtriple=riscv64 -num-instrs=50 \
-# RUN:     -verify-mi -dump-mf -mattr=+c -init-regs-in-elf \
-# RUN:     -o %t |& FileCheck %s
+# RUN: timeout 300 llvm-snippy %s |& FileCheck %s
+# RUN: timeout 300 llvm-snippy %s -init-regs-in-elf \
+# RUN: |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 50
+  verify-mi: true
+  dump-mf: true
+  mattr: +c
 
 sections:
     - name:      1
