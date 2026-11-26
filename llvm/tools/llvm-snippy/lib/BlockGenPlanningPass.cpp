@@ -9,6 +9,7 @@
 #include "BlockGenPlanningPass.h"
 #include "InitializePasses.h"
 
+#include "snippy/Config/BaseRegisterGroups.h"
 #include "snippy/Generator/BlockGenPlanWrapperPass.h"
 #include "snippy/Generator/GeneratorContextPass.h"
 #include "snippy/Generator/SimulatorContextWrapperPass.h"
@@ -117,8 +118,7 @@ private:
   };
   size_t calculateMFSizeLimit(const MachineFunction &MF) const;
 
-  auto findSuitableBBAndContextGroup(
-      const BurstGramData::UniqueOpcodesTy &BurstGroup);
+  auto findSuitableBBAndContextGroup(const UniqueOpcodesTy &BurstGroup);
 
   size_t fillReqWithBurstGroups(size_t NumInstrsLeft, size_t NumInstrTotal);
 
@@ -433,7 +433,7 @@ static auto getRandomIndices(size_t Size) {
 // the largest number of opcodes from the group and insert the burst group in
 // this single context group.
 auto BlockGenPlanningImpl::findSuitableBBAndContextGroup(
-    const BurstGramData::UniqueOpcodesTy &BurstGroup) {
+    const UniqueOpcodesTy &BurstGroup) {
   assert(!BurstGroup.empty());
   auto MaxSuitableOpcodes = 0u;
   std::optional<std::pair<const MachineBasicBlock *,

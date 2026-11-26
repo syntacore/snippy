@@ -1,0 +1,40 @@
+# RUN: llvm-snippy %s |& FileCheck %s
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+  # COM: minimize the number of base registers left
+  reserved-regs-list: ["X([0-9]|1[0-9]|2[0-6])"]
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  base-register-groups:
+    - [LD]
+  patterns:
+    - LoadStore: "SLT * LD * SD * LB * XOR"
+    - LoadOnly: "SUB * LD * LW * LB * OR"
+
+histogram:
+  - [pattern: LoadStore, 1.0]
+  - [pattern: LoadOnly, 1.0]
+
+# CHECK: SLT
+# CHECK-NEXT: LD [[G1:\$x[0-9]+]]
+# CHECK-NEXT: SD {{.*}},
+# CHECK-NOT: [[G1]]
+# CHECK-NEXT: LB
+# CHECK-NOT: [[G1]]
+# CHECK-NEXT: XOR 
+
+# CHECK: SUB
+# CHECK-NEXT: LD [[G1:\$x[0-9]+]]
+# CHECK-NEXT: LW
+# CHECK-NOT: [[G1]]
+# CHECK-NEXT: LB
+# CHECK-NOT: [[G1]]
+# CHECK-NEXT: OR

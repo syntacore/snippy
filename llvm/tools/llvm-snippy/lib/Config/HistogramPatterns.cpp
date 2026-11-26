@@ -9,8 +9,10 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include "snippy/Config/BaseRegisterGroups.h"
 #include "snippy/Config/ConfigIOContext.h"
 #include "snippy/Config/HistogramPatterns.h"
+#include "snippy/Config/OpcodeHistogramVisitor.h"
 #include "snippy/GeneratorUtils/LLVMState.h"
 #include "snippy/Support/OpcodeCache.h"
 
@@ -350,6 +352,87 @@ yaml::SequenceTraits<snippy::HistogramPatterns>::element(
   if (Index >= Seq.NameToPattern.size())
     Seq.NameToPattern.resize(Index + 1);
   return Seq.NameToPattern[Index];
+}
+
+namespace {
+
+// Collects the opcodes referenced by the pattern trees (transitively through
+// pattern references).
+class PatternOpcodesCollector final : public snippy::HistogramVisitor {
+public:
+  void visit(const snippy::OpcodeNode &OpcNode) override {
+    Opcodes.insert(OpcNode.getNum());
+  }
+
+  std::set<unsigned> takeOpcodes() && { return std::move(Opcodes); }
+  std::set<unsigned> takeOpcodes() const & { return Opcodes; }
+
+private:
+  std::set<unsigned> Opcodes;
+};
+
+} // namespace
+
+void yaml::MappingTraits<snippy::HistogramPatternsMap>::mapping(
+    IO &IO, snippy::HistogramPatternsMap &Info) {
+  IO.mapOptional("base-register-groups", Info.BaseRegisterGroups);
+  IO.mapRequired("patterns", Info.Patterns);
+  if (IO.outputting())
+    return;
+
+  if (Info.BaseRegisterGroups.empty())
+    return;
+
+  void *Ctx = IO.getContext();
+  auto *HistPatternsCtx = static_cast<snippy::HistogramPatternsContext *>(Ctx);
+  const auto &OpCC = HistPatternsCtx->OpCC;
+  // All opcodes that appear in the defined patterns; opcodes not listed in any
+  // explicit base-register-group end up in the implicit "default" group.
+  PatternOpcodesCollector Collector;
+  for (auto &&[HistName, HistPtr] : Info.Patterns.Histograms)
+    HistPtr->accept(Collector);
+  Info.Patterns.BaseRegisterGroups = snippy::parseBaseRegisterGroups(
+      Info.BaseRegisterGroups, OpCC, std::move(Collector).takeOpcodes());
+}
+
+yaml::NodeKind yaml::PolymorphicTraits<snippy::HistogramPatternsNorm>::getKind(
+    const snippy::HistogramPatternsNorm &Norm) {
+  // When base-register-groups were specified, dump the map form; otherwise the
+  // plain list of pattern definitions.
+  const auto &BRG = Norm.Map.Patterns.BaseRegisterGroups;
+  return (BRG && !BRG->empty()) ? yaml::NodeKind::Map
+                                : yaml::NodeKind::Sequence;
+}
+
+snippy::HistogramPatternsMap &
+yaml::PolymorphicTraits<snippy::HistogramPatternsNorm>::getAsScalar(
+    snippy::HistogramPatternsNorm &Norm) {
+  Norm.IO.setError(
+      "histogram-patterns can only be a list of patterns or a map, "
+      "not a scalar");
+  return Norm.Map;
+}
+
+snippy::HistogramPatternsMap &
+yaml::PolymorphicTraits<snippy::HistogramPatternsNorm>::getAsMap(
+    snippy::HistogramPatternsNorm &Norm) {
+  snippy::HistogramPatternsMap &Info = Norm.Map;
+  if (Norm.IO.outputting())
+    return Info;
+  const auto &BRG = Info.Patterns.BaseRegisterGroups;
+  if (!BRG || BRG->empty())
+    return Info;
+  void *Ctx = Norm.IO.getContext();
+  const auto &OpCC =
+      static_cast<const snippy::HistogramPatternsContext *>(Ctx)->OpCC;
+  Info.BaseRegisterGroups = snippy::denormalizeBaseRegisterGroups(*BRG, OpCC);
+  return Info;
+}
+
+snippy::HistogramPatterns &
+yaml::PolymorphicTraits<snippy::HistogramPatternsNorm>::getAsSequence(
+    snippy::HistogramPatternsNorm &Norm) {
+  return Norm.Map.Patterns;
 }
 
 } // namespace llvm

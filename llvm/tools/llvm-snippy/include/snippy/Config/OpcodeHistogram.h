@@ -273,6 +273,8 @@ public:
 
   friend struct llvm::OpcodeHistogramNormalization;
 
+  std::optional<OpcodeGroupsTy> BaseRegisterGroups;
+
 private:
   // After any modifications to the histogram (insertions / deletions), we must
   // recalculate the weights (probabilities) for all opcodes.

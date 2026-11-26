@@ -32,6 +32,7 @@
 
 #include "llvm/ADT/SmallSet.h"
 
+#include <optional>
 #include <unordered_map>
 
 namespace llvm {

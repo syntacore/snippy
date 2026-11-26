@@ -1,4 +1,5 @@
 set(LLVMSnippyConfigSources
+    BaseRegisterGroups.cpp
     Config.cpp
     HistogramPatterns.cpp
     OpcodeHistogramNode.cpp

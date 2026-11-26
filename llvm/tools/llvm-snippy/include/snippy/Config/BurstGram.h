@@ -9,11 +9,11 @@
 #ifndef LLVM_TOOLS_LLVM_SNIPPY_CONFIG_BURSTGRAM_H
 #define LLVM_TOOLS_LLVM_SNIPPY_CONFIG_BURSTGRAM_H
 
+#include "snippy/Config/BaseRegisterGroups.h"
 #include "snippy/Config/ConfigIOContext.h"
 #include "snippy/Support/YAMLUtils.h"
 
 #include <map>
-#include <set>
 
 namespace llvm {
 
@@ -35,8 +35,6 @@ struct BurstGramData final {
   BurstMode Mode = BurstMode::Basic;
   unsigned MinSize = 0;
   unsigned MaxSize = 0;
-  using UniqueOpcodesTy = std::set<unsigned>;
-  using OpcodeGroupsTy = std::vector<UniqueOpcodesTy>;
   std::optional<OpcodeGroupsTy> Groupings = std::nullopt;
   std::optional<OpcodeGroupsTy> BaseRegisterGroups = std::nullopt;
   using OpcodeToNumGroupsTy = std::map<unsigned, unsigned>;

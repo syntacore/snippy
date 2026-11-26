@@ -38,7 +38,7 @@ static OpcodeHistogram getDummyHistogram() {
       {VSE64_V, 3.0}, {AMOADD_W, 2.0}, {LR_D, 1.0}};
 }
 
-static BurstGramData::OpcodeGroupsTy getDummyBurstGramDataGroupings() {
+static OpcodeGroupsTy getDummyBurstGramDataGroupings() {
   return {{ADD, SUB, AND},
           {MUL, DIV, REM},
           {FADD_D, FMUL_S, FSD},
@@ -46,7 +46,7 @@ static BurstGramData::OpcodeGroupsTy getDummyBurstGramDataGroupings() {
           {LD, SW, AMOADD_W}};
 }
 
-static BurstGramData::OpcodeGroupsTy getDummyBurstGramDataBaseRegisterGroups() {
+static OpcodeGroupsTy getDummyBurstGramDataBaseRegisterGroups() {
   return {{ADD, SUB, AND},
           {MUL, DIV, REM},
           {FADD_D, FMUL_S, FSD},
@@ -62,17 +62,16 @@ static OpcodeCache getOpcodeCache(const LLVMState &State) {
 // if in getBurstGramData functions some field of BurstGramData is not seted
 // explicitly it means is has a dummy value, but BurstMode has CustomMode value
 
-static BurstGramData getBurstGramData(
-    BurstMode Mode, std::optional<BurstGramData::OpcodeGroupsTy> &&Groupings,
-    std::optional<BurstGramData::OpcodeGroupsTy> &&BaseRegisterGroups) {
+static BurstGramData
+getBurstGramData(BurstMode Mode, std::optional<OpcodeGroupsTy> &&Groupings,
+                 std::optional<OpcodeGroupsTy> &&BaseRegisterGroups) {
   return BurstGramData{/*Mode=*/Mode, /*MinSize=*/13u, /*MaxSize=*/666u,
                        /*Groupings=*/std::move(Groupings),
                        /*BaseRegisterGroups=*/std::move(BaseRegisterGroups)};
 }
 
 static BurstGramData
-getBurstGramData(BurstMode Mode,
-                 std::optional<BurstGramData::OpcodeGroupsTy> OpcodesGroup) {
+getBurstGramData(BurstMode Mode, std::optional<OpcodeGroupsTy> OpcodesGroup) {
   return getBurstGramData(Mode, std::move(OpcodesGroup),
                           getDummyBurstGramDataBaseRegisterGroups());
 }
@@ -82,8 +81,8 @@ static BurstGramData getBurstGramData(BurstMode Mode) {
                           getDummyBurstGramDataBaseRegisterGroups());
 }
 
-static BurstGramData getBurstGramData(
-    std::optional<BurstGramData::OpcodeGroupsTy> BaseRegisterGroups) {
+static BurstGramData
+getBurstGramData(std::optional<OpcodeGroupsTy> BaseRegisterGroups) {
   return getBurstGramData(BurstMode::CustomBurst,
                           getDummyBurstGramDataGroupings(),
                           std::move(BaseRegisterGroups));
@@ -144,7 +143,7 @@ struct BurstGramDataConvertingToCustomModeInitData {
 
   BurstMode Mode;
 
-  BurstGramData::UniqueOpcodesTy ExpectedBurstGroup;
+  UniqueOpcodesTy ExpectedBurstGroup;
 };
 
 struct BurstGramDataConvertingToCustomMode
@@ -160,7 +159,7 @@ struct BurstGramDataConvertingToCustomMode
     BGD.convertToCustomMode(GetParam().Hist, State.getInstrInfo());
     return BGD;
   }
-  const BurstGramData::UniqueOpcodesTy &getExpectedBurstGroup() {
+  const UniqueOpcodesTy &getExpectedBurstGroup() {
     return GetParam().ExpectedBurstGroup;
   }
 };
@@ -455,8 +454,8 @@ struct BurstGramDataConvertingLoadStoreBurstToCustomModeInitData {
 
   OpcodeHistogram Hist;
 
-  BurstGramData::UniqueOpcodesTy ExpectedStoreBurstGroup;
-  BurstGramData::UniqueOpcodesTy ExpectedLoadBurstGroup;
+  UniqueOpcodesTy ExpectedStoreBurstGroup;
+  UniqueOpcodesTy ExpectedLoadBurstGroup;
 };
 
 struct BurstGramDataConvertingLoadStoreBurstToCustomMode
@@ -472,10 +471,10 @@ struct BurstGramDataConvertingLoadStoreBurstToCustomMode
     BGD.convertToCustomMode(GetParam().Hist, State.getInstrInfo());
     return BGD;
   }
-  const BurstGramData::UniqueOpcodesTy &getExpectedLoadBurstGroup() {
+  const UniqueOpcodesTy &getExpectedLoadBurstGroup() {
     return GetParam().ExpectedLoadBurstGroup;
   }
-  const BurstGramData::UniqueOpcodesTy &getExpectedStoreBurstGroup() {
+  const UniqueOpcodesTy &getExpectedStoreBurstGroup() {
     return GetParam().ExpectedStoreBurstGroup;
   }
 };
@@ -709,7 +708,7 @@ INSTANTIATE_TEST_SUITE_P(
             /*ExpectedLoadBurstGroup=*/{LB, LH, LW, LD}}));
 
 struct BurstGramDataMappingOpcodesToNumBurstGroupsInitData {
-  BurstGramData::OpcodeGroupsTy OpcodeGroups;
+  OpcodeGroupsTy OpcodeGroups;
   BurstGramData::OpcodeToNumGroupsTy ExpectedOpcodeToNumGroups;
 };
 
@@ -874,7 +873,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST(BurstGramDataAllBurstOpcodes, NulloptGroupings) {
   BurstGramData BGD =
       testing::getBurstGramData(BurstMode::CustomBurst, std::nullopt);
-  BurstGramData::UniqueOpcodesTy UniqueOpcodes = BGD.getAllBurstOpcodes();
+  UniqueOpcodesTy UniqueOpcodes = BGD.getAllBurstOpcodes();
   EXPECT_TRUE(UniqueOpcodes.empty());
 }
 
@@ -887,28 +886,26 @@ TEST(BurstGramDataOpcodeToNumBurstGroups, NulloptGroupings) {
 }
 
 struct BurstGramDataAllGroupsOpcodesInitData {
-  BurstGramData::OpcodeGroupsTy OpcodeGroups;
-  BurstGramData::UniqueOpcodesTy ExpectedAllBurstOpcodes;
+  OpcodeGroupsTy OpcodeGroups;
+  UniqueOpcodesTy ExpectedAllBurstOpcodes;
 };
 
 struct BurstGramDataAllBurstOpcodes
     : public ::testing::TestWithParam<BurstGramDataAllGroupsOpcodesInitData> {
-  BurstGramData::UniqueOpcodesTy getBurstGramDataAllBurstOpcodes() {
+  UniqueOpcodesTy getBurstGramDataAllBurstOpcodes() {
     return testing::getBurstGramData(BurstMode::CustomBurst,
                                      GetParam().OpcodeGroups)
         .getAllBurstOpcodes();
   }
 
-  const BurstGramData::UniqueOpcodesTy &getExpectedAllBurstOpcodes() {
+  const UniqueOpcodesTy &getExpectedAllBurstOpcodes() {
     return GetParam().ExpectedAllBurstOpcodes;
   }
 };
 
 TEST_P(BurstGramDataAllBurstOpcodes, NonNulloptGroupings) {
-  BurstGramData::UniqueOpcodesTy BGDAllBurstOpcodes =
-      getBurstGramDataAllBurstOpcodes();
-  const BurstGramData::UniqueOpcodesTy &ExpectedAllBurstOpcodes =
-      getExpectedAllBurstOpcodes();
+  UniqueOpcodesTy BGDAllBurstOpcodes = getBurstGramDataAllBurstOpcodes();
+  const UniqueOpcodesTy &ExpectedAllBurstOpcodes = getExpectedAllBurstOpcodes();
 
   EXPECT_EQ(BGDAllBurstOpcodes, ExpectedAllBurstOpcodes);
 }
@@ -1039,8 +1036,8 @@ struct BurstGramDataRemoveUnsupportedOpcodesInitData {
   std::string Triple;
   std::string Features;
 
-  BurstGramData::OpcodeGroupsTy PrimaryOpcodeGroups;
-  BurstGramData::OpcodeGroupsTy ExpectedGroupingsAfterRemovingUnsupported;
+  OpcodeGroupsTy PrimaryOpcodeGroups;
+  OpcodeGroupsTy ExpectedGroupingsAfterRemovingUnsupported;
 
   std::vector<std::string> ExpectedWarnings;
 };
@@ -1048,8 +1045,7 @@ struct BurstGramDataRemoveUnsupportedOpcodesInitData {
 struct BurstGramDataRemoveUnsupportedOpcodes
     : public ::testing::TestWithParam<
           BurstGramDataRemoveUnsupportedOpcodesInitData> {
-  BurstGramData::OpcodeGroupsTy
-  getBurstGramDataGroupingsWithRemovedUnusedOpcodes() {
+  OpcodeGroupsTy getBurstGramDataGroupingsWithRemovedUnusedOpcodes() {
     // Create LLVMState locally since it's not copyable, but
     // ::testing::Values requires it
     LLVMState State =
@@ -1063,8 +1059,7 @@ struct BurstGramDataRemoveUnsupportedOpcodes
     return *BGD.Groupings;
   }
 
-  const BurstGramData::OpcodeGroupsTy &
-  getExpectedGroupingAfterRemovingUnsupported() {
+  const OpcodeGroupsTy &getExpectedGroupingAfterRemovingUnsupported() {
     return GetParam().ExpectedGroupingsAfterRemovingUnsupported;
   }
 };
@@ -1087,13 +1082,13 @@ MATCHER_P(HasAllSubstrings, Substrings, "") {
 TEST_P(BurstGramDataRemoveUnsupportedOpcodes, BurstGramData) {
   ::testing::internal::CaptureStderr();
 
-  BurstGramData::OpcodeGroupsTy BGDGroupings =
+  OpcodeGroupsTy BGDGroupings =
       getBurstGramDataGroupingsWithRemovedUnusedOpcodes();
 
   EXPECT_THAT(::testing::internal::GetCapturedStderr(),
               HasAllSubstrings(GetParam().ExpectedWarnings));
 
-  const BurstGramData::OpcodeGroupsTy &ExpectedGroupings =
+  const OpcodeGroupsTy &ExpectedGroupings =
       getExpectedGroupingAfterRemovingUnsupported();
 
   EXPECT_EQ(BGDGroupings, ExpectedGroupings);
@@ -1421,8 +1416,8 @@ INSTANTIATE_TEST_SUITE_P(
 // on the state of BaseRegisterGroups and do not modify it.
 
 struct BurstGramDataIndependsOnBaseRegisterGroupsData {
-  std::optional<BurstGramData::OpcodeGroupsTy> FirstBaseRegisterGroups;
-  std::optional<BurstGramData::OpcodeGroupsTy> SecondBaseRegisterGroups;
+  std::optional<OpcodeGroupsTy> FirstBaseRegisterGroups;
+  std::optional<OpcodeGroupsTy> SecondBaseRegisterGroups;
 };
 
 struct BurstGramDataIndependsOnBaseRegisterGroups
@@ -1536,71 +1531,70 @@ INSTANTIATE_TEST_SUITE_P(
         BurstGramDataIndependsOnBaseRegisterGroupsData{
             /*FirstBaseRegisterGroups=*/std::nullopt,
             /*SecondBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{ADD, SUB, AND},
-                                          {MUL, DIV, REM},
-                                          {FADD_D, FMUL_S, FSD},
-                                          {VADD_VV, VMUL_VX, VLE32_V},
-                                          {LD, SW, AMOADD_W}}},
+            OpcodeGroupsTy{{ADD, SUB, AND},
+                           {MUL, DIV, REM},
+                           {FADD_D, FMUL_S, FSD},
+                           {VADD_VV, VMUL_VX, VLE32_V},
+                           {LD, SW, AMOADD_W}}},
 
         // First is present, second is absent
         BurstGramDataIndependsOnBaseRegisterGroupsData{
             /*FirstBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{ADD, SUB, AND},
-                                          {MUL, DIV, REM},
-                                          {FADD_D, FMUL_S, FSD},
-                                          {VADD_VV, VMUL_VX, VLE32_V},
-                                          {LD, SW, AMOADD_W}},
+            OpcodeGroupsTy{{ADD, SUB, AND},
+                           {MUL, DIV, REM},
+                           {FADD_D, FMUL_S, FSD},
+                           {VADD_VV, VMUL_VX, VLE32_V},
+                           {LD, SW, AMOADD_W}},
             /*SecondBaseRegisterGroups=*/std::nullopt},
 
         // Both are present but different
         BurstGramDataIndependsOnBaseRegisterGroupsData{
             /*FirstBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{ADD, SUB}, {MUL}},
+            OpcodeGroupsTy{{ADD, SUB}, {MUL}},
             /*SecondBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{LD, SW}, {VADD_VV}}},
+            OpcodeGroupsTy{{LD, SW}, {VADD_VV}}},
 
         // Both are present and identical
         BurstGramDataIndependsOnBaseRegisterGroupsData{
             /*FirstBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{ADD, SUB}, {MUL}},
+            OpcodeGroupsTy{{ADD, SUB}, {MUL}},
             /*SecondBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{ADD, SUB}, {MUL}}},
+            OpcodeGroupsTy{{ADD, SUB}, {MUL}}},
 
         // Both are empty containers (not nullopt, but empty)
         BurstGramDataIndependsOnBaseRegisterGroupsData{
-            /*FirstBaseRegisterGroups=*/BurstGramData::OpcodeGroupsTy{},
-            /*SecondBaseRegisterGroups=*/BurstGramData::OpcodeGroupsTy{}},
+            /*FirstBaseRegisterGroups=*/OpcodeGroupsTy{},
+            /*SecondBaseRegisterGroups=*/OpcodeGroupsTy{}},
 
         // First is empty container, second is absent
         BurstGramDataIndependsOnBaseRegisterGroupsData{
-            /*FirstBaseRegisterGroups=*/BurstGramData::OpcodeGroupsTy{},
+            /*FirstBaseRegisterGroups=*/OpcodeGroupsTy{},
             /*SecondBaseRegisterGroups=*/std::nullopt},
 
         // First is absent, second is empty container
         BurstGramDataIndependsOnBaseRegisterGroupsData{
             /*FirstBaseRegisterGroups=*/std::nullopt,
-            /*SecondBaseRegisterGroups=*/BurstGramData::OpcodeGroupsTy{}},
+            /*SecondBaseRegisterGroups=*/OpcodeGroupsTy{}},
 
         // First has groups with one opcode, second has groups with many
         BurstGramDataIndependsOnBaseRegisterGroupsData{
             /*FirstBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{ADD}, {SUB}},
+            OpcodeGroupsTy{{ADD}, {SUB}},
             /*SecondBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{AND, OR, XOR, SLL, SRL},
-                                          {LD, LB, LW, LH}}},
+            OpcodeGroupsTy{{AND, OR, XOR, SLL, SRL}, {LD, LB, LW, LH}}},
 
         // Both contain groups that are entirely unsupported
         BurstGramDataIndependsOnBaseRegisterGroupsData{
             /*FirstBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{VSETIVLI, JAL}},
+            OpcodeGroupsTy{{VSETIVLI, JAL}},
             /*SecondBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{BEQ, CM_PUSH}}},
+            OpcodeGroupsTy{{BEQ, CM_PUSH}}},
 
         // Both contain groups with a mix of supported and unsupported
         BurstGramDataIndependsOnBaseRegisterGroupsData{
             /*FirstBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{ADD, VSETIVLI}, {JAL, MUL}},
+            OpcodeGroupsTy{{ADD, VSETIVLI}, {JAL, MUL}},
             /*SecondBaseRegisterGroups=*/
-            BurstGramData::OpcodeGroupsTy{{BEQ, SUB}, {CM_PUSH, DIV}}}));
+            OpcodeGroupsTy{{BEQ, SUB}, {CM_PUSH, DIV}}}));
 
 } // namespace llvm::snippy

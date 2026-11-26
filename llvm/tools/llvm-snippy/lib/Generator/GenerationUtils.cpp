@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "snippy/Generator/GenerationUtils.h"
+#include "snippy/Config/BaseRegisterGroups.h"
 #include "snippy/Config/Config.h"
 #include "snippy/Config/RegisterAccess.h"
 #include "snippy/Generator/MemAccessInfo.h"
@@ -599,10 +600,12 @@ collectAddressRestrictions(ArrayRef<unsigned> Opcodes,
   return OpcodeToAR;
 }
 
-using BRGroupRefTy =
-    std::reference_wrapper<const BurstGramData::UniqueOpcodesTy>;
+using BRGroupRefTy = std::reference_wrapper<const UniqueOpcodesTy>;
+// Selects a base-register-group that contains the given opcode. Each opcode is
+// guaranteed to belong to at least one group because an implicit "default"
+// group of all the not-otherwise-listed opcodes is appended while parsing.
 static BRGroupRefTy
-selectBRGroupWithOpcode(const BurstGramData::OpcodeGroupsTy &BaseRegisterGroups,
+selectBRGroupWithOpcode(const OpcodeGroupsTy &BaseRegisterGroups,
                         unsigned Opcode) {
   auto DoesNotContainOpcode = [&Opcode](auto GroupRef) {
     return !GroupRef.count(Opcode);
@@ -634,27 +637,45 @@ selectBaseRegForOpcode(unsigned Opcode,
   return *ExpectedReg;
 }
 
+// Returns the base-register-groups applicable to the currently active
+// generation policy: burst groups use the base-register-groups of the burst
+// configuration, while patterns use the ones defined inside the
+// histogram-patterns section. Returns nullptr when the active policy has no
+// base-register-groups.
+static const OpcodeGroupsTy *
+getBaseRegisterGroupsForActivePolicy(const InstructionGenerationContext &IGC) {
+  if (IGC.hasCfg<BurstPolicyConfig>()) {
+    const auto &Burst = IGC.getCfg<BurstPolicyConfig>().Burst;
+    return Burst.BaseRegisterGroups ? &*Burst.BaseRegisterGroups : nullptr;
+  }
+  if (IGC.hasCfg<DefaultPolicyConfig>()) {
+    const auto &DFCfg = IGC.getCfg<DefaultPolicyConfig>();
+    auto &BaseRegGroupsOpt = DFCfg.DataFlowHistogram.BaseRegisterGroups;
+    return BaseRegGroupsOpt ? &*BaseRegGroupsOpt : nullptr;
+  }
+  llvm_unreachable("unexpected policy");
+}
+
 static std::vector<unsigned>
 generateBaseRegsForOpcodes(InstructionGenerationContext &IGC,
                            ArrayRef<unsigned> Opcodes,
                            ArrayRef<unsigned> AvailableRegs) {
   std::vector<unsigned> Res(Opcodes.size());
 
-  if (!IGC.hasCfg<BurstPolicyConfig>() ||
-      !IGC.getCfg<BurstPolicyConfig>().Burst.BaseRegisterGroups) {
+  const auto *BaseRegsGroupsPtr = getBaseRegisterGroupsForActivePolicy(IGC);
+  if (!BaseRegsGroupsPtr) {
     std::generate(Res.begin(), Res.end(), [&AvailableRegs]() {
       return RandEngine::selectFromContainer(AvailableRegs);
     });
     return Res;
   }
 
-  const auto &BaseRegsGroups =
-      *IGC.getCfg<BurstPolicyConfig>().Burst.BaseRegisterGroups;
+  const auto &BaseRegsGroups = *BaseRegsGroupsPtr;
   std::unordered_map<unsigned, BRGroupRefTy> RegToBRGroup;
   transform(Opcodes, Res.begin(), [&](auto Opcode) {
     auto Reg = selectBaseRegForOpcode(Opcode, RegToBRGroup, AvailableRegs);
-    // Bind the selected register to some base-register-group that
-    // contains this opcode
+    // Bind the selected register to some base-register-group that contains
+    // this opcode.
     if (!RegToBRGroup.count(Reg))
       RegToBRGroup.emplace(Reg,
                            selectBRGroupWithOpcode(BaseRegsGroups, Opcode));

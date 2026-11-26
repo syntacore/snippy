@@ -126,6 +126,7 @@ OpcodeHistogram OpcodeHistogramNormalization::denormalize(yaml::IO &IO) {
         Result.insertTopOpcode(Tgt.getInternalOpcode(Opc), WeightRes);
     }
   }
+  Result.BaseRegisterGroups = std::move(HistPatterns.BaseRegisterGroups);
   // Recalculate opcodes state for the fully constructed histogram
   Result.reinitOpcodesState();
   return Result;
@@ -137,9 +138,10 @@ void OpcodeHistogramNormalization::mapHistogramPatterns(yaml::IO &IO) {
   auto *ConfigIOCtx = static_cast<ConfigIOContext *>(CurrContext);
   assert(ConfigIOCtx);
   HistogramPatternsContext HistCtx(*ConfigIOCtx, HistPatterns);
+  HistogramPatternsNorm Norm(IO, HistPatterns);
   // We swap the context during mapping to access specific objects
   IO.setContext(&HistCtx);
-  IO.mapOptional("histogram-patterns", HistPatterns);
+  IO.mapOptional("histogram-patterns", Norm);
   // Return the previous context
   IO.setContext(CurrContext);
 }

@@ -1146,6 +1146,33 @@ In the example above:
       histogram:
       - [pattern: MultiHistogram, 1.0]
 
+``histogram-patterns`` can also be given as a map, where ``patterns`` holds
+the pattern definitions and one or more optional keys configure how the
+patterns are generated. Currently the only such key is
+``base-register-groups`` (see `_base_register_groups`_ for details), which
+associates a set of base-register groups with the opcodes used inside the
+patterns.
+
+The ``base-register-groups`` of ``histogram-patterns`` lets you split the
+opcodes used inside the patterns into groups. Opcodes from different groups are
+never bound to the same base register, so each group can have its own base
+register (and thus be served by a distinct memory scheme):
+
+.. code:: yaml
+
+   histogram-patterns:
+     base-register-groups:
+       - [CBO_INVAL, SW]
+       - [LW]
+     patterns:
+       - Mixed: "CBO_INVAL * LW * SW | CBO_INVAL * SW"
+
+Here ``CBO_INVAL`` and ``SW`` share a base-register group, while ``LW`` gets its
+own, so ``LW`` can never use a base register bound to ``CBO_INVAL``/``SW`` (and
+vice-versa). Opcodes used inside the patterns that are not listed in any
+explicit group are merged into a single implicit group, just like for the burst
+``base-register-groups``.
+
 .. _`_immediate_histograms`:
 
 Immediate Histograms

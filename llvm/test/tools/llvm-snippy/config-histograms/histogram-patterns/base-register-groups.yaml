@@ -1,0 +1,39 @@
+# RUN: llvm-snippy %s |& FileCheck %s
+
+# COM: We check that different base-register groups use different memory base
+# COM: registers within a single pattern
+
+options:
+  mtriple: riscv64
+  num-instrs: 1000
+  mattr: "+m"
+  dump-mf: on
+  verify-gen-histogram: on
+  histogram-must-succeed: on
+  # COM: minimize the number of base registers left
+  reserved-regs-list: ["X([0-9]|1[0-9]|2[0-8])"]
+
+include:
+  - Inputs/sections.yaml
+
+histogram-patterns:
+  base-register-groups:
+    - [LW, SW]
+    - [LB, SB]
+  patterns:
+    - LoadStore: "SLT * LW * SB * DIV | XOR * SW * LB * MUL"
+
+histogram:
+  - [pattern: LoadStore, 1.0]
+
+# CHECK: SLT
+# CHECK-NEXT: LW [[G1:\$x[0-9]+]]
+# CHECK-NEXT: SB {{.*}},
+# CHECK-NOT: [[G1]]
+# CHECK-NEXT: DIV
+
+# CHECK: XOR
+# CHECK-NEXT: SW {{.*}}, [[G1:\$x[0-9]+]]
+# CHECK-NEXT: LB
+# CHECK-NOT: [[G1]]
+# CHECK-NEXT: MUL

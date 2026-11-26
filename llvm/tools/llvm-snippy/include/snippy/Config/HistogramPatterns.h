@@ -12,8 +12,11 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/YAMLTraits.h"
 
+#include "snippy/Config/BaseRegisterGroups.h"
 #include "snippy/Config/ConfigIOContext.h"
 #include "snippy/Config/OpcodeHistogramNode.h"
 #include "snippy/Support/YAMLUtils.h"
@@ -38,6 +41,7 @@ public:
   HistogramPatterns(const HistogramPatterns &Rhs) {
     for (auto &&[HistName, HistPtr] : Rhs.Histograms)
       Histograms.insert_or_assign(HistName, HistPtr->clone());
+    BaseRegisterGroups = Rhs.BaseRegisterGroups;
   };
 
   HistogramPatterns(HistogramPatterns &&Rhs) = default;
@@ -48,6 +52,7 @@ public:
     auto Tmp = Rhs;
     NameToPattern = std::move(Tmp.NameToPattern);
     Histograms = std::move(Tmp.Histograms);
+    BaseRegisterGroups = std::move(Tmp.BaseRegisterGroups);
     return *this;
   }
 
@@ -81,6 +86,7 @@ public:
   SmallVector<HistogramPatternsEntry> NameToPattern;
   // Histogram name to its defining node
   StringMap<BaseNode::NodeHandle> Histograms;
+  std::optional<BaseRegisterGroupsTy> BaseRegisterGroups;
 
   friend class OpcodeHistogram;
 
@@ -111,12 +117,40 @@ struct HistogramPatternsContext final {
   unsigned InputCounts;
 };
 
+// The "histogram-patterns" key is polymorphic: it can be a plain list of
+// pattern definitions or a map that configures the patterns through additional
+// keys (e.g. "base-register-groups"). The exact YAML encoding is determined by
+// yaml::PolymorphicTraits below.
+struct HistogramPatternsMap final {
+  explicit HistogramPatternsMap(HistogramPatterns &Patterns)
+      : Patterns(Patterns) {}
+
+  HistogramPatterns &Patterns;
+  std::vector<SList> BaseRegisterGroups;
+};
+
+struct HistogramPatternsNorm final {
+  HistogramPatternsMap Map;
+  yaml::IO &IO;
+
+  HistogramPatternsNorm(yaml::IO &IO, HistogramPatterns &Patterns)
+      : Map(Patterns), IO(IO) {}
+};
+
 } // namespace snippy
 LLVM_SNIPPY_YAML_DECLARE_CUSTOM_MAPPING_TRAITS(snippy::HistogramPatternsEntry);
-// Using SequenceTraits for the mapping (rather than just CustomMappingTraits)
-// to maintain a clear order of defined patterns, which allows us to use a
-// previous pattern when initializing a new one.
 LLVM_SNIPPY_YAML_DECLARE_SEQUENCE_TRAITS(snippy::HistogramPatterns,
                                          snippy::HistogramPatternsEntry);
+LLVM_SNIPPY_YAML_DECLARE_MAPPING_TRAITS(snippy::HistogramPatternsMap);
+
+template <> struct yaml::PolymorphicTraits<snippy::HistogramPatternsNorm> {
+  static yaml::NodeKind getKind(const snippy::HistogramPatternsNorm &Norm);
+  static snippy::HistogramPatternsMap &
+  getAsScalar(snippy::HistogramPatternsNorm &Norm);
+  static snippy::HistogramPatternsMap &
+  getAsMap(snippy::HistogramPatternsNorm &Norm);
+  static snippy::HistogramPatterns &
+  getAsSequence(snippy::HistogramPatternsNorm &Norm);
+};
 } // namespace llvm
 #endif // LLVM_TOOLS_LLVM_SNIPPY_CONFIG_HISTOGRAMPATTERNS_H
