@@ -8,9 +8,24 @@
 
 #include "snippy/Simulator/Simulator.h"
 
+#include "snippy/Support/Error.h"
+
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/YAMLTraits.h"
 
 namespace llvm {
+
+void snippy::IRegisterState::saveAsYAMLFile(StringRef YamlPath) const {
+  if (YamlPath.empty())
+    return;
+
+  std::error_code EC;
+  raw_fd_ostream File(YamlPath, EC);
+  if (EC)
+    snippy::fatal(formatv("Register dump error: {0}", EC.message()));
+
+  saveAsYAMLFile(File);
+}
 
 namespace {
 
