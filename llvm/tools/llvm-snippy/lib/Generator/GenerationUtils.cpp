@@ -653,7 +653,7 @@ getBaseRegisterGroupsForActivePolicy(const InstructionGenerationContext &IGC) {
     auto &BaseRegGroupsOpt = DFCfg.DataFlowHistogram.BaseRegisterGroups;
     return BaseRegGroupsOpt ? &*BaseRegGroupsOpt : nullptr;
   }
-  llvm_unreachable("unexpected policy");
+  return nullptr;
 }
 
 static std::vector<unsigned>
